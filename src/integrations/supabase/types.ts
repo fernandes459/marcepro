@@ -14,7 +14,154 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      budget_items: {
+        Row: {
+          budget_id: string
+          id: string
+          labor_cost: number
+          material_cost: number
+          name: string
+          quantity: number
+          unit_price: number
+        }
+        Insert: {
+          budget_id: string
+          id?: string
+          labor_cost?: number
+          material_cost?: number
+          name: string
+          quantity?: number
+          unit_price?: number
+        }
+        Update: {
+          budget_id?: string
+          id?: string
+          labor_cost?: number
+          material_cost?: number
+          name?: string
+          quantity?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_items_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budgets: {
+        Row: {
+          client_id: string | null
+          code: string
+          created_at: string
+          final_price: number
+          id: string
+          notes: string | null
+          payment_method: string | null
+          profit_margin: number
+          project_name: string | null
+          status: string
+          total_cost: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          code: string
+          created_at?: string
+          final_price?: number
+          id?: string
+          notes?: string | null
+          payment_method?: string | null
+          profit_margin?: number
+          project_name?: string | null
+          status?: string
+          total_cost?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string | null
+          code?: string
+          created_at?: string
+          final_price?: number
+          id?: string
+          notes?: string | null
+          payment_method?: string | null
+          profit_margin?: number
+          project_name?: string | null
+          status?: string
+          total_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          address: string | null
+          budgets_count: number | null
+          cep: string | null
+          city: string | null
+          cpf_cnpj: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          neighborhood: string | null
+          phone: string
+          state: string | null
+          total_spent: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          budgets_count?: number | null
+          cep?: string | null
+          city?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          neighborhood?: string | null
+          phone: string
+          state?: string | null
+          total_spent?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          budgets_count?: number | null
+          cep?: string | null
+          city?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          neighborhood?: string | null
+          phone?: string
+          state?: string | null
+          total_spent?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
