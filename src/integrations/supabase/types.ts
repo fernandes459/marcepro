@@ -14,6 +14,102 @@ export type Database = {
   }
   public: {
     Tables: {
+      bank_accounts: {
+        Row: {
+          account_number: string | null
+          account_type: string
+          agency: string | null
+          bank_name: string | null
+          color: string | null
+          created_at: string
+          current_balance: number
+          id: string
+          initial_balance: number
+          is_main: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_number?: string | null
+          account_type?: string
+          agency?: string | null
+          bank_name?: string | null
+          color?: string | null
+          created_at?: string
+          current_balance?: number
+          id?: string
+          initial_balance?: number
+          is_main?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_number?: string | null
+          account_type?: string
+          agency?: string | null
+          bank_name?: string | null
+          color?: string | null
+          created_at?: string
+          current_balance?: number
+          id?: string
+          initial_balance?: number
+          is_main?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bank_transfers: {
+        Row: {
+          amount: number
+          created_at: string
+          date: string
+          description: string | null
+          from_account_id: string
+          id: string
+          to_account_id: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          date?: string
+          description?: string | null
+          from_account_id: string
+          id?: string
+          to_account_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          date?: string
+          description?: string | null
+          from_account_id?: string
+          id?: string
+          to_account_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transfers_from_account_id_fkey"
+            columns: ["from_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transfers_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_items: {
         Row: {
           budget_id: string
@@ -264,6 +360,7 @@ export type Database = {
       financial_transactions: {
         Row: {
           amount: number
+          bank_account_id: string | null
           budget_id: string | null
           category: string
           client_id: string | null
@@ -274,6 +371,7 @@ export type Database = {
           id: string
           is_fixed: boolean
           notes: string | null
+          order_number: string | null
           paid_date: string | null
           payment_method: string | null
           recurrence: string | null
@@ -285,6 +383,7 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          bank_account_id?: string | null
           budget_id?: string | null
           category: string
           client_id?: string | null
@@ -295,6 +394,7 @@ export type Database = {
           id?: string
           is_fixed?: boolean
           notes?: string | null
+          order_number?: string | null
           paid_date?: string | null
           payment_method?: string | null
           recurrence?: string | null
@@ -306,6 +406,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          bank_account_id?: string | null
           budget_id?: string | null
           category?: string
           client_id?: string | null
@@ -316,6 +417,7 @@ export type Database = {
           id?: string
           is_fixed?: boolean
           notes?: string | null
+          order_number?: string | null
           paid_date?: string | null
           payment_method?: string | null
           recurrence?: string | null
@@ -326,6 +428,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "financial_transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "financial_transactions_budget_id_fkey"
             columns: ["budget_id"]
