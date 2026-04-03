@@ -50,7 +50,7 @@ export default function ClientsPage() {
   // Form state
   const [form, setForm] = useState({
     name: '', phone: '', cpf_cnpj: '', email: '', cep: '',
-    address: '', neighborhood: '', city: '', state: '',
+    address: '', address_number: '', complement: '', neighborhood: '', city: '', state: '',
   });
 
   const fetchClients = async () => {
