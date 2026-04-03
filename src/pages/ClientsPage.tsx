@@ -141,7 +141,8 @@ export default function ClientsPage() {
   };
 
   const shareAddressWhatsApp = (client: Client) => {
-    const parts = [client.address, client.neighborhood, client.city, client.state].filter(Boolean);
+    const addrParts = [client.address, client.address_number].filter(Boolean).join(', ');
+    const parts = [addrParts, client.complement, client.neighborhood, client.city, client.state].filter(Boolean);
     const addressText = parts.join(', ');
     if (!addressText) {
       toast.error('Cliente sem endereço cadastrado');
