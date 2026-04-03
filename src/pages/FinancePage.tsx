@@ -760,7 +760,7 @@ export default function FinancePage() {
                 <Select value={form.bank_account_id} onValueChange={v => setForm({ ...form, bank_account_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Selecionar conta" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhuma</SelectItem>
+                    <SelectItem value="none">Nenhuma</SelectItem>
                     {bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
