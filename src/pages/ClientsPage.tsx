@@ -20,6 +20,8 @@ interface Client {
   cpf_cnpj: string | null;
   cep: string | null;
   address: string | null;
+  address_number: string | null;
+  complement: string | null;
   neighborhood: string | null;
   city: string | null;
   state: string | null;
