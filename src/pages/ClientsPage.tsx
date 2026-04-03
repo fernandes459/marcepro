@@ -124,7 +124,7 @@ export default function ClientsPage() {
       console.error(error);
     } else {
       toast.success('Cliente cadastrado com sucesso!');
-      setForm({ name: '', phone: '', cpf_cnpj: '', email: '', cep: '', address: '', neighborhood: '', city: '', state: '' });
+      setForm({ name: '', phone: '', cpf_cnpj: '', email: '', cep: '', address: '', address_number: '', complement: '', neighborhood: '', city: '', state: '' });
       setDialogOpen(false);
       fetchClients();
     }
