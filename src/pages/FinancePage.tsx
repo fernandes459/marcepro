@@ -716,7 +716,7 @@ export default function FinancePage() {
                 <Select value={form.client_id} onValueChange={v => setForm({ ...form, client_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Vincular cliente" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="none">Nenhum</SelectItem>
                     {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
