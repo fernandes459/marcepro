@@ -381,6 +381,9 @@ export default function BudgetsPage() {
                           <button onClick={() => sendWhatsApp(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Enviar WhatsApp">
                             <Send className="h-4 w-4 text-muted-foreground" />
                           </button>
+                          <button onClick={() => { /* TODO: edit */ toast.info('Edição em breve'); }} className="rounded p-1.5 hover:bg-muted transition-colors" title="Editar">
+                            <Edit className="h-4 w-4 text-muted-foreground" />
+                          </button>
                           <button onClick={() => deleteBudget(b.id)} className="rounded p-1.5 hover:bg-destructive/10 transition-colors" title="Excluir">
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </button>
