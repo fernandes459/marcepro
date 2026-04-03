@@ -713,7 +713,7 @@ export default function FinancePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Cliente</Label>
-                <Select value={form.client_id} onValueChange={v => setForm({ ...form, client_id: v })}>
+                <Select value={form.client_id || 'none'} onValueChange={v => setForm({ ...form, client_id: v === 'none' ? '' : v })}>
                   <SelectTrigger><SelectValue placeholder="Vincular cliente" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Nenhum</SelectItem>
