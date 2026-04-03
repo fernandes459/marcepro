@@ -713,10 +713,10 @@ export default function FinancePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Cliente</Label>
-                <Select value={form.client_id} onValueChange={v => setForm({ ...form, client_id: v })}>
+                <Select value={form.client_id || 'none'} onValueChange={v => setForm({ ...form, client_id: v === 'none' ? '' : v })}>
                   <SelectTrigger><SelectValue placeholder="Vincular cliente" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="none">Nenhum</SelectItem>
                     {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -757,10 +757,10 @@ export default function FinancePage() {
               </div>
               <div className="space-y-2">
                 <Label>Conta Bancária</Label>
-                <Select value={form.bank_account_id} onValueChange={v => setForm({ ...form, bank_account_id: v })}>
+                <Select value={form.bank_account_id || 'none'} onValueChange={v => setForm({ ...form, bank_account_id: v === 'none' ? '' : v })}>
                   <SelectTrigger><SelectValue placeholder="Selecionar conta" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhuma</SelectItem>
+                    <SelectItem value="none">Nenhuma</SelectItem>
                     {bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
