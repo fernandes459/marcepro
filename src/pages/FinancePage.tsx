@@ -757,7 +757,7 @@ export default function FinancePage() {
               </div>
               <div className="space-y-2">
                 <Label>Conta Bancária</Label>
-                <Select value={form.bank_account_id} onValueChange={v => setForm({ ...form, bank_account_id: v })}>
+                <Select value={form.bank_account_id || 'none'} onValueChange={v => setForm({ ...form, bank_account_id: v === 'none' ? '' : v })}>
                   <SelectTrigger><SelectValue placeholder="Selecionar conta" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Nenhuma</SelectItem>
