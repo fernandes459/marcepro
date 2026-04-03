@@ -112,6 +112,8 @@ export default function ClientsPage() {
       email: form.email || null,
       cep: form.cep || null,
       address: form.address || null,
+      address_number: form.address_number || null,
+      complement: form.complement || null,
       neighborhood: form.neighborhood || null,
       city: form.city || null,
       state: form.state || null,
