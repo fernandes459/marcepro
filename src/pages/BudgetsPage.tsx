@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Send, FileText, Loader2, Trash2 } from 'lucide-react';
+import { Plus, Search, Send, FileText, Loader2, Trash2, Edit } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -380,6 +380,9 @@ export default function BudgetsPage() {
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => sendWhatsApp(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Enviar WhatsApp">
                             <Send className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                          <button onClick={() => { /* TODO: edit */ toast.info('Edição em breve'); }} className="rounded p-1.5 hover:bg-muted transition-colors" title="Editar">
+                            <Edit className="h-4 w-4 text-muted-foreground" />
                           </button>
                           <button onClick={() => deleteBudget(b.id)} className="rounded p-1.5 hover:bg-destructive/10 transition-colors" title="Excluir">
                             <Trash2 className="h-4 w-4 text-destructive" />

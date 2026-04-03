@@ -20,6 +20,8 @@ interface Client {
   cpf_cnpj: string | null;
   cep: string | null;
   address: string | null;
+  address_number: string | null;
+  complement: string | null;
   neighborhood: string | null;
   city: string | null;
   state: string | null;
@@ -48,7 +50,7 @@ export default function ClientsPage() {
   // Form state
   const [form, setForm] = useState({
     name: '', phone: '', cpf_cnpj: '', email: '', cep: '',
-    address: '', neighborhood: '', city: '', state: '',
+    address: '', address_number: '', complement: '', neighborhood: '', city: '', state: '',
   });
 
   const fetchClients = async () => {
@@ -110,6 +112,8 @@ export default function ClientsPage() {
       email: form.email || null,
       cep: form.cep || null,
       address: form.address || null,
+      address_number: form.address_number || null,
+      complement: form.complement || null,
       neighborhood: form.neighborhood || null,
       city: form.city || null,
       state: form.state || null,
@@ -120,7 +124,7 @@ export default function ClientsPage() {
       console.error(error);
     } else {
       toast.success('Cliente cadastrado com sucesso!');
-      setForm({ name: '', phone: '', cpf_cnpj: '', email: '', cep: '', address: '', neighborhood: '', city: '', state: '' });
+      setForm({ name: '', phone: '', cpf_cnpj: '', email: '', cep: '', address: '', address_number: '', complement: '', neighborhood: '', city: '', state: '' });
       setDialogOpen(false);
       fetchClients();
     }
@@ -137,7 +141,8 @@ export default function ClientsPage() {
   };
 
   const shareAddressWhatsApp = (client: Client) => {
-    const parts = [client.address, client.neighborhood, client.city, client.state].filter(Boolean);
+    const addrParts = [client.address, client.address_number].filter(Boolean).join(', ');
+    const parts = [addrParts, client.complement, client.neighborhood, client.city, client.state].filter(Boolean);
     const addressText = parts.join(', ');
     if (!addressText) {
       toast.error('Cliente sem endereço cadastrado');
@@ -217,9 +222,19 @@ export default function ClientsPage() {
                   <Input placeholder="Bairro" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Endereço</Label>
-                <Input placeholder="Rua, nº" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2 col-span-1">
+                  <Label>Endereço</Label>
+                  <Input placeholder="Rua" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Número</Label>
+                  <Input placeholder="Nº" value={form.address_number} onChange={(e) => setForm({ ...form, address_number: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Complemento</Label>
+                  <Input placeholder="Bloco, Apto..." value={form.complement} onChange={(e) => setForm({ ...form, complement: e.target.value })} />
+                </div>
               </div>
 
               <Button type="submit" className="w-full gradient-primary shadow-primary border-0" disabled={saving}>

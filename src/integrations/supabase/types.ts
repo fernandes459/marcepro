@@ -207,9 +207,11 @@ export type Database = {
       clients: {
         Row: {
           address: string | null
+          address_number: string | null
           budgets_count: number | null
           cep: string | null
           city: string | null
+          complement: string | null
           cpf_cnpj: string | null
           created_at: string
           email: string | null
@@ -224,9 +226,11 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_number?: string | null
           budgets_count?: number | null
           cep?: string | null
           city?: string | null
+          complement?: string | null
           cpf_cnpj?: string | null
           created_at?: string
           email?: string | null
@@ -241,9 +245,11 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_number?: string | null
           budgets_count?: number | null
           cep?: string | null
           city?: string | null
+          complement?: string | null
           cpf_cnpj?: string | null
           created_at?: string
           email?: string | null
