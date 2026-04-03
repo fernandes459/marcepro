@@ -222,9 +222,19 @@ export default function ClientsPage() {
                   <Input placeholder="Bairro" value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Endereço</Label>
-                <Input placeholder="Rua, nº" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2 col-span-1">
+                  <Label>Endereço</Label>
+                  <Input placeholder="Rua" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Número</Label>
+                  <Input placeholder="Nº" value={form.address_number} onChange={(e) => setForm({ ...form, address_number: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Complemento</Label>
+                  <Input placeholder="Bloco, Apto..." value={form.complement} onChange={(e) => setForm({ ...form, complement: e.target.value })} />
+                </div>
               </div>
 
               <Button type="submit" className="w-full gradient-primary shadow-primary border-0" disabled={saving}>
