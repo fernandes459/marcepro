@@ -35,6 +35,7 @@ export function CurrencyInput({ value, onChange, placeholder = 'R$ 0,00', classN
       <Input
         value={display}
         onChange={(e) => handleChange(e.target.value)}
+        onFocus={(e) => e.target.select()}
         placeholder={placeholder}
         className={`pl-10 ${className || ''}`}
         disabled={disabled}
