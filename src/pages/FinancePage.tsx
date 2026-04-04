@@ -102,14 +102,7 @@ export default function FinancePage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
 
-  const emptyForm = {
-    type: 'expense' as string, category: '', description: '', amount: 0,
-    date: new Date().toISOString().slice(0, 10), due_date: '', status: 'pending',
-    is_fixed: false, payment_method: '', recurrence: 'none', notes: '',
-    client_id: '', order_number: '', bank_account_id: '',
-  };
-  const [form, setForm] = useState(emptyForm);
-
+  const emptyForm = { type: 'expense' as string };
   const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
 
