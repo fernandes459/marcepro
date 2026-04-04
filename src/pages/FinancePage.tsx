@@ -265,7 +265,7 @@ export default function FinancePage() {
     return { revenue, fixedExp, varExp, totalExp: fixedExp + varExp, profit: revenue - fixedExp - varExp, byCategory };
   }, [transactions]);
 
-  const categories = form.type === 'income' ? incomeCategories : expenseCategories;
+  
 
   const kpis = [
     { title: 'Receita Total', value: formatBRL(totalIncome), icon: TrendingUp, positive: true },
