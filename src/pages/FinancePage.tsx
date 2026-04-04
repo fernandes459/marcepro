@@ -21,6 +21,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
+import { TransactionDialog } from '@/components/finance/TransactionDialog';
 
 interface Transaction {
   id: string;
@@ -101,14 +102,7 @@ export default function FinancePage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
 
-  const emptyForm = {
-    type: 'expense' as string, category: '', description: '', amount: 0,
-    date: new Date().toISOString().slice(0, 10), due_date: '', status: 'pending',
-    is_fixed: false, payment_method: '', recurrence: 'none', notes: '',
-    client_id: '', order_number: '', bank_account_id: '',
-  };
-  const [form, setForm] = useState(emptyForm);
-
+  
   const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
 
@@ -136,19 +130,6 @@ export default function FinancePage() {
     });
   }, [transactions]);
 
-  async function handleSave() {
-    if (!form.category || !form.description || !form.amount) { toast.error('Preencha os campos obrigatórios'); return; }
-    const { error } = await supabase.from('financial_transactions').insert({
-      user_id: user!.id, type: form.type, category: form.category, description: form.description,
-      amount: form.amount, date: form.date, due_date: form.due_date || null, status: form.status,
-      is_fixed: form.is_fixed, payment_method: form.payment_method || null, recurrence: form.recurrence,
-      notes: form.notes || null, client_id: form.client_id || null, order_number: form.order_number || null,
-      bank_account_id: form.bank_account_id || null,
-    } as any);
-    if (error) { toast.error('Erro ao salvar'); console.error(error); return; }
-    toast.success('Lançamento criado!');
-    setDialogOpen(false); setForm(emptyForm); fetchAll();
-  }
 
   async function handleSaveBank() {
     if (!bankForm.name) { toast.error('Nome da conta é obrigatório'); return; }
@@ -284,7 +265,7 @@ export default function FinancePage() {
     return { revenue, fixedExp, varExp, totalExp: fixedExp + varExp, profit: revenue - fixedExp - varExp, byCategory };
   }, [transactions]);
 
-  const categories = form.type === 'income' ? incomeCategories : expenseCategories;
+  
 
   const kpis = [
     { title: 'Receita Total', value: formatBRL(totalIncome), icon: TrendingUp, positive: true },
@@ -307,7 +288,7 @@ export default function FinancePage() {
           <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
             <ArrowRightLeft className="h-4 w-4 mr-2" /> Transferir
           </Button>
-          <Button className="gradient-primary shadow-primary border-0" onClick={() => { setForm(emptyForm); setDialogOpen(true); }}>
+          <Button className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Novo Lançamento
           </Button>
         </div>
@@ -695,130 +676,14 @@ export default function FinancePage() {
       </Tabs>
 
       {/* New Transaction Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-display">Novo Lançamento</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Button variant={form.type === 'income' ? 'default' : 'outline'} className={form.type === 'income' ? 'flex-1 gradient-primary border-0' : 'flex-1'} onClick={() => setForm({ ...form, type: 'income', category: '' })}>
-                <ArrowUpRight className="h-4 w-4 mr-1" /> Receita
-              </Button>
-              <Button variant={form.type === 'expense' ? 'default' : 'outline'} className={form.type === 'expense' ? 'flex-1 bg-destructive text-destructive-foreground border-0' : 'flex-1'} onClick={() => setForm({ ...form, type: 'expense', category: '' })}>
-                <ArrowDownRight className="h-4 w-4 mr-1" /> Despesa
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Cliente</Label>
-                <Select value={form.client_id || 'none'} onValueChange={v => setForm({ ...form, client_id: v === 'none' ? '' : v })}>
-                  <SelectTrigger><SelectValue placeholder="Vincular cliente" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum</SelectItem>
-                    {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Ordem de Serviço</Label>
-                <Input value={form.order_number} onChange={e => setForm({ ...form, order_number: e.target.value })} placeholder="Ex: OS-001" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Categoria *</Label>
-              <Select value={form.category} onValueChange={v => setForm({ ...form, category: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecionar categoria" /></SelectTrigger>
-                <SelectContent>
-                  {categories.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Descrição *</Label>
-              <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Ex: Pagamento MDF" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Valor *</Label>
-                <CurrencyInput value={form.amount} onChange={v => setForm({ ...form, amount: v })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Data</Label>
-                <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Vencimento</Label>
-                <Input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Conta Bancária</Label>
-                <Select value={form.bank_account_id || 'none'} onValueChange={v => setForm({ ...form, bank_account_id: v === 'none' ? '' : v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecionar conta" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhuma</SelectItem>
-                    {bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Forma de Pagamento</Label>
-              <Select value={form.payment_method} onValueChange={v => setForm({ ...form, payment_method: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="cash">Dinheiro</SelectItem>
-                  <SelectItem value="credit">Cartão Crédito</SelectItem>
-                  <SelectItem value="debit">Cartão Débito</SelectItem>
-                  <SelectItem value="transfer">Transferência</SelectItem>
-                  <SelectItem value="boleto">Boleto</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Switch checked={form.is_fixed} onCheckedChange={v => setForm({ ...form, is_fixed: v })} />
-                <Label className="text-sm">Despesa Fixa (recorrente)</Label>
-              </div>
-            </div>
-            {form.is_fixed && (
-              <div className="space-y-2">
-                <Label>Recorrência</Label>
-                <Select value={form.recurrence} onValueChange={v => setForm({ ...form, recurrence: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="monthly">Mensal</SelectItem>
-                    <SelectItem value="weekly">Semanal</SelectItem>
-                    <SelectItem value="yearly">Anual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="paid">Pago</SelectItem>
-                  <SelectItem value="overdue">Vencido</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Observações</Label>
-              <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Notas adicionais..." />
-            </div>
-            <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleSave}>Salvar Lançamento</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TransactionDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        userId={user!.id}
+        clients={clients}
+        bankAccounts={bankAccounts}
+        onSaved={fetchAll}
+      />
 
       {/* Bank Account Dialog */}
       <Dialog open={bankDialogOpen} onOpenChange={setBankDialogOpen}>
