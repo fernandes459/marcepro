@@ -130,19 +130,6 @@ export default function FinancePage() {
     });
   }, [transactions]);
 
-  async function handleSave() {
-    if (!form.category || !form.description || !form.amount) { toast.error('Preencha os campos obrigatórios'); return; }
-    const { error } = await supabase.from('financial_transactions').insert({
-      user_id: user!.id, type: form.type, category: form.category, description: form.description,
-      amount: form.amount, date: form.date, due_date: form.due_date || null, status: form.status,
-      is_fixed: form.is_fixed, payment_method: form.payment_method || null, recurrence: form.recurrence,
-      notes: form.notes || null, client_id: form.client_id || null, order_number: form.order_number || null,
-      bank_account_id: form.bank_account_id || null,
-    } as any);
-    if (error) { toast.error('Erro ao salvar'); console.error(error); return; }
-    toast.success('Lançamento criado!');
-    setDialogOpen(false); setForm(emptyForm); fetchAll();
-  }
 
   async function handleSaveBank() {
     if (!bankForm.name) { toast.error('Nome da conta é obrigatório'); return; }
