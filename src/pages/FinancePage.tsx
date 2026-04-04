@@ -288,7 +288,7 @@ export default function FinancePage() {
           <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
             <ArrowRightLeft className="h-4 w-4 mr-2" /> Transferir
           </Button>
-          <Button className="gradient-primary shadow-primary border-0" onClick={() => { setForm(emptyForm); setDialogOpen(true); }}>
+          <Button className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Novo Lançamento
           </Button>
         </div>
