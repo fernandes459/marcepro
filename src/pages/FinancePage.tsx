@@ -21,6 +21,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
+import { TransactionDialog } from '@/components/finance/TransactionDialog';
 
 interface Transaction {
   id: string;
