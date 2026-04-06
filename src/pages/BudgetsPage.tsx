@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Send, FileText, Loader2, Trash2, Edit } from 'lucide-react';
+import {
+  Plus, Search, Send, FileText, Loader2, Trash2, Edit, CheckCircle, XCircle,
+  Factory, Download, MessageSquare, ChevronDown, Settings2,
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,21 +12,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
+import { generateBudgetPdf, defaultContractClauses } from '@/components/finance/BudgetPdfGenerator';
 
 interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; }
-interface Client { id: string; name: string; phone: string; email: string | null; city: string | null; cpf_cnpj: string | null; address: string | null; neighborhood: string | null; state: string | null; cep: string | null; }
-interface Budget { id: string; code: string; client_id: string | null; project_name: string | null; status: string; total_cost: number; profit_margin: number; final_price: number; payment_method: string | null; notes: string | null; created_at: string; clients?: Client | null; }
+interface Client {
+  id: string; name: string; phone: string; email: string | null; city: string | null;
+  cpf_cnpj: string | null; address: string | null; neighborhood: string | null;
+  state: string | null; cep: string | null; address_number: string | null; complement: string | null;
+}
+interface Budget {
+  id: string; code: string; client_id: string | null; project_name: string | null;
+  status: string; total_cost: number; profit_margin: number; final_price: number;
+  payment_method: string | null; notes: string | null; created_at: string;
+  clients?: Client | null;
+}
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   draft: { label: 'Rascunho', className: 'bg-muted text-muted-foreground' },
   pending: { label: 'Pendente', className: 'bg-warning/10 text-warning' },
   approved: { label: 'Aprovado', className: 'bg-success/10 text-success' },
   rejected: { label: 'Rejeitado', className: 'bg-destructive/10 text-destructive' },
+  in_production: { label: 'Em Produção', className: 'bg-info/10 text-info' },
 };
 
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -61,14 +77,19 @@ export default function BudgetsPage() {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
+  const [deliveryDays, setDeliveryDays] = useState(30);
+  const [contractClauses, setContractClauses] = useState<string[]>([...defaultContractClauses]);
+  const [newClause, setNewClause] = useState('');
+  const [enabledClauses, setEnabledClauses] = useState<boolean[]>(defaultContractClauses.map(() => true));
+  const [companySettings, setCompanySettings] = useState<any>(null);
 
   const [selectedClientId, setSelectedClientId] = useState('');
   const [projectName, setProjectName] = useState('');
   const [notes, setNotes] = useState('');
   const [margin, setMargin] = useState(40);
   const [items, setItems] = useState<BudgetItem[]>([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
-
-  // Advanced payment
   const [useAdvancedPayment, setUseAdvancedPayment] = useState(false);
   const [downPayment, setDownPayment] = useState(0);
   const [downPaymentMethod, setDownPaymentMethod] = useState('pix');
@@ -78,12 +99,14 @@ export default function BudgetsPage() {
   const [simplePaymentMethod, setSimplePaymentMethod] = useState('');
 
   const fetchData = async () => {
-    const [budgetsRes, clientsRes] = await Promise.all([
-      supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep)').order('created_at', { ascending: false }),
+    const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
+      supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
+      supabase.from('company_settings').select('*').limit(1).maybeSingle(),
     ]);
     if (budgetsRes.data) setBudgets(budgetsRes.data as any);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
+    if (settingsRes.data) setCompanySettings(settingsRes.data);
     setLoading(false);
   };
 
@@ -101,8 +124,6 @@ export default function BudgetsPage() {
   const totalCost = totalMaterial + totalLabor;
   const profit = totalCost * (margin / 100);
   const finalPrice = totalCost + profit;
-
-  // Advanced payment calcs
   const remaining = finalPrice - downPayment;
   const machineDiscountAmount = remaining * (machineDiscount / 100);
   const installmentValue = installments > 0 ? (remaining + machineDiscountAmount) / installments : 0;
@@ -134,22 +155,18 @@ export default function BudgetsPage() {
     if (!user || !selectedClientId) { toast.error('Selecione um cliente'); return; }
     setSaving(true);
     const paymentDesc = buildPaymentDescription();
-
     const { data: budgetData, error: budgetError } = await supabase.from('budgets').insert({
       user_id: user.id, client_id: selectedClientId, code: 'TEMP',
       project_name: projectName || null, status: 'draft',
       total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
       payment_method: paymentDesc || null, notes: notes || null,
     } as any).select().single();
-
-    if (budgetError || !budgetData) { toast.error('Erro ao criar orçamento'); console.error(budgetError); setSaving(false); return; }
-
+    if (budgetError || !budgetData) { toast.error('Erro ao criar orçamento'); setSaving(false); return; }
     const budgetItems = items.filter(i => i.name.trim()).map(i => ({
       budget_id: (budgetData as any).id, name: i.name, quantity: i.quantity,
       material_cost: i.materialCost, labor_cost: i.laborCost, unit_price: i.unitPrice,
     }));
     if (budgetItems.length > 0) await supabase.from('budget_items').insert(budgetItems as any);
-
     toast.success('Orçamento criado com sucesso!');
     setDialogOpen(false); resetForm(); fetchData(); setSaving(false);
   };
@@ -173,6 +190,84 @@ export default function BudgetsPage() {
   const deleteBudget = async (id: string) => {
     const { error } = await supabase.from('budgets').delete().eq('id', id);
     if (error) toast.error('Erro ao excluir'); else { toast.success('Excluído'); fetchData(); }
+  };
+
+  const updateBudgetStatus = async (id: string, status: string) => {
+    const { error } = await supabase.from('budgets').update({ status } as any).eq('id', id);
+    if (error) { toast.error('Erro ao atualizar status'); return; }
+    toast.success(`Status atualizado para ${statusConfig[status]?.label || status}`);
+    fetchData();
+  };
+
+  const sendToProduction = async (budget: Budget) => {
+    const client = budget.clients as Client | null;
+    if (!client) { toast.error('Orçamento sem cliente vinculado'); return; }
+    const { error } = await supabase.from('production_tasks').insert({
+      user_id: user!.id,
+      project_name: budget.project_name || budget.code,
+      client_name: client.name,
+      budget_id: budget.id,
+      stage: 'corte',
+      priority: 'normal',
+      notes: `Orçamento: ${budget.code} - ${formatBRL(budget.final_price)}`,
+    });
+    if (error) { toast.error('Erro ao enviar para produção'); return; }
+    await updateBudgetStatus(budget.id, 'in_production');
+    toast.success('Enviado para produção!');
+  };
+
+  const openPdfDialog = async (budget: Budget) => {
+    setSelectedBudget(budget);
+    setContractClauses([...defaultContractClauses]);
+    setEnabledClauses(defaultContractClauses.map(() => true));
+    setDeliveryDays(30);
+    setPdfDialogOpen(true);
+  };
+
+  const handleGeneratePdf = async () => {
+    if (!selectedBudget) return;
+    const client = selectedBudget.clients as Client | null;
+    const { data: budgetItems } = await supabase.from('budget_items').select('*').eq('budget_id', selectedBudget.id);
+    const activeClauses = contractClauses.filter((_, i) => enabledClauses[i]);
+
+    generateBudgetPdf({
+      code: selectedBudget.code,
+      projectName: selectedBudget.project_name,
+      finalPrice: selectedBudget.final_price,
+      totalCost: selectedBudget.total_cost,
+      profitMargin: selectedBudget.profit_margin,
+      paymentMethod: selectedBudget.payment_method,
+      notes: selectedBudget.notes,
+      createdAt: selectedBudget.created_at,
+      deliveryDays,
+      client: client ? {
+        name: client.name, phone: client.phone, email: client.email,
+        cpf_cnpj: client.cpf_cnpj, address: client.address,
+        address_number: client.address_number, complement: client.complement,
+        neighborhood: client.neighborhood, city: client.city,
+        state: client.state, cep: client.cep,
+      } : null,
+      items: (budgetItems || []).map((i: any) => ({ name: i.name, quantity: i.quantity, unit_price: i.unit_price })),
+      companyName: companySettings?.company_name,
+      companyCnpj: companySettings?.cnpj,
+      companyPhone: companySettings?.phone,
+      companyEmail: companySettings?.email,
+      companyAddress: companySettings?.address,
+      contractClauses: activeClauses,
+    });
+    setPdfDialogOpen(false);
+  };
+
+  const addCustomClause = () => {
+    if (!newClause.trim()) return;
+    setContractClauses([...contractClauses, newClause.trim()]);
+    setEnabledClauses([...enabledClauses, true]);
+    setNewClause('');
+  };
+
+  const removeClause = (idx: number) => {
+    setContractClauses(contractClauses.filter((_, i) => i !== idx));
+    setEnabledClauses(enabledClauses.filter((_, i) => i !== idx));
   };
 
   return (
@@ -202,13 +297,10 @@ export default function BudgetsPage() {
                   <Input placeholder="Ex: Cozinha Planejada" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label>Margem de Lucro (%)</Label>
                 <Input type="number" value={margin} onChange={(e) => setMargin(Number(e.target.value))} className="max-w-[120px]" />
               </div>
-
-              {/* Items */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold">Itens do Orçamento</Label>
@@ -224,8 +316,6 @@ export default function BudgetsPage() {
                   </div>
                 ))}
               </div>
-
-              {/* Calculator */}
               <Card className="bg-accent/30 border-accent">
                 <CardContent className="p-4 space-y-2">
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Material</span><span className="font-medium">{formatBRL(totalMaterial)}</span></div>
@@ -238,8 +328,6 @@ export default function BudgetsPage() {
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Payment */}
               <div className="space-y-4 border border-border rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold">Forma de Pagamento</Label>
@@ -248,7 +336,6 @@ export default function BudgetsPage() {
                     <Switch checked={useAdvancedPayment} onCheckedChange={setUseAdvancedPayment} />
                   </div>
                 </div>
-
                 {!useAdvancedPayment ? (
                   <Select value={simplePaymentMethod} onValueChange={setSimplePaymentMethod}>
                     <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
@@ -259,22 +346,14 @@ export default function BudgetsPage() {
                       <SelectItem value="Cartão Débito">Cartão Débito</SelectItem>
                       <SelectItem value="Boleto">Boleto</SelectItem>
                       <SelectItem value="Transferência">Transferência</SelectItem>
-                      <SelectItem value="2x Cartão">2x Cartão</SelectItem>
-                      <SelectItem value="3x Cartão">3x Cartão</SelectItem>
-                      <SelectItem value="6x Cartão">6x Cartão</SelectItem>
-                      <SelectItem value="10x Cartão">10x Cartão</SelectItem>
-                      <SelectItem value="12x Cartão">12x Cartão</SelectItem>
+                      {[2,3,6,10,12].map(n => <SelectItem key={n} value={`${n}x Cartão`}>{n}x Cartão</SelectItem>)}
                     </SelectContent>
                   </Select>
                 ) : (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-xs">Entrada</Label>
-                        <CurrencyInput value={downPayment} onChange={setDownPayment} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Método da Entrada</Label>
+                      <div className="space-y-2"><Label className="text-xs">Entrada</Label><CurrencyInput value={downPayment} onChange={setDownPayment} /></div>
+                      <div className="space-y-2"><Label className="text-xs">Método da Entrada</Label>
                         <Select value={downPaymentMethod} onValueChange={setDownPaymentMethod}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -286,17 +365,13 @@ export default function BudgetsPage() {
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-xs">Parcelas</Label>
+                      <div className="space-y-2"><Label className="text-xs">Parcelas</Label>
                         <Select value={String(installments)} onValueChange={v => setInstallments(Number(v))}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <SelectItem key={n} value={String(n)}>{n}x</SelectItem>)}
-                          </SelectContent>
+                          <SelectContent>{[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <SelectItem key={n} value={String(n)}>{n}x</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Método</Label>
+                      <div className="space-y-2"><Label className="text-xs">Método</Label>
                         <Select value={installmentMethod} onValueChange={setInstallmentMethod}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -306,29 +381,22 @@ export default function BudgetsPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Taxa Maquininha (%)</Label>
+                      <div className="space-y-2"><Label className="text-xs">Taxa Maquininha (%)</Label>
                         <Input type="number" step="0.1" value={machineDiscount || ''} onChange={e => setMachineDiscount(Number(e.target.value))} placeholder="0" />
                       </div>
                     </div>
-                    {/* Preview */}
                     <Card className="bg-muted/50">
                       <CardContent className="p-3 space-y-1 text-sm">
                         {downPayment > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Entrada ({downPaymentMethod === 'pix' ? 'PIX' : downPaymentMethod})</span><span className="font-medium">{formatBRL(downPayment)}</span></div>}
                         <div className="flex justify-between"><span className="text-muted-foreground">Restante</span><span className="font-medium">{formatBRL(remaining)}</span></div>
-                        {machineDiscount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Taxa maquininha ({machineDiscount}%)</span><span className="font-medium text-destructive">+{formatBRL(machineDiscountAmount)}</span></div>}
+                        {machineDiscount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Taxa ({machineDiscount}%)</span><span className="font-medium text-destructive">+{formatBRL(machineDiscountAmount)}</span></div>}
                         <div className="flex justify-between border-t border-border pt-1"><span className="font-semibold">{installments}x de</span><span className="font-bold">{formatBRL(installmentValue)}</span></div>
                       </CardContent>
                     </Card>
                   </div>
                 )}
               </div>
-
-              <div className="space-y-2">
-                <Label>Observações</Label>
-                <Textarea placeholder="Notas sobre o orçamento..." value={notes} onChange={(e) => setNotes(e.target.value)} />
-              </div>
-
+              <div className="space-y-2"><Label>Observações</Label><Textarea placeholder="Notas sobre o orçamento..." value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
               <Button type="submit" className="w-full gradient-primary shadow-primary border-0" disabled={saving}>
                 {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 <FileText className="h-4 w-4 mr-2" /> Salvar Orçamento
@@ -354,34 +422,50 @@ export default function BudgetsPage() {
                   <tr className="border-b border-border bg-muted/30">
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Código</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Projeto</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cliente</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pagamento</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Preço Final</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Cliente</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Preço</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum orçamento encontrado</td></tr>
+                    <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum orçamento encontrado</td></tr>
                   ) : filtered.map((b) => (
                     <motion.tr key={b.id} variants={itemVariants} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 text-sm font-mono font-medium">{b.code}</td>
                       <td className="px-4 py-3 text-sm">{b.project_name || '—'}</td>
-                      <td className="px-4 py-3 text-sm font-medium">{(b.clients as any)?.name || '—'}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground max-w-[180px] truncate">{b.payment_method || '—'}</td>
+                      <td className="px-4 py-3 text-sm font-medium hidden sm:table-cell">{(b.clients as any)?.name || '—'}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold">{formatBRL(b.final_price)}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusConfig[b.status]?.className || ''}`}>
                           {statusConfig[b.status]?.label || b.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => sendWhatsApp(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Enviar WhatsApp">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1 flex-wrap">
+                          {(b.status === 'draft' || b.status === 'pending') && (
+                            <Button size="sm" variant="ghost" className="h-7 text-xs text-success" onClick={() => updateBudgetStatus(b.id, 'approved')} title="Aprovar">
+                              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Aprovar
+                            </Button>
+                          )}
+                          {(b.status === 'draft' || b.status === 'pending') && (
+                            <button onClick={() => updateBudgetStatus(b.id, 'rejected')} className="rounded p-1.5 hover:bg-destructive/10 transition-colors" title="Rejeitar">
+                              <XCircle className="h-4 w-4 text-destructive" />
+                            </button>
+                          )}
+                          {b.status === 'approved' && (
+                            <Button size="sm" variant="ghost" className="h-7 text-xs text-info" onClick={() => sendToProduction(b)} title="Enviar para Produção">
+                              <Factory className="h-3.5 w-3.5 mr-1" /> Produzir
+                            </Button>
+                          )}
+                          <button onClick={() => openPdfDialog(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Gerar PDF">
+                            <Download className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                          <button onClick={() => sendWhatsApp(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp">
                             <Send className="h-4 w-4 text-muted-foreground" />
                           </button>
-                          <button onClick={() => { /* TODO: edit */ toast.info('Edição em breve'); }} className="rounded p-1.5 hover:bg-muted transition-colors" title="Editar">
+                          <button onClick={() => { toast.info('Edição em breve'); }} className="rounded p-1.5 hover:bg-muted transition-colors" title="Editar">
                             <Edit className="h-4 w-4 text-muted-foreground" />
                           </button>
                           <button onClick={() => deleteBudget(b.id)} className="rounded p-1.5 hover:bg-destructive/10 transition-colors" title="Excluir">
@@ -397,6 +481,64 @@ export default function BudgetsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* PDF / Contract Dialog */}
+      <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" /> Gerar PDF — Orçamento / Contrato
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label>Prazo de Entrega (dias úteis)</Label>
+              <Input type="number" value={deliveryDays} onChange={e => setDeliveryDays(Number(e.target.value))} className="max-w-[150px]" />
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold flex items-center gap-2">
+                  <Settings2 className="h-4 w-4" /> Cláusulas do Contrato
+                </Label>
+              </div>
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                {contractClauses.map((clause, idx) => (
+                  <div key={idx} className="flex items-start gap-2 rounded-lg bg-muted/50 p-3">
+                    <Checkbox
+                      checked={enabledClauses[idx]}
+                      onCheckedChange={(checked) => {
+                        const newEnabled = [...enabledClauses];
+                        newEnabled[idx] = checked === true;
+                        setEnabledClauses(newEnabled);
+                      }}
+                      className="mt-0.5"
+                    />
+                    <p className={`text-xs flex-1 ${!enabledClauses[idx] ? 'line-through text-muted-foreground' : ''}`}>{clause}</p>
+                    <button onClick={() => removeClause(idx)} className="text-muted-foreground hover:text-destructive shrink-0">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Adicionar nova cláusula..."
+                  value={newClause}
+                  onChange={e => setNewClause(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomClause(); } }}
+                  className="text-xs"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={addCustomClause}><Plus className="h-3 w-3" /></Button>
+              </div>
+            </div>
+
+            <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleGeneratePdf}>
+              <Download className="h-4 w-4 mr-2" /> Gerar PDF do Orçamento + Contrato
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
