@@ -32,6 +32,19 @@ interface BudgetPdfData {
   contractClauses: string[];
 }
 
+function addBusinessDays(startDate: Date, numDays: number): Date {
+  const result = new Date(startDate);
+  let added = 0;
+  while (added < numDays) {
+    result.setDate(result.getDate() + 1);
+    const day = result.getDay();
+    if (day !== 0 && day !== 6) {
+      added++;
+    }
+  }
+  return result;
+}
+
 export function generateBudgetPdf(data: BudgetPdfData): void {
   const clientAddress = data.client ? [
     data.client.address,
@@ -41,6 +54,11 @@ export function generateBudgetPdf(data: BudgetPdfData): void {
     data.client.city && data.client.state ? `${data.client.city}/${data.client.state}` : data.client.city,
     data.client.cep ? `CEP: ${data.client.cep}` : '',
   ].filter(Boolean).join(', ') : '';
+
+  // Calculate delivery date based on business days
+  const startDate = new Date(data.createdAt);
+  const deliveryDate = addBusinessDays(startDate, data.deliveryDays);
+  const deliveryDateFormatted = deliveryDate.toLocaleDateString('pt-BR');
 
   const itemsHtml = data.items.map((item, i) => `
     <tr>
@@ -63,10 +81,12 @@ export function generateBudgetPdf(data: BudgetPdfData): void {
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Orçamento ${data.code}</title>
   <style>
-    @page { size: A4; margin: 20mm; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1f2e; margin: 0; padding: 20px; }
+    @page { size: A4; margin: 15mm; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1f2e; margin: 0; padding: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #e07a3a; padding-bottom: 16px; margin-bottom: 24px; }
     .company-name { font-size: 24px; font-weight: 800; color: #e07a3a; }
     .doc-title { font-size: 20px; font-weight: 700; color: #1a1f2e; text-align: right; }
@@ -86,6 +106,10 @@ export function generateBudgetPdf(data: BudgetPdfData): void {
     table { width: 100%; border-collapse: collapse; }
     th { background: #1a1f2e; color: white; padding: 10px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
     .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+    @media print {
+      body { padding: 0; }
+      .no-print { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -121,8 +145,16 @@ export function generateBudgetPdf(data: BudgetPdfData): void {
     <div class="info-grid">
       <div class="info-item"><span class="info-label">Nome: </span>${data.projectName}</div>
       <div class="info-item"><span class="info-label">Prazo de Entrega: </span>${data.deliveryDays} dias úteis</div>
+      <div class="info-item"><span class="info-label">Data Prevista de Entrega: </span>${deliveryDateFormatted}</div>
     </div>
-  </div>` : ''}
+  </div>` : `
+  <div class="section">
+    <div class="section-title">Prazo</div>
+    <div class="info-grid">
+      <div class="info-item"><span class="info-label">Prazo de Entrega: </span>${data.deliveryDays} dias úteis</div>
+      <div class="info-item"><span class="info-label">Data Prevista de Entrega: </span>${deliveryDateFormatted}</div>
+    </div>
+  </div>`}
 
   ${data.items.length > 0 ? `
   <div class="section">
@@ -176,14 +208,33 @@ export function generateBudgetPdf(data: BudgetPdfData): void {
   <div class="footer">
     Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')} • ${data.companyName || 'Marcenaria Pro'} — ERP
   </div>
+
+  <div class="no-print" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:9999;">
+    <button onclick="window.print()" style="background:#e07a3a;color:white;border:none;padding:14px 32px;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(224,122,58,0.4);">
+      📄 Imprimir / Salvar PDF
+    </button>
+  </div>
 </body>
 </html>`;
 
-  const printWindow = window.open('', '_blank');
-  if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.onload = () => { printWindow.print(); };
+  // Mobile-compatible approach: use blob URL instead of document.write
+  const blob = new Blob([html], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+  
+  const newWindow = window.open(blobUrl, '_blank');
+  if (newWindow) {
+    newWindow.onload = () => {
+      URL.revokeObjectURL(blobUrl);
+    };
+  } else {
+    // Fallback for mobile browsers that block popups: download as HTML file
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `Orcamento_${data.code}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
   }
 }
 

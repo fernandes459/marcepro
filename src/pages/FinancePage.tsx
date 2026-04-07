@@ -4,7 +4,7 @@ import {
   DollarSign, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Plus, Search, Trash2, Building2, ArrowRightLeft, AlertTriangle, FileBarChart,
   Receipt, Wallet, PieChart as PieChartIcon, BarChart3, ChevronLeft,
-  CreditCard, Clock, CheckCircle2, X,
+  CreditCard, Clock, CheckCircle2, X, Pencil,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -93,6 +93,14 @@ export default function FinancePage() {
   const [search, setSearch] = useState('');
   const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
+  
+  // Edit transaction state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editTx, setEditTx] = useState<Transaction | null>(null);
+  const [editAmount, setEditAmount] = useState(0);
+  const [editDescription, setEditDescription] = useState('');
+  const [editStatus, setEditStatus] = useState('pending');
+  const [editDueDate, setEditDueDate] = useState('');
 
   useEffect(() => { if (user) fetchAll(); }, [user]);
 
@@ -170,6 +178,30 @@ export default function FinancePage() {
   async function deleteBank(id: string) {
     await supabase.from('bank_accounts').delete().eq('id', id);
     fetchAll(); toast.success('Conta removida');
+  }
+
+  function openEditTransaction(tx: Transaction) {
+    setEditTx(tx);
+    setEditAmount(Number(tx.amount));
+    setEditDescription(tx.description);
+    setEditStatus(tx.status);
+    setEditDueDate(tx.due_date || '');
+    setEditDialogOpen(true);
+  }
+
+  async function saveEditTransaction() {
+    if (!editTx) return;
+    const { error } = await supabase.from('financial_transactions').update({
+      amount: editAmount,
+      description: editDescription,
+      status: editStatus,
+      due_date: editDueDate || null,
+    } as any).eq('id', editTx.id);
+    if (error) { toast.error('Erro ao salvar'); return; }
+    toast.success('Lançamento atualizado!');
+    setEditDialogOpen(false);
+    setEditTx(null);
+    fetchAll();
   }
 
   // Computed
@@ -350,7 +382,7 @@ export default function FinancePage() {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-12">Nenhum lançamento registrado ainda.</p>
+              <p className="text-sm text-muted-foreground text-center py-12">Nenhum lançamento registrado ainda. Crie um lançamento para ver o gráfico.</p>
             )}
           </CardContent>
         </Card>
@@ -431,7 +463,10 @@ export default function FinancePage() {
                           {(tx.status === 'pending' || tx.status === 'overdue') && (
                             <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => markPaid(tx.id)}>Pagar</Button>
                           )}
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteTransaction(tx.id)}>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditTransaction(tx)} title="Editar">
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteTransaction(tx.id)} title="Excluir">
                             <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
                         </div>
@@ -767,6 +802,44 @@ export default function FinancePage() {
 
       {/* Dialogs */}
       <TransactionDialog open={dialogOpen} onOpenChange={setDialogOpen} userId={user!.id} clients={clients} bankAccounts={bankAccounts} onSaved={fetchAll} />
+
+      {/* Edit Transaction Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="font-display">Editar Lançamento</DialogTitle></DialogHeader>
+          {editTx && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Descrição</Label>
+                <Input value={editDescription} onChange={e => setEditDescription(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Valor</Label>
+                <CurrencyInput value={editAmount} onChange={setEditAmount} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={editStatus} onValueChange={setEditStatus}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="paid">Pago</SelectItem>
+                      <SelectItem value="overdue">Vencido</SelectItem>
+                      <SelectItem value="cancelled">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Vencimento</Label>
+                  <Input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} />
+                </div>
+              </div>
+              <Button className="w-full gradient-primary shadow-primary border-0" onClick={saveEditTransaction}>Salvar Alterações</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={bankDialogOpen} onOpenChange={setBankDialogOpen}>
         <DialogContent className="max-w-md">

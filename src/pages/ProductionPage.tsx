@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Factory, GripVertical, Clock, User, Plus, X, ChevronRight, AlertCircle } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Factory, GripVertical, Clock, User, Plus, X, ChevronRight, AlertCircle, Package, Pencil } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { formatBRL } from '@/lib/format';
 
 interface ProductionTask {
   id: string;
@@ -20,6 +22,16 @@ interface ProductionTask {
   stage: string;
   priority: string;
   notes: string | null;
+  budget_id: string | null;
+}
+
+interface BudgetItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit_price: number;
+  material_cost: number;
+  labor_cost: number;
 }
 
 const stages = [
@@ -55,6 +67,9 @@ export default function ProductionPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogStage, setDialogStage] = useState('corte');
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
+  const [materialsDialogOpen, setMaterialsDialogOpen] = useState(false);
+  const [selectedTaskMaterials, setSelectedTaskMaterials] = useState<BudgetItem[]>([]);
+  const [selectedTaskForMaterials, setSelectedTaskForMaterials] = useState<ProductionTask | null>(null);
 
   const [form, setForm] = useState({
     project_name: '', client_name: '', assignee: '', due_date: '', priority: 'normal', notes: '',
@@ -108,6 +123,17 @@ export default function ProductionPage() {
     await supabase.from('production_tasks').delete().eq('id', taskId);
     setTasks(prev => prev.filter(t => t.id !== taskId));
     toast.success('Tarefa removida');
+  }
+
+  async function openMaterials(task: ProductionTask) {
+    setSelectedTaskForMaterials(task);
+    if (task.budget_id) {
+      const { data } = await supabase.from('budget_items').select('*').eq('budget_id', task.budget_id);
+      setSelectedTaskMaterials((data || []) as BudgetItem[]);
+    } else {
+      setSelectedTaskMaterials([]);
+    }
+    setMaterialsDialogOpen(true);
   }
 
   function handleDragStart(taskId: string) { setDraggedTask(taskId); }
@@ -188,16 +214,28 @@ export default function ProductionPage() {
                               </div>
                             )}
                           </div>
-                          {nextStage && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full text-xs h-7 mt-1"
-                              onClick={() => moveTask(task.id, nextStage.id)}
-                            >
-                              Mover para {nextStage.title} <ChevronRight className="h-3 w-3 ml-1" />
-                            </Button>
-                          )}
+                          <div className="flex gap-1">
+                            {task.budget_id && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs h-7 flex-1"
+                                onClick={() => openMaterials(task)}
+                              >
+                                <Package className="h-3 w-3 mr-1" /> Materiais
+                              </Button>
+                            )}
+                            {nextStage && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs h-7 flex-1"
+                                onClick={() => moveTask(task.id, nextStage.id)}
+                              >
+                                {nextStage.title} <ChevronRight className="h-3 w-3 ml-1" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -266,6 +304,59 @@ export default function ProductionPage() {
             <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleCreateTask}>
               Criar Tarefa
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Materials Dialog */}
+      <Dialog open={materialsDialogOpen} onOpenChange={setMaterialsDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" /> Materiais — {selectedTaskForMaterials?.project_name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              Cliente: <strong>{selectedTaskForMaterials?.client_name}</strong>
+              {selectedTaskForMaterials?.due_date && (
+                <> • Entrega: <strong>{new Date(selectedTaskForMaterials.due_date).toLocaleDateString('pt-BR')}</strong></>
+              )}
+            </div>
+            {selectedTaskMaterials.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Nenhum material vinculado a este projeto.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Material</th>
+                      <th className="px-3 py-2 text-center text-xs font-semibold uppercase text-muted-foreground">Qtd</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">Custo Material</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">M.O.</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedTaskMaterials.map(item => (
+                      <tr key={item.id} className="border-b last:border-0">
+                        <td className="px-3 py-2 text-sm font-medium">{item.name}</td>
+                        <td className="px-3 py-2 text-sm text-center">{item.quantity}</td>
+                        <td className="px-3 py-2 text-sm text-right">{formatBRL(item.material_cost)}</td>
+                        <td className="px-3 py-2 text-sm text-right">{formatBRL(item.labor_cost)}</td>
+                        <td className="px-3 py-2 text-sm text-right font-semibold">{formatBRL(item.unit_price * item.quantity)}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-accent/50">
+                      <td colSpan={4} className="px-3 py-2 text-sm font-bold text-right">Total</td>
+                      <td className="px-3 py-2 text-sm text-right font-bold">
+                        {formatBRL(selectedTaskMaterials.reduce((s, i) => s + i.unit_price * i.quantity, 0))}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
