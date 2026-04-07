@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -37,6 +38,13 @@ interface CompanySettings {
   default_margin: string;
 }
 
+interface TeamMember {
+  id: string;
+  user_id: string;
+  role: string;
+  email?: string;
+}
+
 const roleLabels: Record<string, string> = {
   admin: 'Administrador',
   manager: 'Gerente',
@@ -55,6 +63,22 @@ const roleBadgeColors: Record<string, string> = {
   partner: 'bg-success/10 text-success',
 };
 
+const accessRoleLabels: Record<string, string> = {
+  admin: 'Administrador (acesso total)',
+  partner: 'Sócio (ver cadastros, contratos, relatórios)',
+  sales: 'Vendedor (cadastros, orçamentos)',
+  production: 'Produção (kanban de produção)',
+  viewer: 'Somente Leitura (ver relatórios)',
+};
+
+const accessPermissions: Record<string, string[]> = {
+  admin: ['Acesso total a todos os módulos', 'Gerenciar equipe e configurações', 'Lançar e editar financeiro', 'Cadastrar clientes e orçamentos'],
+  partner: ['Ver cadastro de clientes', 'Ver contratos e orçamentos', 'Ver relatórios financeiros', 'Ver contas a pagar/receber', 'Sem acesso para editar ou lançar'],
+  sales: ['Cadastrar e editar clientes', 'Criar e editar orçamentos', 'Ver relatórios de vendas'],
+  production: ['Ver e gerenciar kanban de produção', 'Ver materiais dos projetos'],
+  viewer: ['Ver relatório financeiro', 'Ver contas a pagar/receber', 'Sem acesso para editar ou lançar'],
+};
+
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -64,12 +88,18 @@ export default function SettingsPage() {
     company_name: '', cnpj: '', phone: '', email: '', address: '', city: '', state: '', cep: '', default_margin: '40',
   });
 
+  // Team access
+  const [teamDialogOpen, setTeamDialogOpen] = useState(false);
+  const [teamEmail, setTeamEmail] = useState('');
+  const [teamRole, setTeamRole] = useState('partner');
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+
   const emptyEmpForm = {
     name: '', role: 'production', email: '', phone: '', cpf: '', salary: '', hire_date: '', notes: '',
   };
   const [empForm, setEmpForm] = useState(emptyEmpForm);
 
-  useEffect(() => { if (user) { fetchEmployees(); fetchCompany(); } }, [user]);
+  useEffect(() => { if (user) { fetchEmployees(); fetchCompany(); fetchTeamMembers(); } }, [user]);
 
   async function fetchEmployees() {
     const { data } = await supabase.from('employees').select('*').order('name');
@@ -91,6 +121,11 @@ export default function SettingsPage() {
         default_margin: String(data.default_margin || 40),
       });
     }
+  }
+
+  async function fetchTeamMembers() {
+    const { data } = await supabase.from('user_roles').select('*');
+    if (data) setTeamMembers(data as TeamMember[]);
   }
 
   async function saveCompany() {
@@ -167,6 +202,12 @@ export default function SettingsPage() {
     toast.success('Funcionário removido');
   }
 
+  async function removeTeamMember(id: string) {
+    await supabase.from('user_roles').delete().eq('id', id);
+    fetchTeamMembers();
+    toast.success('Acesso removido');
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       <div className="flex items-center justify-between">
@@ -178,9 +219,10 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="company">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="company"><Building className="h-4 w-4 mr-1" /> Empresa</TabsTrigger>
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-1" /> Equipe</TabsTrigger>
+          <TabsTrigger value="access"><Shield className="h-4 w-4 mr-1" /> Acessos</TabsTrigger>
           <TabsTrigger value="profile"><User className="h-4 w-4 mr-1" /> Perfil</TabsTrigger>
         </TabsList>
 
@@ -262,6 +304,70 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Access Control */}
+        <TabsContent value="access">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-display flex items-center gap-2">
+                  <Shield className="h-4 w-4" /> Controle de Acessos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Gerencie quem tem acesso ao sistema e quais permissões cada pessoa possui.
+                </p>
+                
+                {/* Current team members */}
+                <div className="space-y-3">
+                  {teamMembers.map(member => (
+                    <div key={member.id} className="flex items-center justify-between rounded-lg border border-border p-4">
+                      <div>
+                        <p className="text-sm font-medium">{member.user_id === user?.id ? 'Você' : member.user_id.slice(0, 8) + '...'}</p>
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold mt-1 ${
+                          member.role === 'admin' ? 'bg-destructive/10 text-destructive' :
+                          member.role === 'partner' ? 'bg-success/10 text-success' :
+                          member.role === 'viewer' ? 'bg-muted text-muted-foreground' :
+                          'bg-info/10 text-info'
+                        }`}>
+                          {accessRoleLabels[member.role] || member.role}
+                        </span>
+                      </div>
+                      {member.user_id !== user?.id && (
+                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => removeTeamMember(member.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Role descriptions */}
+                <div className="space-y-3 mt-6">
+                  <h3 className="text-sm font-semibold">Níveis de Acesso Disponíveis</h3>
+                  {Object.entries(accessPermissions).map(([role, perms]) => (
+                    <div key={role} className="rounded-lg border border-border p-4">
+                      <p className="text-sm font-semibold mb-2">{accessRoleLabels[role]}</p>
+                      <ul className="space-y-1">
+                        {perms.map((perm, i) => (
+                          <li key={i} className="text-xs text-muted-foreground flex items-center gap-2">
+                            <div className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                            {perm}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
+                  💡 Para adicionar um novo colaborador com acesso ao sistema, cadastre-o primeiro na aba "Equipe" e depois solicite que ele crie uma conta. O administrador poderá atribuir o nível de acesso adequado.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Profile */}

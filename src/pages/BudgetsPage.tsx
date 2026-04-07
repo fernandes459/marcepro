@@ -84,6 +84,7 @@ export default function BudgetsPage() {
   const [newClause, setNewClause] = useState('');
   const [enabledClauses, setEnabledClauses] = useState<boolean[]>(defaultContractClauses.map(() => true));
   const [companySettings, setCompanySettings] = useState<any>(null);
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
 
   const [selectedClientId, setSelectedClientId] = useState('');
   const [projectName, setProjectName] = useState('');
@@ -155,19 +156,41 @@ export default function BudgetsPage() {
     if (!user || !selectedClientId) { toast.error('Selecione um cliente'); return; }
     setSaving(true);
     const paymentDesc = buildPaymentDescription();
-    const { data: budgetData, error: budgetError } = await supabase.from('budgets').insert({
-      user_id: user.id, client_id: selectedClientId, code: 'TEMP',
-      project_name: projectName || null, status: 'draft',
-      total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
-      payment_method: paymentDesc || null, notes: notes || null,
-    } as any).select().single();
-    if (budgetError || !budgetData) { toast.error('Erro ao criar orçamento'); setSaving(false); return; }
-    const budgetItems = items.filter(i => i.name.trim()).map(i => ({
-      budget_id: (budgetData as any).id, name: i.name, quantity: i.quantity,
-      material_cost: i.materialCost, labor_cost: i.laborCost, unit_price: i.unitPrice,
-    }));
-    if (budgetItems.length > 0) await supabase.from('budget_items').insert(budgetItems as any);
-    toast.success('Orçamento criado com sucesso!');
+
+    if (editingBudgetId) {
+      // Update existing budget
+      const { error: budgetError } = await supabase.from('budgets').update({
+        client_id: selectedClientId,
+        project_name: projectName || null,
+        total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
+        payment_method: paymentDesc || null, notes: notes || null,
+      } as any).eq('id', editingBudgetId);
+      if (budgetError) { toast.error('Erro ao atualizar orçamento'); setSaving(false); return; }
+      
+      // Delete old items and insert new ones
+      await supabase.from('budget_items').delete().eq('budget_id', editingBudgetId);
+      const budgetItems = items.filter(i => i.name.trim()).map(i => ({
+        budget_id: editingBudgetId, name: i.name, quantity: i.quantity,
+        material_cost: i.materialCost, labor_cost: i.laborCost, unit_price: i.unitPrice,
+      }));
+      if (budgetItems.length > 0) await supabase.from('budget_items').insert(budgetItems as any);
+      toast.success('Orçamento atualizado!');
+    } else {
+      // Create new budget
+      const { data: budgetData, error: budgetError } = await supabase.from('budgets').insert({
+        user_id: user.id, client_id: selectedClientId, code: 'TEMP',
+        project_name: projectName || null, status: 'draft',
+        total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
+        payment_method: paymentDesc || null, notes: notes || null,
+      } as any).select().single();
+      if (budgetError || !budgetData) { toast.error('Erro ao criar orçamento'); setSaving(false); return; }
+      const budgetItems = items.filter(i => i.name.trim()).map(i => ({
+        budget_id: (budgetData as any).id, name: i.name, quantity: i.quantity,
+        material_cost: i.materialCost, labor_cost: i.laborCost, unit_price: i.unitPrice,
+      }));
+      if (budgetItems.length > 0) await supabase.from('budget_items').insert(budgetItems as any);
+      toast.success('Orçamento criado com sucesso!');
+    }
     setDialogOpen(false); resetForm(); fetchData(); setSaving(false);
   };
 
@@ -176,6 +199,37 @@ export default function BudgetsPage() {
     setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
     setInstallments(1); setInstallmentMethod('credit'); setMachineDiscount(0);
+    setEditingBudgetId(null);
+  };
+
+  const openEditBudget = async (budget: Budget) => {
+    setEditingBudgetId(budget.id);
+    setSelectedClientId(budget.client_id || '');
+    setProjectName(budget.project_name || '');
+    setNotes(budget.notes || '');
+    setMargin(budget.profit_margin);
+    
+    // Load budget items
+    const { data: budgetItems } = await supabase.from('budget_items').select('*').eq('budget_id', budget.id);
+    if (budgetItems && budgetItems.length > 0) {
+      setItems(budgetItems.map((i: any) => ({
+        name: i.name, quantity: i.quantity, unitPrice: i.unit_price,
+        materialCost: i.material_cost, laborCost: i.labor_cost,
+      })));
+    } else {
+      setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
+    }
+
+    // Parse payment method
+    if (budget.payment_method && budget.payment_method.includes('Entrada:')) {
+      setUseAdvancedPayment(true);
+      // Simple parsing - just set the payment method text
+    } else {
+      setUseAdvancedPayment(false);
+      setSimplePaymentMethod(budget.payment_method || '');
+    }
+    
+    setDialogOpen(true);
   };
 
   const sendWhatsApp = (budget: Budget) => {
@@ -270,6 +324,19 @@ export default function BudgetsPage() {
     setEnabledClauses(enabledClauses.filter((_, i) => i !== idx));
   };
 
+  // Calculate delivery date preview
+  function addBusinessDays(startDate: Date, numDays: number): Date {
+    const result = new Date(startDate);
+    let added = 0;
+    while (added < numDays) {
+      result.setDate(result.getDate() + 1);
+      const day = result.getDay();
+      if (day !== 0 && day !== 6) added++;
+    }
+    return result;
+  }
+  const deliveryDate = selectedBudget ? addBusinessDays(new Date(selectedBudget.created_at), deliveryDays) : addBusinessDays(new Date(), deliveryDays);
+
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -282,7 +349,7 @@ export default function BudgetsPage() {
             <Button className="gradient-primary shadow-primary border-0"><Plus className="h-4 w-4 mr-2" /> Novo Orçamento</Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="font-display">Novo Orçamento</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="font-display">{editingBudgetId ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -399,7 +466,7 @@ export default function BudgetsPage() {
               <div className="space-y-2"><Label>Observações</Label><Textarea placeholder="Notas sobre o orçamento..." value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
               <Button type="submit" className="w-full gradient-primary shadow-primary border-0" disabled={saving}>
                 {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                <FileText className="h-4 w-4 mr-2" /> Salvar Orçamento
+                <FileText className="h-4 w-4 mr-2" /> {editingBudgetId ? 'Salvar Alterações' : 'Salvar Orçamento'}
               </Button>
             </form>
           </DialogContent>
@@ -465,7 +532,7 @@ export default function BudgetsPage() {
                           <button onClick={() => sendWhatsApp(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp">
                             <Send className="h-4 w-4 text-muted-foreground" />
                           </button>
-                          <button onClick={() => { toast.info('Edição em breve'); }} className="rounded p-1.5 hover:bg-muted transition-colors" title="Editar">
+                          <button onClick={() => openEditBudget(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Editar">
                             <Edit className="h-4 w-4 text-muted-foreground" />
                           </button>
                           <button onClick={() => deleteBudget(b.id)} className="rounded p-1.5 hover:bg-destructive/10 transition-colors" title="Excluir">
@@ -494,6 +561,9 @@ export default function BudgetsPage() {
             <div className="space-y-2">
               <Label>Prazo de Entrega (dias úteis)</Label>
               <Input type="number" value={deliveryDays} onChange={e => setDeliveryDays(Number(e.target.value))} className="max-w-[150px]" />
+              <p className="text-xs text-muted-foreground">
+                Data prevista de entrega: <strong>{deliveryDate.toLocaleDateString('pt-BR')}</strong>
+              </p>
             </div>
 
             <div className="space-y-3">
