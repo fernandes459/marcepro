@@ -776,45 +776,15 @@ export default function FinancePage() {
       </AnimatePresence>
 
       {/* Dialogs */}
-      <TransactionDialog open={dialogOpen} onOpenChange={setDialogOpen} userId={user!.id} clients={clients} bankAccounts={bankAccounts} onSaved={fetchAll} />
-
-      {/* Edit Transaction Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-display">Editar Lançamento</DialogTitle></DialogHeader>
-          {editTx && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Descrição</Label>
-                <Input value={editDescription} onChange={e => setEditDescription(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Valor</Label>
-                <CurrencyInput value={editAmount} onChange={setEditAmount} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select value={editStatus} onValueChange={setEditStatus}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="paid">Pago</SelectItem>
-                      <SelectItem value="overdue">Vencido</SelectItem>
-                      <SelectItem value="cancelled">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Vencimento</Label>
-                  <Input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} />
-                </div>
-              </div>
-              <Button className="w-full gradient-primary shadow-primary border-0" onClick={saveEditTransaction}>Salvar Alterações</Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <TransactionDialog
+        open={dialogOpen}
+        onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditingTransaction(null); }}
+        userId={user!.id}
+        clients={clients}
+        bankAccounts={bankAccounts}
+        onSaved={fetchAll}
+        editTransaction={editingTransaction}
+      />
 
       <Dialog open={bankDialogOpen} onOpenChange={setBankDialogOpen}>
         <DialogContent className="max-w-md">
