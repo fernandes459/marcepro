@@ -94,14 +94,8 @@ export default function FinancePage() {
   const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
   
-  // Edit transaction state
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editTx, setEditTx] = useState<Transaction | null>(null);
-  const [editAmount, setEditAmount] = useState(0);
-  const [editDescription, setEditDescription] = useState('');
-  const [editStatus, setEditStatus] = useState('pending');
-  const [editDueDate, setEditDueDate] = useState('');
-
+  // Edit transaction state - uses full TransactionDialog
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   useEffect(() => { if (user) fetchAll(); }, [user]);
 
   async function fetchAll() {
@@ -181,27 +175,8 @@ export default function FinancePage() {
   }
 
   function openEditTransaction(tx: Transaction) {
-    setEditTx(tx);
-    setEditAmount(Number(tx.amount));
-    setEditDescription(tx.description);
-    setEditStatus(tx.status);
-    setEditDueDate(tx.due_date || '');
-    setEditDialogOpen(true);
-  }
-
-  async function saveEditTransaction() {
-    if (!editTx) return;
-    const { error } = await supabase.from('financial_transactions').update({
-      amount: editAmount,
-      description: editDescription,
-      status: editStatus,
-      due_date: editDueDate || null,
-    } as any).eq('id', editTx.id);
-    if (error) { toast.error('Erro ao salvar'); return; }
-    toast.success('Lançamento atualizado!');
-    setEditDialogOpen(false);
-    setEditTx(null);
-    fetchAll();
+    setEditingTransaction(tx);
+    setDialogOpen(true);
   }
 
   // Computed
