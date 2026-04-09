@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   DollarSign, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Plus, Search, Trash2, Building2, ArrowRightLeft, AlertTriangle, FileBarChart,
@@ -94,14 +94,8 @@ export default function FinancePage() {
   const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
   
-  // Edit transaction state
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editTx, setEditTx] = useState<Transaction | null>(null);
-  const [editAmount, setEditAmount] = useState(0);
-  const [editDescription, setEditDescription] = useState('');
-  const [editStatus, setEditStatus] = useState('pending');
-  const [editDueDate, setEditDueDate] = useState('');
-
+  // Edit transaction state - uses full TransactionDialog
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   useEffect(() => { if (user) fetchAll(); }, [user]);
 
   async function fetchAll() {
@@ -181,27 +175,8 @@ export default function FinancePage() {
   }
 
   function openEditTransaction(tx: Transaction) {
-    setEditTx(tx);
-    setEditAmount(Number(tx.amount));
-    setEditDescription(tx.description);
-    setEditStatus(tx.status);
-    setEditDueDate(tx.due_date || '');
-    setEditDialogOpen(true);
-  }
-
-  async function saveEditTransaction() {
-    if (!editTx) return;
-    const { error } = await supabase.from('financial_transactions').update({
-      amount: editAmount,
-      description: editDescription,
-      status: editStatus,
-      due_date: editDueDate || null,
-    } as any).eq('id', editTx.id);
-    if (error) { toast.error('Erro ao salvar'); return; }
-    toast.success('Lançamento atualizado!');
-    setEditDialogOpen(false);
-    setEditTx(null);
-    fetchAll();
+    setEditingTransaction(tx);
+    setDialogOpen(true);
   }
 
   // Computed
@@ -288,7 +263,7 @@ export default function FinancePage() {
   const miniCards = [
     { id: 'lancamentos' as Section, title: 'Lançamentos', icon: Receipt, value: String(transactions.length), sub: 'registros', color: 'text-primary' },
     { id: 'dre' as Section, title: 'DRE', icon: BarChart3, value: formatBRL(dreData.profit), sub: 'resultado mensal', color: dreData.profit >= 0 ? 'text-success' : 'text-destructive' },
-    { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(overdueItems.length + transactions.filter(t => t.status === 'pending' && t.due_date).length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
+    { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(transactions.filter(t => t.status === 'pending' || t.status === 'overdue').length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
     { id: 'recebidos' as Section, title: 'Recebidos', icon: CheckCircle2, value: formatBRL(paidIncome), sub: 'total recebido', color: 'text-success' },
     { id: 'relatorio' as Section, title: 'Relatório', icon: FileBarChart, value: String(clientProfitData.length), sub: 'clientes', color: 'text-info' },
     { id: 'contas' as Section, title: 'Contas', icon: Building2, value: formatBRL(totalBankBalance), sub: `${bankAccounts.length} conta(s)`, color: 'text-primary' },
@@ -561,7 +536,7 @@ export default function FinancePage() {
   }
 
   function renderAVencer() {
-    const upcoming = transactions.filter(t => (t.status === 'pending' || t.status === 'overdue') && t.due_date).sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
+    const upcoming = transactions.filter(t => t.status === 'pending' || t.status === 'overdue').sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
     return (
       <Card>
         <CardHeader>
@@ -794,52 +769,20 @@ export default function FinancePage() {
         </motion.div>
       )}
 
-      <AnimatePresence mode="wait">
-        <motion.div key={activeSection} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-          {renderSection()}
-        </motion.div>
-      </AnimatePresence>
+      <motion.div key={activeSection} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+        {renderSection()}
+      </motion.div>
 
       {/* Dialogs */}
-      <TransactionDialog open={dialogOpen} onOpenChange={setDialogOpen} userId={user!.id} clients={clients} bankAccounts={bankAccounts} onSaved={fetchAll} />
-
-      {/* Edit Transaction Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-display">Editar Lançamento</DialogTitle></DialogHeader>
-          {editTx && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Descrição</Label>
-                <Input value={editDescription} onChange={e => setEditDescription(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Valor</Label>
-                <CurrencyInput value={editAmount} onChange={setEditAmount} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select value={editStatus} onValueChange={setEditStatus}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="paid">Pago</SelectItem>
-                      <SelectItem value="overdue">Vencido</SelectItem>
-                      <SelectItem value="cancelled">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Vencimento</Label>
-                  <Input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} />
-                </div>
-              </div>
-              <Button className="w-full gradient-primary shadow-primary border-0" onClick={saveEditTransaction}>Salvar Alterações</Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <TransactionDialog
+        open={dialogOpen}
+        onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditingTransaction(null); }}
+        userId={user!.id}
+        clients={clients}
+        bankAccounts={bankAccounts}
+        onSaved={fetchAll}
+        editTransaction={editingTransaction}
+      />
 
       <Dialog open={bankDialogOpen} onOpenChange={setBankDialogOpen}>
         <DialogContent className="max-w-md">
