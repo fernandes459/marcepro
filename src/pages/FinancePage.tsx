@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   DollarSign, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
@@ -80,6 +80,7 @@ type Section = 'home' | 'lancamentos' | 'dre' | 'vencer' | 'recebidos' | 'relato
 
 export default function FinancePage() {
   const { user } = useAuth();
+  const pageRef = useRef<HTMLDivElement>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -96,19 +97,56 @@ export default function FinancePage() {
   
   // Edit transaction state - uses full TransactionDialog
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  useEffect(() => { if (user) fetchAll(); }, [user]);
 
-  async function fetchAll() {
+  const fetchAll = useCallback(async () => {
+    if (!user) return;
+
     const [txRes, clientsRes, banksRes] = await Promise.all([
       supabase.from('financial_transactions').select('*').order('date', { ascending: false }),
       supabase.from('clients').select('id, name').order('name'),
       supabase.from('bank_accounts').select('*').order('is_main', { ascending: false }),
     ]);
+
     if (txRes.data) setTransactions(txRes.data as Transaction[]);
     if (clientsRes.data) setClients(clientsRes.data);
     if (banksRes.data) setBankAccounts(banksRes.data as BankAccount[]);
     setLoading(false);
-  }
+  }, [user]);
+
+  useEffect(() => {
+    void fetchAll();
+  }, [fetchAll]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`finance-live-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'financial_transactions' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_transfers' }, () => {
+        void fetchAll();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchAll, user]);
+
+  useEffect(() => {
+    const container = pageRef.current?.closest('main');
+    if (container instanceof HTMLElement) {
+      container.scrollTo({ top: 0 });
+    }
+  }, [activeSection]);
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -754,7 +792,7 @@ export default function FinancePage() {
   }
 
   return (
-    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
+    <motion.div ref={pageRef} variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           {activeSection !== 'home' && (

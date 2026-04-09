@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   DollarSign, TrendingUp, TrendingDown, Users, FileText, ArrowUpRight, ArrowDownRight,
@@ -49,23 +49,55 @@ export default function DashboardPage() {
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchDashboardData = useCallback(async () => {
     if (!user) return;
-    Promise.all([
+
+    const [txRes, budRes, cliRes, taskRes, bankRes] = await Promise.all([
       supabase.from('financial_transactions').select('*').order('date', { ascending: false }),
-      supabase.from('budgets').select('*, clients(name)').order('created_at', { ascending: false }).limit(10),
+      supabase.from('budgets').select('*, clients(name)').order('created_at', { ascending: false }),
       supabase.from('clients').select('id, name'),
       supabase.from('production_tasks').select('*'),
       supabase.from('bank_accounts').select('*'),
-    ]).then(([txRes, budRes, cliRes, taskRes, bankRes]) => {
-      if (txRes.data) setTransactions(txRes.data);
-      if (budRes.data) setBudgets(budRes.data);
-      if (cliRes.data) setClients(cliRes.data);
-      if (taskRes.data) setTasks(taskRes.data);
-      if (bankRes.data) setBankAccounts(bankRes.data);
-      setLoading(false);
-    });
+    ]);
+
+    if (txRes.data) setTransactions(txRes.data);
+    if (budRes.data) setBudgets(budRes.data);
+    if (cliRes.data) setClients(cliRes.data);
+    if (taskRes.data) setTasks(taskRes.data);
+    if (bankRes.data) setBankAccounts(bankRes.data);
+    setLoading(false);
   }, [user]);
+
+  useEffect(() => {
+    void fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`dashboard-live-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'financial_transactions' }, () => {
+        void fetchDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => {
+        void fetchDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
+        void fetchDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => {
+        void fetchDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts' }, () => {
+        void fetchDashboardData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchDashboardData, user]);
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const monthTx = transactions.filter(t => t.date?.startsWith(currentMonth));
@@ -157,6 +189,14 @@ export default function DashboardPage() {
   }, [transactions, today]);
 
   const margin = monthIncome > 0 ? (monthProfit / monthIncome * 100) : 0;
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
