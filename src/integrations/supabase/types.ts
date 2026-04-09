@@ -544,6 +544,7 @@ export type Database = {
         Returns: boolean
       }
       get_data_owner_id: { Args: { _user_id: string }; Returns: string }
+      get_user_id_by_email: { Args: { _email: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
