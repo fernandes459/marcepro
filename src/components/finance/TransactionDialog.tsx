@@ -67,9 +67,16 @@ interface TransactionDialogProps {
   clients: Client[];
   bankAccounts: BankAccount[];
   onSaved: () => void;
+  editTransaction?: {
+    id: string; type: string; category: string; description: string;
+    amount: number; date: string; due_date: string | null; status: string;
+    is_fixed: boolean; recurrence: string; notes: string | null;
+    client_id: string | null; order_number: string | null;
+    bank_account_id: string | null; payment_method: string | null;
+  } | null;
 }
 
-export function TransactionDialog({ open, onOpenChange, userId, clients, bankAccounts, onSaved }: TransactionDialogProps) {
+export function TransactionDialog({ open, onOpenChange, userId, clients, bankAccounts, onSaved, editTransaction }: TransactionDialogProps) {
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -91,6 +98,34 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
   ]);
 
   const categories = type === 'income' ? incomeCategories : expenseCategories;
+
+  // Load edit data when editTransaction changes
+  useEffect(() => {
+    if (editTransaction && open) {
+      setType(editTransaction.type as 'income' | 'expense');
+      setCategory(editTransaction.category);
+      setDescription(editTransaction.description);
+      setTotalAmount(Number(editTransaction.amount));
+      setDate(editTransaction.date);
+      setDueDate(editTransaction.due_date || '');
+      setStatus(editTransaction.status);
+      setIsFixed(editTransaction.is_fixed);
+      setRecurrence(editTransaction.recurrence || 'monthly');
+      setNotes(editTransaction.notes || '');
+      setClientId(editTransaction.client_id || '');
+      setOrderNumber(editTransaction.order_number || '');
+      setBankAccountId(editTransaction.bank_account_id || '');
+      // Parse payment method
+      if (editTransaction.payment_method && editTransaction.payment_method.includes('|')) {
+        setUseSplitPayment(true);
+      } else {
+        setUseSplitPayment(false);
+        const method = editTransaction.payment_method || 'pix';
+        const validMethod = paymentMethods.find(m => m.value === method || m.label === method);
+        setPayments([{ id: '1', method: validMethod?.value || 'pix', amount: Number(editTransaction.amount), installments: 1, machineDiscount: 0 }]);
+      }
+    }
+  }, [editTransaction, open]);
 
   function resetForm() {
     setType('expense'); setCategory(''); setDescription(''); setTotalAmount(0);
@@ -154,16 +189,25 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
       useSplitPayment ? `Valor líquido recebido: ${formatBRL(totalAfterDiscounts)}` : '',
     ].filter(Boolean).join('\n');
 
-    const { error } = await supabase.from('financial_transactions').insert({
+    const payload = {
       user_id: userId, type, category, description, amount: totalAmount,
       date, due_date: dueDate || null, status, is_fixed: isFixed,
       payment_method: paymentMethod, recurrence: isFixed ? recurrence : 'none',
       notes: finalNotes || null, client_id: clientId || null,
       order_number: orderNumber || null, bank_account_id: bankAccountId || null,
-    } as any);
+    };
+
+    let error;
+    if (editTransaction?.id) {
+      const res = await supabase.from('financial_transactions').update(payload as any).eq('id', editTransaction.id);
+      error = res.error;
+    } else {
+      const res = await supabase.from('financial_transactions').insert(payload as any);
+      error = res.error;
+    }
 
     if (error) { toast.error('Erro ao salvar'); console.error(error); return; }
-    toast.success('Lançamento criado!');
+    toast.success(editTransaction?.id ? 'Lançamento atualizado!' : 'Lançamento criado!');
     resetForm();
     onOpenChange(false);
     onSaved();
@@ -173,7 +217,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-lg">Novo Lançamento</DialogTitle>
+          <DialogTitle className="font-display text-lg">{editTransaction?.id ? 'Editar Lançamento' : 'Novo Lançamento'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-5">
           {/* Type toggle */}
