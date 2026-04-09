@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus } from 'lucide-react';
+import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -362,9 +362,46 @@ export default function SettingsPage() {
                   ))}
                 </div>
 
-                <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
-                  💡 Para adicionar um novo colaborador com acesso ao sistema, cadastre-o primeiro na aba "Equipe" e depois solicite que ele crie uma conta. O administrador poderá atribuir o nível de acesso adequado.
-                </p>
+                <div className="space-y-4 bg-accent/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Link className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold">Convidar Colaborador</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Compartilhe o link abaixo para que o colaborador crie uma conta no sistema. Após o cadastro, volte aqui e atribua o nível de acesso.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input 
+                      readOnly 
+                      value={`${window.location.origin}/login`} 
+                      className="text-xs"
+                    />
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/login`);
+                        toast.success('Link copiado!');
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1" /> Copiar
+                    </Button>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <Input placeholder="Email do colaborador" value={teamEmail} onChange={e => setTeamEmail(e.target.value)} className="text-xs" />
+                    <Select value={teamRole} onValueChange={setTeamRole}>
+                      <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(accessRoleLabels).filter(([k]) => k !== 'admin').map(([value, label]) => (
+                          <SelectItem key={value} value={value}>{label.split(' (')[0]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    💡 Após o colaborador se cadastrar com este email, o acesso será vinculado automaticamente ao nível selecionado.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>
