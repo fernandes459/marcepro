@@ -113,6 +113,21 @@ export default function BudgetsPage() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Realtime subscription for budgets
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`budgets-live-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
+        fetchData();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
   const filtered = budgets.filter(b => {
     const clientName = (b.clients as any)?.name || '';
     return clientName.toLowerCase().includes(search.toLowerCase()) ||
