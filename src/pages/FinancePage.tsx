@@ -263,7 +263,7 @@ export default function FinancePage() {
   const miniCards = [
     { id: 'lancamentos' as Section, title: 'Lançamentos', icon: Receipt, value: String(transactions.length), sub: 'registros', color: 'text-primary' },
     { id: 'dre' as Section, title: 'DRE', icon: BarChart3, value: formatBRL(dreData.profit), sub: 'resultado mensal', color: dreData.profit >= 0 ? 'text-success' : 'text-destructive' },
-    { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(overdueItems.length + transactions.filter(t => t.status === 'pending' && t.due_date).length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
+    { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(transactions.filter(t => t.status === 'pending' || t.status === 'overdue').length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
     { id: 'recebidos' as Section, title: 'Recebidos', icon: CheckCircle2, value: formatBRL(paidIncome), sub: 'total recebido', color: 'text-success' },
     { id: 'relatorio' as Section, title: 'Relatório', icon: FileBarChart, value: String(clientProfitData.length), sub: 'clientes', color: 'text-info' },
     { id: 'contas' as Section, title: 'Contas', icon: Building2, value: formatBRL(totalBankBalance), sub: `${bankAccounts.length} conta(s)`, color: 'text-primary' },
@@ -536,7 +536,7 @@ export default function FinancePage() {
   }
 
   function renderAVencer() {
-    const upcoming = transactions.filter(t => (t.status === 'pending' || t.status === 'overdue') && t.due_date).sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
+    const upcoming = transactions.filter(t => t.status === 'pending' || t.status === 'overdue').sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
     return (
       <Card>
         <CardHeader>
@@ -769,11 +769,9 @@ export default function FinancePage() {
         </motion.div>
       )}
 
-      <AnimatePresence mode="wait">
-        <motion.div key={activeSection} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-          {renderSection()}
-        </motion.div>
-      </AnimatePresence>
+      <motion.div key={activeSection} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+        {renderSection()}
+      </motion.div>
 
       {/* Dialogs */}
       <TransactionDialog
