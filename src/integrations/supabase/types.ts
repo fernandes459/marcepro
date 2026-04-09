@@ -514,18 +514,21 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          owner_id: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
+          owner_id?: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          owner_id?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
@@ -536,6 +539,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_data: {
+        Args: { _data_owner_id: string; _user_id: string }
+        Returns: boolean
+      }
+      get_data_owner_id: { Args: { _user_id: string }; Returns: string }
+      get_user_id_by_email: { Args: { _email: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

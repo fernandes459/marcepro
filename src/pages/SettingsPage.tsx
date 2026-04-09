@@ -208,6 +208,36 @@ export default function SettingsPage() {
     toast.success('Acesso removido');
   }
 
+  async function addTeamMember() {
+    if (!teamEmail.trim()) { toast.error('Informe o email do colaborador'); return; }
+    // Look up user by email - we need to find their user_id
+    // Since we can't query auth.users directly, we'll insert the role
+    // and use a lookup approach: check if a user with this email exists via user_roles
+    // We'll use the supabase admin approach - search by email in auth
+    const { data: userData, error: lookupError } = await supabase.rpc('get_user_id_by_email' as any, { _email: teamEmail.trim() });
+    
+    if (lookupError || !userData) {
+      // Fallback: try to find from existing team members or just save with email for later linking
+      toast.error('Usuário não encontrado. Verifique se o colaborador já criou a conta com este email.');
+      return;
+    }
+
+    const targetUserId = userData as string;
+    
+    // Check if already has a role
+    const { data: existing } = await supabase.from('user_roles').select('id').eq('user_id', targetUserId);
+    if (existing && existing.length > 0) {
+      // Update existing role
+      await supabase.from('user_roles').update({ role: teamRole as any, owner_id: user!.id } as any).eq('user_id', targetUserId);
+      toast.success('Acesso atualizado!');
+    } else {
+      await supabase.from('user_roles').insert({ user_id: targetUserId, role: teamRole as any, owner_id: user!.id } as any);
+      toast.success('Acesso concedido!');
+    }
+    setTeamEmail('');
+    fetchTeamMembers();
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       <div className="flex items-center justify-between">
@@ -398,8 +428,11 @@ export default function SettingsPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <Button className="w-full gradient-primary shadow-primary border-0 mt-2" onClick={addTeamMember}>
+                    <UserPlus className="h-4 w-4 mr-2" /> Confirmar Acesso
+                  </Button>
                   <p className="text-[10px] text-muted-foreground">
-                    💡 Após o colaborador se cadastrar com este email, o acesso será vinculado automaticamente ao nível selecionado.
+                    💡 O colaborador precisa ter criado a conta primeiro. Depois, informe o email e o nível de acesso aqui.
                   </p>
                 </div>
               </CardContent>
