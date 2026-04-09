@@ -164,9 +164,19 @@ export default function FinancePage() {
   }
 
   async function deleteTransaction(id: string) {
+    const tx = transactions.find(t => t.id === id);
+    if (tx && tx.status === 'paid' && tx.bank_account_id) {
+      const acc = bankAccounts.find(a => a.id === tx.bank_account_id);
+      if (acc) {
+        const adjustment = tx.type === 'income'
+          ? acc.current_balance - Number(tx.amount)
+          : acc.current_balance + Number(tx.amount);
+        await supabase.from('bank_accounts').update({ current_balance: adjustment } as any).eq('id', acc.id);
+      }
+    }
     await supabase.from('financial_transactions').delete().eq('id', id);
-    setTransactions(prev => prev.filter(t => t.id !== id));
     toast.success('Lançamento removido');
+    fetchAll();
   }
 
   async function deleteBank(id: string) {
