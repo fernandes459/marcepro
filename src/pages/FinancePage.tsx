@@ -159,8 +159,20 @@ export default function FinancePage() {
   }
 
   async function markPaid(id: string) {
+    const tx = transactions.find(t => t.id === id);
     await supabase.from('financial_transactions').update({ status: 'paid', paid_date: new Date().toISOString().slice(0, 10) } as any).eq('id', id);
-    fetchAll(); toast.success('Marcado como pago');
+    // Update bank balance when marking as paid
+    if (tx && tx.bank_account_id) {
+      const acc = bankAccounts.find(a => a.id === tx.bank_account_id);
+      if (acc) {
+        const newBalance = tx.type === 'income'
+          ? acc.current_balance + Number(tx.amount)
+          : acc.current_balance - Number(tx.amount);
+        await supabase.from('bank_accounts').update({ current_balance: newBalance } as any).eq('id', acc.id);
+      }
+    }
+    toast.success('Marcado como pago');
+    fetchAll();
   }
 
   async function deleteTransaction(id: string) {
