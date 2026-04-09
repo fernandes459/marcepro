@@ -141,20 +141,30 @@ export default function FinancePage() {
     };
   }, [fetchAll, user]);
 
+  // Scroll to top when section changes
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
     const container = pageRef.current?.closest('main');
     if (container instanceof HTMLElement) {
       container.scrollTo({ top: 0 });
     }
   }, [activeSection]);
 
+  // Mark overdue transactions (fire-and-forget, only once per load)
+  const overdueCheckedRef = useRef(false);
   useEffect(() => {
+    if (overdueCheckedRef.current || transactions.length === 0) return;
+    overdueCheckedRef.current = true;
     const today = new Date().toISOString().slice(0, 10);
-    transactions.forEach(t => {
-      if (t.status === 'pending' && t.due_date && t.due_date < today) {
-        supabase.from('financial_transactions').update({ status: 'overdue' }).eq('id', t.id).then(() => {});
-      }
-    });
+    const overdueIds = transactions
+      .filter(t => t.status === 'pending' && t.due_date && t.due_date < today)
+      .map(t => t.id);
+    if (overdueIds.length > 0) {
+      supabase.from('financial_transactions')
+        .update({ status: 'overdue' } as any)
+        .in('id', overdueIds)
+        .then(() => fetchAll());
+    }
   }, [transactions]);
 
   async function handleSaveBank() {
