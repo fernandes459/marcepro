@@ -69,6 +69,18 @@ export default function ClientsPage() {
 
   useEffect(() => { fetchClients(); }, []);
 
+  // Realtime subscription for clients
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`clients-live-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
+        fetchClients();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
   const filtered = clients.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||

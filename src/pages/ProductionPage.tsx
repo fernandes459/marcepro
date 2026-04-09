@@ -79,6 +79,18 @@ export default function ProductionPage() {
 
   useEffect(() => { if (user) { fetchTasks(); fetchEmployees(); } }, [user]);
 
+  // Realtime subscription for production tasks
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`production-live-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => {
+        fetchTasks();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
   async function fetchTasks() {
     const { data } = await supabase.from('production_tasks').select('*').order('created_at', { ascending: true });
     if (data) setTasks(data as ProductionTask[]);
