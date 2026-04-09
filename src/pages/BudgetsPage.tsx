@@ -246,29 +246,80 @@ export default function BudgetsPage() {
     if (error) toast.error('Erro ao excluir'); else { toast.success('Excluído'); fetchData(); }
   };
 
+  const addBusinessDays = (startDate: Date, days: number): Date => {
+    const result = new Date(startDate);
+    let added = 0;
+    while (added < days) {
+      result.setDate(result.getDate() + 1);
+      const dow = result.getDay();
+      if (dow !== 0 && dow !== 6) added++;
+    }
+    return result;
+  };
+
   const updateBudgetStatus = async (id: string, status: string) => {
     const budget = budgets.find(b => b.id === id);
     const { error } = await supabase.from('budgets').update({ status } as any).eq('id', id);
     if (error) { toast.error('Erro ao atualizar status'); return; }
     
-    // Auto-create financial transaction when budget is approved
+    // Auto-create financial transactions when budget is approved
     if (status === 'approved' && budget && user) {
       const client = budget.clients as Client | null;
-      await supabase.from('financial_transactions').insert({
-        user_id: user.id,
-        type: 'income',
-        category: 'project',
-        description: `${budget.project_name || budget.code} — ${client?.name || 'Cliente'}`,
-        amount: budget.final_price,
-        date: new Date().toISOString().slice(0, 10),
-        status: 'pending',
-        client_id: budget.client_id,
-        budget_id: budget.id,
-        order_number: budget.code,
-        payment_method: budget.payment_method || null,
-        notes: `Orçamento aprovado: ${budget.code}\nValor total: ${formatBRL(budget.final_price)}`,
-      } as any);
-      toast.info('Lançamento financeiro criado automaticamente (pendente)');
+      const paymentStr = budget.payment_method || '';
+      
+      // Parse down payment from payment method string
+      const entradaMatch = paymentStr.match(/Entrada:\s*R\$\s*([\d.,]+)/);
+      const downPaymentValue = entradaMatch 
+        ? parseFloat(entradaMatch[1].replace(/\./g, '').replace(',', '.')) 
+        : 0;
+      const remainingValue = budget.final_price - downPaymentValue;
+
+      // Parse installments
+      const parcelasMatch = paymentStr.match(/(\d+)x\s*de/);
+      const numInstallments = parcelasMatch ? parseInt(parcelasMatch[1]) : 1;
+
+      const today = new Date().toISOString().slice(0, 10);
+      const baseDesc = `${budget.project_name || budget.code} — ${client?.name || 'Cliente'}`;
+
+      if (downPaymentValue > 0) {
+        // Create PAID entry for down payment
+        await supabase.from('financial_transactions').insert({
+          user_id: user.id, type: 'income', category: 'project',
+          description: `${baseDesc} (Entrada)`,
+          amount: downPaymentValue, date: today, status: 'paid', paid_date: today,
+          client_id: budget.client_id, budget_id: budget.id,
+          order_number: budget.code, payment_method: paymentStr.split('+')[0]?.trim() || 'PIX',
+          notes: `Entrada do orçamento ${budget.code}`,
+        } as any);
+      }
+
+      if (remainingValue > 0) {
+        // Create PENDING entry for remaining amount with due date in business days
+        const dueDate = addBusinessDays(new Date(), 30);
+        await supabase.from('financial_transactions').insert({
+          user_id: user.id, type: 'income', category: 'project',
+          description: `${baseDesc} (Restante)`,
+          amount: remainingValue, date: today, status: 'pending',
+          due_date: dueDate.toISOString().slice(0, 10),
+          client_id: budget.client_id, budget_id: budget.id,
+          order_number: budget.code,
+          payment_method: numInstallments > 1 ? `${numInstallments}x cartão` : 'A combinar',
+          notes: `Saldo restante do orçamento ${budget.code}\nVencimento: ${dueDate.toLocaleDateString('pt-BR')}\nTotal do projeto: ${formatBRL(budget.final_price)}`,
+        } as any);
+      }
+
+      if (downPaymentValue === 0 && remainingValue === 0) {
+        // No payment info parsed, create single pending transaction
+        await supabase.from('financial_transactions').insert({
+          user_id: user.id, type: 'income', category: 'project',
+          description: baseDesc, amount: budget.final_price, date: today,
+          status: 'pending', client_id: budget.client_id, budget_id: budget.id,
+          order_number: budget.code, payment_method: paymentStr || null,
+          notes: `Orçamento aprovado: ${budget.code}\nValor total: ${formatBRL(budget.final_price)}`,
+        } as any);
+      }
+      
+      toast.info('Lançamentos financeiros criados automaticamente');
     }
     
     toast.success(`Status atualizado para ${statusConfig[status]?.label || status}`);
