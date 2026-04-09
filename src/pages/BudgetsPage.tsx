@@ -398,16 +398,6 @@ export default function BudgetsPage() {
   };
 
   // Calculate delivery date preview
-  function addBusinessDays(startDate: Date, numDays: number): Date {
-    const result = new Date(startDate);
-    let added = 0;
-    while (added < numDays) {
-      result.setDate(result.getDate() + 1);
-      const day = result.getDay();
-      if (day !== 0 && day !== 6) added++;
-    }
-    return result;
-  }
   const deliveryDate = selectedBudget ? addBusinessDays(new Date(selectedBudget.created_at), deliveryDays) : addBusinessDays(new Date(), deliveryDays);
 
   return (
