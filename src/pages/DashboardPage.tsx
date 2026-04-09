@@ -179,7 +179,7 @@ export default function DashboardPage() {
       counts[cat] = (counts[cat] || 0) + Number(t.amount);
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [transactions, currentMonth]);
+  }, [monthTx]);
 
   // Budget status pie
   const budgetStatusData = useMemo(() => {
