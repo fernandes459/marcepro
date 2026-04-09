@@ -100,26 +100,55 @@ export default function DashboardPage() {
   }, [fetchDashboardData, user]);
 
   const currentMonth = new Date().toISOString().slice(0, 7);
-  const monthTx = transactions.filter(t => t.date?.startsWith(currentMonth));
-  const monthIncome = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
-  const monthExpense = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
+  
+  const monthTx = useMemo(() => 
+    transactions.filter(t => t.date?.startsWith(currentMonth)),
+    [transactions, currentMonth]
+  );
+  
+  const monthIncome = useMemo(() => 
+    monthTx.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
+    [monthTx]
+  );
+  const monthExpense = useMemo(() => 
+    monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
+    [monthTx]
+  );
   const monthProfit = monthIncome - monthExpense;
-  const totalBankBalance = bankAccounts.reduce((s, a) => s + Number(a.current_balance), 0);
+  const totalBankBalance = useMemo(() => 
+    bankAccounts.reduce((s, a) => s + Number(a.current_balance), 0),
+    [bankAccounts]
+  );
 
   const prevMonth = new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().slice(0, 7);
-  const prevMonthIncome = transactions.filter(t => t.date?.startsWith(prevMonth) && t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
-  const prevMonthExpense = transactions.filter(t => t.date?.startsWith(prevMonth) && t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
+  const prevMonthIncome = useMemo(() => 
+    transactions.filter(t => t.date?.startsWith(prevMonth) && t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
+    [transactions, prevMonth]
+  );
+  const prevMonthExpense = useMemo(() => 
+    transactions.filter(t => t.date?.startsWith(prevMonth) && t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
+    [transactions, prevMonth]
+  );
   const incomeChange = prevMonthIncome > 0 ? ((monthIncome - prevMonthIncome) / prevMonthIncome * 100) : 0;
   const expenseChange = prevMonthExpense > 0 ? ((monthExpense - prevMonthExpense) / prevMonthExpense * 100) : 0;
 
   const today = new Date().toISOString().slice(0, 10);
-  const overdueItems = transactions.filter(t => t.status === 'pending' && t.due_date && t.due_date < today);
-  const pendingReceivable = transactions.filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
-  const pendingPayable = transactions.filter(t => t.type === 'expense' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
+  const overdueItems = useMemo(() => 
+    transactions.filter(t => t.status === 'pending' && t.due_date && t.due_date < today),
+    [transactions, today]
+  );
+  const pendingReceivable = useMemo(() => 
+    transactions.filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0),
+    [transactions]
+  );
+  const pendingPayable = useMemo(() => 
+    transactions.filter(t => t.type === 'expense' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0),
+    [transactions]
+  );
 
-  const openBudgets = budgets.filter(b => b.status === 'draft' || b.status === 'pending').length;
-  const approvedBudgets = budgets.filter(b => b.status === 'approved').length;
-  const activeTasks = tasks.filter(t => t.stage !== 'entregue');
+  const openBudgets = useMemo(() => budgets.filter(b => b.status === 'draft' || b.status === 'pending').length, [budgets]);
+  const approvedBudgets = useMemo(() => budgets.filter(b => b.status === 'approved').length, [budgets]);
+  const activeTasks = useMemo(() => tasks.filter(t => t.stage !== 'entregue'), [tasks]);
 
   // Timeline - last 6 months with accumulated
   const timelineData = useMemo(() => {
