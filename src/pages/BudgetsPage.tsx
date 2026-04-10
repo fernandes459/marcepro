@@ -212,11 +212,11 @@ export default function BudgetsPage() {
   };
 
   const resetForm = () => {
-    setSelectedClientId(''); setProjectName(''); setSimplePaymentMethod(''); setNotes('');
+    setSelectedClientId(''); setProjectName(''); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT); setNotes('');
     setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
     setInstallments(1); setInstallmentMethod('credit'); setMachineDiscount(0);
-    setEditingBudgetId(null);
+    setEditingBudgetId(null); setSendSimplified(false);
   };
 
   const openEditBudget = async (budget: Budget) => {
