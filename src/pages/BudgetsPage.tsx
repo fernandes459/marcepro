@@ -22,6 +22,7 @@ import { CurrencyInput } from '@/components/CurrencyInput';
 import { generateBudgetPdf, defaultContractClauses } from '@/components/finance/BudgetPdfGenerator';
 
 interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; }
+const DEFAULT_PAYMENT_TEXT = '50% de entrada e o restante na entrega da obra';
 interface Client {
   id: string; name: string; phone: string; email: string | null; city: string | null;
   cpf_cnpj: string | null; address: string | null; neighborhood: string | null;
