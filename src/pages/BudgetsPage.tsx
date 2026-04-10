@@ -142,8 +142,9 @@ export default function BudgetsPage() {
   const profit = totalCost * (margin / 100);
   const finalPrice = totalCost + profit;
   const remaining = finalPrice - downPayment;
-  const machineDiscountAmount = remaining * (machineDiscount / 100);
-  const installmentValue = installments > 0 ? (remaining + machineDiscountAmount) / installments : 0;
+  const cardFeeAmount = remaining * (cardFeePercent / 100);
+  const totalWithFee = remaining + (installmentMethod === 'credit' ? cardFeeAmount : 0);
+  const installmentValue = installments > 0 ? totalWithFee / installments : 0;
 
   const buildPaymentDescription = () => {
     if (!useAdvancedPayment) return simplePaymentMethod;
