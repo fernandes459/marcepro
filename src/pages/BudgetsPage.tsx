@@ -431,7 +431,7 @@ export default function BudgetsPage() {
           <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle className="font-display">{editingBudgetId ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="space-y-5">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Cliente *</Label>
                   <Select value={selectedClientId} onValueChange={setSelectedClientId}>
@@ -440,41 +440,70 @@ export default function BudgetsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Nome do Projeto</Label>
-                  <Input placeholder="Ex: Cozinha Planejada" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
+                  <Label>Nome do Projeto *</Label>
+                  <Input placeholder="Ex: Cozinha Planejada" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Margem de Lucro (%)</Label>
                 <Input type="number" value={margin} onChange={(e) => setMargin(Number(e.target.value))} className="max-w-[120px]" />
               </div>
+
+              {/* Materiais */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Itens do Orçamento</Label>
+                  <Label className="text-sm font-semibold">Materiais e Serviços</Label>
                   <Button type="button" variant="outline" size="sm" onClick={addItem}><Plus className="h-3 w-3 mr-1" /> Adicionar</Button>
                 </div>
-                {items.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-6 gap-2 rounded-lg bg-muted/50 p-3 items-center">
-                    <Input placeholder="Descrição" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} className="col-span-2" />
-                    <Input type="number" placeholder="Qtd" value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} />
-                    <CurrencyInput value={item.materialCost} onChange={(v) => updateItem(idx, 'materialCost', v)} placeholder="Material" />
-                    <CurrencyInput value={item.laborCost} onChange={(v) => updateItem(idx, 'laborCost', v)} placeholder="M.O." />
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
-                  </div>
-                ))}
+                <div className="space-y-2">
+                  {items.map((item, idx) => {
+                    const itemSubtotal = (item.materialCost + item.laborCost) * item.quantity;
+                    return (
+                      <div key={idx} className="rounded-lg bg-muted/50 p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input placeholder="Nome do material/serviço" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} className="flex-1 text-sm" />
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="text-destructive shrink-0 h-8 w-8 p-0"><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] text-muted-foreground mb-1 block">Qtd</label>
+                            <Input type="number" value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} className="text-sm h-9" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-foreground mb-1 block">Material (R$)</label>
+                            <CurrencyInput value={item.materialCost} onChange={(v) => updateItem(idx, 'materialCost', v)} placeholder="0,00" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-foreground mb-1 block">M.O. (R$)</label>
+                            <CurrencyInput value={item.laborCost} onChange={(v) => updateItem(idx, 'laborCost', v)} placeholder="0,00" />
+                          </div>
+                        </div>
+                        {itemSubtotal > 0 && (
+                          <div className="text-right text-xs text-muted-foreground">
+                            Subtotal: <span className="font-semibold text-foreground">{formatBRL(itemSubtotal)}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Resumo financeiro */}
               <Card className="bg-accent/30 border-accent">
                 <CardContent className="p-4 space-y-2">
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Material</span><span className="font-medium">{formatBRL(totalMaterial)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Mão de Obra</span><span className="font-medium">{formatBRL(totalLabor)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Custo Total</span><span className="font-medium">{formatBRL(totalCost)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Lucro ({margin}%)</span><span className="font-medium text-success">{formatBRL(profit)}</span></div>
-                  <div className="border-t border-border pt-2 flex justify-between">
+                  <div className="border-t border-border pt-2 flex justify-between items-center">
                     <span className="font-bold font-display">Preço Final</span>
-                    <span className="font-bold font-display text-lg">{formatBRL(finalPrice)}</span>
+                    <span className="font-bold font-display text-xl">{formatBRL(finalPrice)}</span>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Forma de pagamento */}
               <div className="space-y-4 border border-border rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold">Forma de Pagamento</Label>
@@ -484,18 +513,12 @@ export default function BudgetsPage() {
                   </div>
                 </div>
                 {!useAdvancedPayment ? (
-                  <Select value={simplePaymentMethod} onValueChange={setSimplePaymentMethod}>
-                    <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="À Vista - PIX">À Vista - PIX</SelectItem>
-                      <SelectItem value="À Vista - Dinheiro">À Vista - Dinheiro</SelectItem>
-                      <SelectItem value="Cartão Crédito">Cartão Crédito</SelectItem>
-                      <SelectItem value="Cartão Débito">Cartão Débito</SelectItem>
-                      <SelectItem value="Boleto">Boleto</SelectItem>
-                      <SelectItem value="Transferência">Transferência</SelectItem>
-                      {[2,3,6,10,12].map(n => <SelectItem key={n} value={`${n}x Cartão`}>{n}x Cartão</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Textarea
+                    value={simplePaymentMethod}
+                    onChange={(e) => setSimplePaymentMethod(e.target.value)}
+                    placeholder="Ex: 50% de entrada e o restante na entrega da obra"
+                    className="min-h-[60px] text-sm"
+                  />
                 ) : (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -543,6 +566,16 @@ export default function BudgetsPage() {
                   </div>
                 )}
               </div>
+
+              {/* Envio simplificado toggle */}
+              <div className="flex items-center justify-between border border-border rounded-xl p-4">
+                <div>
+                  <Label className="text-sm font-semibold">Enviar versão resumida</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">Mostra apenas projeto, valor e pagamento</p>
+                </div>
+                <Switch checked={sendSimplified} onCheckedChange={setSendSimplified} />
+              </div>
+
               <div className="space-y-2"><Label>Observações</Label><Textarea placeholder="Notas sobre o orçamento..." value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
               <Button type="submit" className="w-full gradient-primary shadow-primary border-0" disabled={saving}>
                 {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
