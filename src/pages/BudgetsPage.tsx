@@ -46,7 +46,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } };
 
-function generateBudgetText(budget: Budget, clientData: Client | null) {
+function generateBudgetText(budget: Budget, clientData: Client | null, simplified = false) {
   const lines = [
     '═══════════════════════════════════',
     '        ORÇAMENTO - MARCENARIA PRO',
@@ -62,7 +62,7 @@ function generateBudgetText(budget: Budget, clientData: Client | null) {
     '', '── RESUMO ──────────────────────', '',
     `💰 VALOR TOTAL: ${formatBRL(budget.final_price)}`, '',
     budget.payment_method ? `Forma de Pagamento: ${budget.payment_method}` : '',
-    '', budget.notes ? `Observações: ${budget.notes}` : '',
+    '', budget.notes && !simplified ? `Observações: ${budget.notes}` : '',
     '', '═══════════════════════════════════',
     '      Marcenaria Pro - ERP',
     '═══════════════════════════════════',
