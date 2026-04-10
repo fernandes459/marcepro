@@ -249,12 +249,12 @@ export default function BudgetsPage() {
     setDialogOpen(true);
   };
 
-  const sendWhatsApp = (budget: Budget) => {
+  const sendWhatsApp = (budget: Budget, simplified = false) => {
     const client = budget.clients as Client | null;
     if (!client?.phone) { toast.error('Cliente sem telefone cadastrado'); return; }
     const phone = client.phone.replace(/\D/g, '');
     const phoneWithCountry = phone.startsWith('55') ? phone : `55${phone}`;
-    const text = generateBudgetText(budget, client);
+    const text = generateBudgetText(budget, client, simplified);
     window.open(`https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
