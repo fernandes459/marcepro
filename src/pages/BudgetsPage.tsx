@@ -97,7 +97,7 @@ export default function BudgetsPage() {
   const [downPaymentMethod, setDownPaymentMethod] = useState('pix');
   const [installments, setInstallments] = useState(1);
   const [installmentMethod, setInstallmentMethod] = useState('credit');
-  const [machineDiscount, setMachineDiscount] = useState(0);
+  const [cardFeePercent, setCardFeePercent] = useState(0);
   const [simplePaymentMethod, setSimplePaymentMethod] = useState(DEFAULT_PAYMENT_TEXT);
   const [sendSimplified, setSendSimplified] = useState(false);
   const fetchData = async () => {
