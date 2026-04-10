@@ -642,7 +642,10 @@ export default function BudgetsPage() {
                           <button onClick={() => openPdfDialog(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Gerar PDF">
                             <Download className="h-4 w-4 text-muted-foreground" />
                           </button>
-                          <button onClick={() => sendWhatsApp(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp">
+                          <button onClick={() => sendWhatsApp(b, true)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp (resumido)">
+                            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                          <button onClick={() => sendWhatsApp(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp (completo)">
                             <Send className="h-4 w-4 text-muted-foreground" />
                           </button>
                           <button onClick={() => openEditBudget(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Editar">
