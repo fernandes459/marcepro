@@ -22,6 +22,7 @@ import { CurrencyInput } from '@/components/CurrencyInput';
 import { generateBudgetPdf, defaultContractClauses } from '@/components/finance/BudgetPdfGenerator';
 
 interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; }
+const DEFAULT_PAYMENT_TEXT = '50% de entrada e o restante na entrega da obra';
 interface Client {
   id: string; name: string; phone: string; email: string | null; city: string | null;
   cpf_cnpj: string | null; address: string | null; neighborhood: string | null;
@@ -45,7 +46,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } };
 
-function generateBudgetText(budget: Budget, clientData: Client | null) {
+function generateBudgetText(budget: Budget, clientData: Client | null, simplified = false) {
   const lines = [
     '═══════════════════════════════════',
     '        ORÇAMENTO - MARCENARIA PRO',
@@ -61,7 +62,7 @@ function generateBudgetText(budget: Budget, clientData: Client | null) {
     '', '── RESUMO ──────────────────────', '',
     `💰 VALOR TOTAL: ${formatBRL(budget.final_price)}`, '',
     budget.payment_method ? `Forma de Pagamento: ${budget.payment_method}` : '',
-    '', budget.notes ? `Observações: ${budget.notes}` : '',
+    '', budget.notes && !simplified ? `Observações: ${budget.notes}` : '',
     '', '═══════════════════════════════════',
     '      Marcenaria Pro - ERP',
     '═══════════════════════════════════',
@@ -97,8 +98,8 @@ export default function BudgetsPage() {
   const [installments, setInstallments] = useState(1);
   const [installmentMethod, setInstallmentMethod] = useState('credit');
   const [machineDiscount, setMachineDiscount] = useState(0);
-  const [simplePaymentMethod, setSimplePaymentMethod] = useState('');
-
+  const [simplePaymentMethod, setSimplePaymentMethod] = useState(DEFAULT_PAYMENT_TEXT);
+  const [sendSimplified, setSendSimplified] = useState(false);
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
       supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
@@ -169,6 +170,7 @@ export default function BudgetsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !selectedClientId) { toast.error('Selecione um cliente'); return; }
+    if (!projectName.trim()) { toast.error('Nome do projeto é obrigatório'); return; }
     setSaving(true);
     const paymentDesc = buildPaymentDescription();
 
@@ -210,11 +212,11 @@ export default function BudgetsPage() {
   };
 
   const resetForm = () => {
-    setSelectedClientId(''); setProjectName(''); setSimplePaymentMethod(''); setNotes('');
+    setSelectedClientId(''); setProjectName(''); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT); setNotes('');
     setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
     setInstallments(1); setInstallmentMethod('credit'); setMachineDiscount(0);
-    setEditingBudgetId(null);
+    setEditingBudgetId(null); setSendSimplified(false);
   };
 
   const openEditBudget = async (budget: Budget) => {
@@ -247,12 +249,12 @@ export default function BudgetsPage() {
     setDialogOpen(true);
   };
 
-  const sendWhatsApp = (budget: Budget) => {
+  const sendWhatsApp = (budget: Budget, simplified = false) => {
     const client = budget.clients as Client | null;
     if (!client?.phone) { toast.error('Cliente sem telefone cadastrado'); return; }
     const phone = client.phone.replace(/\D/g, '');
     const phoneWithCountry = phone.startsWith('55') ? phone : `55${phone}`;
-    const text = generateBudgetText(budget, client);
+    const text = generateBudgetText(budget, client, simplified);
     window.open(`https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -429,7 +431,7 @@ export default function BudgetsPage() {
           <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle className="font-display">{editingBudgetId ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="space-y-5">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Cliente *</Label>
                   <Select value={selectedClientId} onValueChange={setSelectedClientId}>
@@ -438,41 +440,70 @@ export default function BudgetsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Nome do Projeto</Label>
-                  <Input placeholder="Ex: Cozinha Planejada" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
+                  <Label>Nome do Projeto *</Label>
+                  <Input placeholder="Ex: Cozinha Planejada" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Margem de Lucro (%)</Label>
                 <Input type="number" value={margin} onChange={(e) => setMargin(Number(e.target.value))} className="max-w-[120px]" />
               </div>
+
+              {/* Materiais */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Itens do Orçamento</Label>
+                  <Label className="text-sm font-semibold">Materiais e Serviços</Label>
                   <Button type="button" variant="outline" size="sm" onClick={addItem}><Plus className="h-3 w-3 mr-1" /> Adicionar</Button>
                 </div>
-                {items.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-6 gap-2 rounded-lg bg-muted/50 p-3 items-center">
-                    <Input placeholder="Descrição" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} className="col-span-2" />
-                    <Input type="number" placeholder="Qtd" value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} />
-                    <CurrencyInput value={item.materialCost} onChange={(v) => updateItem(idx, 'materialCost', v)} placeholder="Material" />
-                    <CurrencyInput value={item.laborCost} onChange={(v) => updateItem(idx, 'laborCost', v)} placeholder="M.O." />
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
-                  </div>
-                ))}
+                <div className="space-y-2">
+                  {items.map((item, idx) => {
+                    const itemSubtotal = (item.materialCost + item.laborCost) * item.quantity;
+                    return (
+                      <div key={idx} className="rounded-lg bg-muted/50 p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input placeholder="Nome do material/serviço" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} className="flex-1 text-sm" />
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="text-destructive shrink-0 h-8 w-8 p-0"><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] text-muted-foreground mb-1 block">Qtd</label>
+                            <Input type="number" value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} className="text-sm h-9" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-foreground mb-1 block">Material (R$)</label>
+                            <CurrencyInput value={item.materialCost} onChange={(v) => updateItem(idx, 'materialCost', v)} placeholder="0,00" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-foreground mb-1 block">M.O. (R$)</label>
+                            <CurrencyInput value={item.laborCost} onChange={(v) => updateItem(idx, 'laborCost', v)} placeholder="0,00" />
+                          </div>
+                        </div>
+                        {itemSubtotal > 0 && (
+                          <div className="text-right text-xs text-muted-foreground">
+                            Subtotal: <span className="font-semibold text-foreground">{formatBRL(itemSubtotal)}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Resumo financeiro */}
               <Card className="bg-accent/30 border-accent">
                 <CardContent className="p-4 space-y-2">
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Material</span><span className="font-medium">{formatBRL(totalMaterial)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Mão de Obra</span><span className="font-medium">{formatBRL(totalLabor)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Custo Total</span><span className="font-medium">{formatBRL(totalCost)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Lucro ({margin}%)</span><span className="font-medium text-success">{formatBRL(profit)}</span></div>
-                  <div className="border-t border-border pt-2 flex justify-between">
+                  <div className="border-t border-border pt-2 flex justify-between items-center">
                     <span className="font-bold font-display">Preço Final</span>
-                    <span className="font-bold font-display text-lg">{formatBRL(finalPrice)}</span>
+                    <span className="font-bold font-display text-xl">{formatBRL(finalPrice)}</span>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Forma de pagamento */}
               <div className="space-y-4 border border-border rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold">Forma de Pagamento</Label>
@@ -482,18 +513,12 @@ export default function BudgetsPage() {
                   </div>
                 </div>
                 {!useAdvancedPayment ? (
-                  <Select value={simplePaymentMethod} onValueChange={setSimplePaymentMethod}>
-                    <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="À Vista - PIX">À Vista - PIX</SelectItem>
-                      <SelectItem value="À Vista - Dinheiro">À Vista - Dinheiro</SelectItem>
-                      <SelectItem value="Cartão Crédito">Cartão Crédito</SelectItem>
-                      <SelectItem value="Cartão Débito">Cartão Débito</SelectItem>
-                      <SelectItem value="Boleto">Boleto</SelectItem>
-                      <SelectItem value="Transferência">Transferência</SelectItem>
-                      {[2,3,6,10,12].map(n => <SelectItem key={n} value={`${n}x Cartão`}>{n}x Cartão</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Textarea
+                    value={simplePaymentMethod}
+                    onChange={(e) => setSimplePaymentMethod(e.target.value)}
+                    placeholder="Ex: 50% de entrada e o restante na entrega da obra"
+                    className="min-h-[60px] text-sm"
+                  />
                 ) : (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -541,6 +566,16 @@ export default function BudgetsPage() {
                   </div>
                 )}
               </div>
+
+              {/* Envio simplificado toggle */}
+              <div className="flex items-center justify-between border border-border rounded-xl p-4">
+                <div>
+                  <Label className="text-sm font-semibold">Enviar versão resumida</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">Mostra apenas projeto, valor e pagamento</p>
+                </div>
+                <Switch checked={sendSimplified} onCheckedChange={setSendSimplified} />
+              </div>
+
               <div className="space-y-2"><Label>Observações</Label><Textarea placeholder="Notas sobre o orçamento..." value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
               <Button type="submit" className="w-full gradient-primary shadow-primary border-0" disabled={saving}>
                 {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -607,7 +642,10 @@ export default function BudgetsPage() {
                           <button onClick={() => openPdfDialog(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Gerar PDF">
                             <Download className="h-4 w-4 text-muted-foreground" />
                           </button>
-                          <button onClick={() => sendWhatsApp(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp">
+                          <button onClick={() => sendWhatsApp(b, true)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp (resumido)">
+                            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                          <button onClick={() => sendWhatsApp(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp (completo)">
                             <Send className="h-4 w-4 text-muted-foreground" />
                           </button>
                           <button onClick={() => openEditBudget(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Editar">

@@ -7,9 +7,10 @@ interface CurrencyInputProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  large?: boolean;
 }
 
-export function CurrencyInput({ value, onChange, placeholder = 'R$ 0,00', className, disabled }: CurrencyInputProps) {
+export function CurrencyInput({ value, onChange, placeholder = '0,00', className, disabled, large }: CurrencyInputProps) {
   const [display, setDisplay] = useState('');
 
   useEffect(() => {
@@ -31,13 +32,13 @@ export function CurrencyInput({ value, onChange, placeholder = 'R$ 0,00', classN
 
   return (
     <div className="relative">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
+      <span className={`absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-muted-foreground ${large ? 'text-base' : 'text-sm'}`}>R$</span>
       <Input
         value={display}
         onChange={(e) => handleChange(e.target.value)}
         onFocus={(e) => e.target.select()}
         placeholder={placeholder}
-        className={`pl-10 ${className || ''}`}
+        className={`pl-10 ${large ? 'text-lg h-12 font-semibold' : ''} ${className || ''}`}
         disabled={disabled}
         inputMode="numeric"
       />
