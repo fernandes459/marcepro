@@ -217,7 +217,7 @@ export default function BudgetsPage() {
     setSelectedClientId(''); setProjectName(''); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT); setNotes('');
     setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
-    setInstallments(1); setInstallmentMethod('credit'); setMachineDiscount(0);
+    setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
     setEditingBudgetId(null); setSendSimplified(false);
   };
 
@@ -536,33 +536,41 @@ export default function BudgetsPage() {
                         </Select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2"><Label className="text-xs">Parcelas</Label>
                         <Select value={String(installments)} onValueChange={v => setInstallments(Number(v))}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>{[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <SelectItem key={n} value={String(n)}>{n}x</SelectItem>)}</SelectContent>
+                          <SelectContent>{Array.from({length: 18}, (_, i) => i + 1).map(n => <SelectItem key={n} value={String(n)}>{n}x</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2"><Label className="text-xs">Método</Label>
-                        <Select value={installmentMethod} onValueChange={setInstallmentMethod}>
+                        <Select value={installmentMethod} onValueChange={(v) => { setInstallmentMethod(v); if (v !== 'credit') setCardFeePercent(0); }}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="credit">Cartão Crédito</SelectItem>
+                            <SelectItem value="debit">Cartão Débito</SelectItem>
                             <SelectItem value="boleto">Boleto</SelectItem>
-                            <SelectItem value="pix">PIX</SelectItem>
+                            <SelectItem value="pix">PIX (à vista)</SelectItem>
+                            <SelectItem value="dinheiro">Dinheiro (à vista)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2"><Label className="text-xs">Taxa Maquininha (%)</Label>
-                        <Input type="number" step="0.1" value={machineDiscount || ''} onChange={e => setMachineDiscount(Number(e.target.value))} placeholder="0" />
-                      </div>
                     </div>
+                    {installmentMethod === 'credit' && (
+                      <div className="space-y-2">
+                        <Label className="text-xs">Taxa do Cartão (%)</Label>
+                        <Input type="number" step="0.1" value={cardFeePercent || ''} onChange={e => setCardFeePercent(Number(e.target.value))} placeholder="Ex: 5.5" />
+                        <p className="text-[10px] text-muted-foreground">A taxa será adicionada ao valor das parcelas</p>
+                      </div>
+                    )}
                     <Card className="bg-muted/50">
                       <CardContent className="p-3 space-y-1 text-sm">
                         {downPayment > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Entrada ({downPaymentMethod === 'pix' ? 'PIX' : downPaymentMethod})</span><span className="font-medium">{formatBRL(downPayment)}</span></div>}
                         <div className="flex justify-between"><span className="text-muted-foreground">Restante</span><span className="font-medium">{formatBRL(remaining)}</span></div>
-                        {machineDiscount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Taxa ({machineDiscount}%)</span><span className="font-medium text-destructive">+{formatBRL(machineDiscountAmount)}</span></div>}
+                        {installmentMethod === 'credit' && cardFeePercent > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Taxa cartão ({cardFeePercent}%)</span><span className="font-medium text-destructive">+{formatBRL(cardFeeAmount)}</span></div>}
+                        {installmentMethod === 'credit' && cardFeePercent > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Total c/ taxa</span><span className="font-medium">{formatBRL(totalWithFee)}</span></div>}
                         <div className="flex justify-between border-t border-border pt-1"><span className="font-semibold">{installments}x de</span><span className="font-bold">{formatBRL(installmentValue)}</span></div>
+                        {installmentMethod !== 'credit' && <div className="text-[10px] text-success mt-1">✓ Sem taxa de cartão</div>}
                       </CardContent>
                     </Card>
                   </div>
