@@ -98,8 +98,8 @@ export default function BudgetsPage() {
   const [installments, setInstallments] = useState(1);
   const [installmentMethod, setInstallmentMethod] = useState('credit');
   const [machineDiscount, setMachineDiscount] = useState(0);
-  const [simplePaymentMethod, setSimplePaymentMethod] = useState('');
-
+  const [simplePaymentMethod, setSimplePaymentMethod] = useState(DEFAULT_PAYMENT_TEXT);
+  const [sendSimplified, setSendSimplified] = useState(false);
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
       supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
