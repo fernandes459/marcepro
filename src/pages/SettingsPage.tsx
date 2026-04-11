@@ -147,7 +147,8 @@ export default function SettingsPage() {
       state: company.state || null,
       cep: company.cep || null,
       default_margin: parseFloat(company.default_margin) || 40,
-    };
+      card_fees: company.card_fees,
+    } as any;
     if (existing) {
       await supabase.from('company_settings').update(payload).eq('id', existing.id);
     } else {
