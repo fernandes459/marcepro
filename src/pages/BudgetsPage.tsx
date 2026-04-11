@@ -573,7 +573,11 @@ export default function BudgetsPage() {
                       <div className="space-y-2">
                         <Label className="text-xs">Taxa do Cartão (%)</Label>
                         <Input type="number" step="0.1" value={cardFeePercent || ''} onChange={e => setCardFeePercent(Number(e.target.value))} placeholder="Ex: 5.5" />
-                        <p className="text-[10px] text-muted-foreground">A taxa será adicionada ao valor das parcelas</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {companySettings && (companySettings as any).card_fees?.[String(installments)]
+                            ? '✓ Taxa preenchida automaticamente das configurações'
+                            : 'Configure taxas padrão em Configurações → Taxas'}
+                        </p>
                       </div>
                     )}
                     <Card className="bg-muted/50">
