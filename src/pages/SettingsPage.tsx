@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link } from 'lucide-react';
+import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -26,6 +26,10 @@ interface Employee {
   notes: string | null;
 }
 
+interface CardFees {
+  [installments: string]: number; // e.g. "1": 0, "2": 3.5, "12": 12
+}
+
 interface CompanySettings {
   company_name: string;
   cnpj: string;
@@ -36,6 +40,7 @@ interface CompanySettings {
   state: string;
   cep: string;
   default_margin: string;
+  card_fees: CardFees;
 }
 
 interface TeamMember {
@@ -85,7 +90,7 @@ export default function SettingsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [company, setCompany] = useState<CompanySettings>({
-    company_name: '', cnpj: '', phone: '', email: '', address: '', city: '', state: '', cep: '', default_margin: '40',
+    company_name: '', cnpj: '', phone: '', email: '', address: '', city: '', state: '', cep: '', default_margin: '40', card_fees: {},
   });
 
   // Team access
@@ -119,6 +124,7 @@ export default function SettingsPage() {
         state: data.state || '',
         cep: data.cep || '',
         default_margin: String(data.default_margin || 40),
+        card_fees: (data as any).card_fees || {},
       });
     }
   }
@@ -141,7 +147,8 @@ export default function SettingsPage() {
       state: company.state || null,
       cep: company.cep || null,
       default_margin: parseFloat(company.default_margin) || 40,
-    };
+      card_fees: company.card_fees,
+    } as any;
     if (existing) {
       await supabase.from('company_settings').update(payload).eq('id', existing.id);
     } else {
@@ -251,6 +258,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="company">
         <TabsList className="flex-wrap">
           <TabsTrigger value="company"><Building className="h-4 w-4 mr-1" /> Empresa</TabsTrigger>
+          <TabsTrigger value="fees"><CreditCard className="h-4 w-4 mr-1" /> Taxas</TabsTrigger>
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-1" /> Equipe</TabsTrigger>
           <TabsTrigger value="access"><Shield className="h-4 w-4 mr-1" /> Acessos</TabsTrigger>
           <TabsTrigger value="profile"><User className="h-4 w-4 mr-1" /> Perfil</TabsTrigger>
@@ -275,6 +283,48 @@ export default function SettingsPage() {
                 <div className="space-y-2"><Label>Margem de Lucro Padrão (%)</Label><Input type="number" value={company.default_margin} onChange={e => setCompany({ ...company, default_margin: e.target.value })} /></div>
               </div>
               <Button className="gradient-primary shadow-primary border-0" onClick={saveCompany}>Salvar Configurações</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Card Fees */}
+        <TabsContent value="fees">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-display flex items-center gap-2">
+                <CreditCard className="h-4 w-4" /> Taxas de Cartão de Crédito
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Configure a taxa (%) para cada número de parcelas. Ao selecionar "Cartão de Crédito" nos orçamentos, a taxa será aplicada automaticamente.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {Array.from({ length: 18 }, (_, i) => i + 1).map(n => (
+                  <div key={n} className="space-y-1">
+                    <Label className="text-xs font-medium">{n}x</Label>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        className="h-9 text-sm"
+                        placeholder="0"
+                        value={company.card_fees[String(n)] ?? ''}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setCompany(prev => ({
+                            ...prev,
+                            card_fees: { ...prev.card_fees, [String(n)]: val === '' ? 0 : Number(val) },
+                          }));
+                        }}
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button className="gradient-primary shadow-primary border-0" onClick={saveCompany}>Salvar Taxas</Button>
             </CardContent>
           </Card>
         </TabsContent>
