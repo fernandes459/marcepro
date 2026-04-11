@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Plus, Search, Send, FileText, Loader2, Trash2, Edit, CheckCircle, XCircle,
-  Factory, Download, MessageSquare, ChevronDown, Settings2,
+  Factory, Download, MessageSquare, Settings2, Eye, EyeOff,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,11 +57,11 @@ function generateBudgetText(budget: Budget, clientData: Client | null, simplifie
     '', '── CLIENTE ──────────────────────',
     clientData ? `Nome: ${clientData.name}` : '',
     clientData?.phone ? `Telefone: ${clientData.phone}` : '',
-    clientData?.email ? `Email: ${clientData.email}` : '',
-    clientData?.city ? `Cidade: ${clientData.city}` : '',
+    !simplified && clientData?.email ? `Email: ${clientData.email}` : '',
+    !simplified && clientData?.city ? `Cidade: ${clientData.city}` : '',
     '', '── RESUMO ──────────────────────', '',
     `💰 VALOR TOTAL: ${formatBRL(budget.final_price)}`, '',
-    budget.payment_method ? `Forma de Pagamento: ${budget.payment_method}` : '',
+    budget.payment_method ? `Condições de Pagamento: ${budget.payment_method}` : '',
     '', budget.notes && !simplified ? `Observações: ${budget.notes}` : '',
     '', '═══════════════════════════════════',
     '      Marcenaria Pro - ERP',
@@ -86,12 +86,16 @@ export default function BudgetsPage() {
   const [enabledClauses, setEnabledClauses] = useState<boolean[]>(defaultContractClauses.map(() => true));
   const [companySettings, setCompanySettings] = useState<any>(null);
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [pdfSimplified, setPdfSimplified] = useState(false);
 
   const [selectedClientId, setSelectedClientId] = useState('');
   const [projectName, setProjectName] = useState('');
   const [notes, setNotes] = useState('');
   const [margin, setMargin] = useState(40);
   const [items, setItems] = useState<BudgetItem[]>([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
+  const [extraTaxes, setExtraTaxes] = useState(0);
+  const [extraFreight, setExtraFreight] = useState(0);
+  const [extraOther, setExtraOther] = useState(0);
   const [useAdvancedPayment, setUseAdvancedPayment] = useState(false);
   const [downPayment, setDownPayment] = useState(0);
   const [downPaymentMethod, setDownPaymentMethod] = useState('pix');
@@ -99,7 +103,7 @@ export default function BudgetsPage() {
   const [installmentMethod, setInstallmentMethod] = useState('credit');
   const [cardFeePercent, setCardFeePercent] = useState(0);
   const [simplePaymentMethod, setSimplePaymentMethod] = useState(DEFAULT_PAYMENT_TEXT);
-  const [sendSimplified, setSendSimplified] = useState(false);
+
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
       supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
@@ -114,7 +118,6 @@ export default function BudgetsPage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // Auto-fill card fee from company settings
   useEffect(() => {
     if (installmentMethod === 'credit' && companySettings) {
       const fees = (companySettings as any).card_fees || {};
@@ -127,17 +130,12 @@ export default function BudgetsPage() {
     }
   }, [installments, installmentMethod, companySettings]);
 
-  // Realtime subscription for budgets
   useEffect(() => {
     if (!user) return;
     const channel = supabase
       .channel(`budgets-live-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => {
-        fetchData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
-        fetchData();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
@@ -151,7 +149,8 @@ export default function BudgetsPage() {
 
   const totalMaterial = items.reduce((s, i) => s + i.materialCost * i.quantity, 0);
   const totalLabor = items.reduce((s, i) => s + i.laborCost * i.quantity, 0);
-  const totalCost = totalMaterial + totalLabor;
+  const totalItemsCost = totalMaterial + totalLabor;
+  const totalCost = totalItemsCost + extraTaxes + extraFreight + extraOther;
   const profit = totalCost * (margin / 100);
   const finalPrice = totalCost + profit;
   const remaining = finalPrice - downPayment;
@@ -190,7 +189,6 @@ export default function BudgetsPage() {
     const paymentDesc = buildPaymentDescription();
 
     if (editingBudgetId) {
-      // Update existing budget
       const { error: budgetError } = await supabase.from('budgets').update({
         client_id: selectedClientId,
         project_name: projectName || null,
@@ -198,8 +196,6 @@ export default function BudgetsPage() {
         payment_method: paymentDesc || null, notes: notes || null,
       } as any).eq('id', editingBudgetId);
       if (budgetError) { toast.error('Erro ao atualizar orçamento'); setSaving(false); return; }
-      
-      // Delete old items and insert new ones
       await supabase.from('budget_items').delete().eq('budget_id', editingBudgetId);
       const budgetItems = items.filter(i => i.name.trim()).map(i => ({
         budget_id: editingBudgetId, name: i.name, quantity: i.quantity,
@@ -208,7 +204,6 @@ export default function BudgetsPage() {
       if (budgetItems.length > 0) await supabase.from('budget_items').insert(budgetItems as any);
       toast.success('Orçamento atualizado!');
     } else {
-      // Create new budget
       const { data: budgetData, error: budgetError } = await supabase.from('budgets').insert({
         user_id: user.id, client_id: selectedClientId, code: 'TEMP',
         project_name: projectName || null, status: 'draft',
@@ -229,9 +224,10 @@ export default function BudgetsPage() {
   const resetForm = () => {
     setSelectedClientId(''); setProjectName(''); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT); setNotes('');
     setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
+    setExtraTaxes(0); setExtraFreight(0); setExtraOther(0);
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
     setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
-    setEditingBudgetId(null); setSendSimplified(false);
+    setEditingBudgetId(null);
   };
 
   const openEditBudget = async (budget: Budget) => {
@@ -240,8 +236,6 @@ export default function BudgetsPage() {
     setProjectName(budget.project_name || '');
     setNotes(budget.notes || '');
     setMargin(budget.profit_margin);
-    
-    // Load budget items
     const { data: budgetItems } = await supabase.from('budget_items').select('*').eq('budget_id', budget.id);
     if (budgetItems && budgetItems.length > 0) {
       setItems(budgetItems.map((i: any) => ({
@@ -251,16 +245,12 @@ export default function BudgetsPage() {
     } else {
       setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
     }
-
-    // Parse payment method
     if (budget.payment_method && budget.payment_method.includes('Entrada:')) {
       setUseAdvancedPayment(true);
-      // Simple parsing - just set the payment method text
     } else {
       setUseAdvancedPayment(false);
-      setSimplePaymentMethod(budget.payment_method || '');
+      setSimplePaymentMethod(budget.payment_method || DEFAULT_PAYMENT_TEXT);
     }
-    
     setDialogOpen(true);
   };
 
@@ -293,28 +283,18 @@ export default function BudgetsPage() {
     const budget = budgets.find(b => b.id === id);
     const { error } = await supabase.from('budgets').update({ status } as any).eq('id', id);
     if (error) { toast.error('Erro ao atualizar status'); return; }
-    
-    // Auto-create financial transactions when budget is approved
     if (status === 'approved' && budget && user) {
       const client = budget.clients as Client | null;
       const paymentStr = budget.payment_method || '';
-      
-      // Parse down payment from payment method string
       const entradaMatch = paymentStr.match(/Entrada:\s*R\$\s*([\d.,]+)/);
-      const downPaymentValue = entradaMatch 
-        ? parseFloat(entradaMatch[1].replace(/\./g, '').replace(',', '.')) 
-        : 0;
+      const downPaymentValue = entradaMatch ? parseFloat(entradaMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
       const remainingValue = budget.final_price - downPaymentValue;
-
-      // Parse installments
       const parcelasMatch = paymentStr.match(/(\d+)x\s*de/);
       const numInstallments = parcelasMatch ? parseInt(parcelasMatch[1]) : 1;
-
       const today = new Date().toISOString().slice(0, 10);
       const baseDesc = `${budget.project_name || budget.code} — ${client?.name || 'Cliente'}`;
 
       if (downPaymentValue > 0) {
-        // Create PAID entry for down payment
         await supabase.from('financial_transactions').insert({
           user_id: user.id, type: 'income', category: 'project',
           description: `${baseDesc} (Entrada)`,
@@ -324,9 +304,7 @@ export default function BudgetsPage() {
           notes: `Entrada do orçamento ${budget.code}`,
         } as any);
       }
-
       if (remainingValue > 0) {
-        // Create PENDING entry for remaining amount with due date in business days
         const dueDate = addBusinessDays(new Date(), 30);
         await supabase.from('financial_transactions').insert({
           user_id: user.id, type: 'income', category: 'project',
@@ -339,9 +317,7 @@ export default function BudgetsPage() {
           notes: `Saldo restante do orçamento ${budget.code}\nVencimento: ${dueDate.toLocaleDateString('pt-BR')}\nTotal do projeto: ${formatBRL(budget.final_price)}`,
         } as any);
       }
-
       if (downPaymentValue === 0 && remainingValue === 0) {
-        // No payment info parsed, create single pending transaction
         await supabase.from('financial_transactions').insert({
           user_id: user.id, type: 'income', category: 'project',
           description: baseDesc, amount: budget.final_price, date: today,
@@ -350,10 +326,8 @@ export default function BudgetsPage() {
           notes: `Orçamento aprovado: ${budget.code}\nValor total: ${formatBRL(budget.final_price)}`,
         } as any);
       }
-      
       toast.info('Lançamentos financeiros criados automaticamente');
     }
-    
     toast.success(`Status atualizado para ${statusConfig[status]?.label || status}`);
     fetchData();
   };
@@ -380,6 +354,7 @@ export default function BudgetsPage() {
     setContractClauses([...defaultContractClauses]);
     setEnabledClauses(defaultContractClauses.map(() => true));
     setDeliveryDays(30);
+    setPdfSimplified(false);
     setPdfDialogOpen(true);
   };
 
@@ -413,6 +388,7 @@ export default function BudgetsPage() {
       companyEmail: companySettings?.email,
       companyAddress: companySettings?.address,
       contractClauses: activeClauses,
+      simplified: pdfSimplified,
     });
     setPdfDialogOpen(false);
   };
@@ -429,7 +405,6 @@ export default function BudgetsPage() {
     setEnabledClauses(enabledClauses.filter((_, i) => i !== idx));
   };
 
-  // Calculate delivery date preview
   const deliveryDate = selectedBudget ? addBusinessDays(new Date(selectedBudget.created_at), deliveryDays) : addBusinessDays(new Date(), deliveryDays);
 
   return (
@@ -504,24 +479,46 @@ export default function BudgetsPage() {
                 </div>
               </div>
 
-              {/* Resumo financeiro */}
-              <Card className="bg-accent/30 border-accent">
-                <CardContent className="p-4 space-y-2">
+              {/* Custos adicionais */}
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold">Custos Adicionais</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground mb-1 block">Taxas (R$)</label>
+                    <CurrencyInput value={extraTaxes} onChange={setExtraTaxes} placeholder="0,00" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground mb-1 block">Frete (R$)</label>
+                    <CurrencyInput value={extraFreight} onChange={setExtraFreight} placeholder="0,00" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground mb-1 block">Outros (R$)</label>
+                    <CurrencyInput value={extraOther} onChange={setExtraOther} placeholder="0,00" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Resumo financeiro - sticky on mobile */}
+              <Card className="bg-accent/30 border-accent sticky bottom-0 z-10">
+                <CardContent className="p-4 space-y-1.5">
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Material</span><span className="font-medium">{formatBRL(totalMaterial)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Mão de Obra</span><span className="font-medium">{formatBRL(totalLabor)}</span></div>
+                  {extraTaxes > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxas</span><span className="font-medium">{formatBRL(extraTaxes)}</span></div>}
+                  {extraFreight > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Frete</span><span className="font-medium">{formatBRL(extraFreight)}</span></div>}
+                  {extraOther > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Outros</span><span className="font-medium">{formatBRL(extraOther)}</span></div>}
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Custo Total</span><span className="font-medium">{formatBRL(totalCost)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Lucro ({margin}%)</span><span className="font-medium text-success">{formatBRL(profit)}</span></div>
                   <div className="border-t border-border pt-2 flex justify-between items-center">
-                    <span className="font-bold font-display">Preço Final</span>
-                    <span className="font-bold font-display text-xl">{formatBRL(finalPrice)}</span>
+                    <span className="font-bold font-display text-base">VALOR TOTAL</span>
+                    <span className="font-bold font-display text-2xl">{formatBRL(finalPrice)}</span>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Forma de pagamento */}
+              {/* Condições de pagamento */}
               <div className="space-y-4 border border-border rounded-xl p-4">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Forma de Pagamento</Label>
+                  <Label className="text-sm font-semibold">Condições de Pagamento</Label>
                   <div className="flex items-center gap-2">
                     <Label className="text-xs text-muted-foreground">Avançado</Label>
                     <Switch checked={useAdvancedPayment} onCheckedChange={setUseAdvancedPayment} />
@@ -594,16 +591,7 @@ export default function BudgetsPage() {
                 )}
               </div>
 
-              {/* Envio simplificado toggle */}
-              <div className="flex items-center justify-between border border-border rounded-xl p-4">
-                <div>
-                  <Label className="text-sm font-semibold">Enviar versão resumida</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">Mostra apenas projeto, valor e pagamento</p>
-                </div>
-                <Switch checked={sendSimplified} onCheckedChange={setSendSimplified} />
-              </div>
-
-              <div className="space-y-2"><Label>Observações</Label><Textarea placeholder="Notas sobre o orçamento..." value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+              <div className="space-y-2"><Label>Observações</Label><Textarea placeholder="Notas internas sobre o orçamento..." value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
               <Button type="submit" className="w-full gradient-primary shadow-primary border-0" disabled={saving}>
                 {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 <FileText className="h-4 w-4 mr-2" /> {editingBudgetId ? 'Salvar Alterações' : 'Salvar Orçamento'}
@@ -666,7 +654,7 @@ export default function BudgetsPage() {
                               <Factory className="h-3.5 w-3.5 mr-1" /> Produzir
                             </Button>
                           )}
-                          <button onClick={() => openPdfDialog(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Gerar PDF">
+                          <button onClick={() => openPdfDialog(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="PDF Completo">
                             <Download className="h-4 w-4 text-muted-foreground" />
                           </button>
                           <button onClick={() => sendWhatsApp(b, true)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp (resumido)">
@@ -697,10 +685,26 @@ export default function BudgetsPage() {
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" /> Gerar PDF — Orçamento / Contrato
+              <FileText className="h-5 w-5 text-primary" /> Gerar PDF — Orçamento
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5">
+            {/* Modo de PDF */}
+            <div className="flex items-center justify-between border border-border rounded-xl p-4">
+              <div>
+                <Label className="text-sm font-semibold flex items-center gap-2">
+                  {pdfSimplified ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {pdfSimplified ? 'Modo Simplificado (Cliente)' : 'Modo Completo (Interno)'}
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {pdfSimplified
+                    ? 'Mostra apenas: Projeto, Cliente, Valor Total e Condições'
+                    : 'Mostra todos os detalhes: itens, custos, cláusulas'}
+                </p>
+              </div>
+              <Switch checked={pdfSimplified} onCheckedChange={setPdfSimplified} />
+            </div>
+
             <div className="space-y-2">
               <Label>Prazo de Entrega (dias úteis)</Label>
               <Input type="number" value={deliveryDays} onChange={e => setDeliveryDays(Number(e.target.value))} className="max-w-[150px]" />
@@ -709,45 +713,48 @@ export default function BudgetsPage() {
               </p>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold flex items-center gap-2">
-                  <Settings2 className="h-4 w-4" /> Cláusulas do Contrato
-                </Label>
+            {!pdfSimplified && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold flex items-center gap-2">
+                    <Settings2 className="h-4 w-4" /> Cláusulas do Contrato
+                  </Label>
+                </div>
+                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                  {contractClauses.map((clause, idx) => (
+                    <div key={idx} className="flex items-start gap-2 rounded-lg bg-muted/50 p-3">
+                      <Checkbox
+                        checked={enabledClauses[idx]}
+                        onCheckedChange={(checked) => {
+                          const newEnabled = [...enabledClauses];
+                          newEnabled[idx] = checked === true;
+                          setEnabledClauses(newEnabled);
+                        }}
+                        className="mt-0.5"
+                      />
+                      <p className={`text-xs flex-1 ${!enabledClauses[idx] ? 'line-through text-muted-foreground' : ''}`}>{clause}</p>
+                      <button onClick={() => removeClause(idx)} className="text-muted-foreground hover:text-destructive shrink-0">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Adicionar nova cláusula..."
+                    value={newClause}
+                    onChange={e => setNewClause(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomClause(); } }}
+                    className="text-xs"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={addCustomClause}><Plus className="h-3 w-3" /></Button>
+                </div>
               </div>
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                {contractClauses.map((clause, idx) => (
-                  <div key={idx} className="flex items-start gap-2 rounded-lg bg-muted/50 p-3">
-                    <Checkbox
-                      checked={enabledClauses[idx]}
-                      onCheckedChange={(checked) => {
-                        const newEnabled = [...enabledClauses];
-                        newEnabled[idx] = checked === true;
-                        setEnabledClauses(newEnabled);
-                      }}
-                      className="mt-0.5"
-                    />
-                    <p className={`text-xs flex-1 ${!enabledClauses[idx] ? 'line-through text-muted-foreground' : ''}`}>{clause}</p>
-                    <button onClick={() => removeClause(idx)} className="text-muted-foreground hover:text-destructive shrink-0">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Adicionar nova cláusula..."
-                  value={newClause}
-                  onChange={e => setNewClause(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomClause(); } }}
-                  className="text-xs"
-                />
-                <Button type="button" variant="outline" size="sm" onClick={addCustomClause}><Plus className="h-3 w-3" /></Button>
-              </div>
-            </div>
+            )}
 
             <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleGeneratePdf}>
-              <Download className="h-4 w-4 mr-2" /> Gerar PDF do Orçamento + Contrato
+              <Download className="h-4 w-4 mr-2" />
+              {pdfSimplified ? 'Gerar PDF Simplificado' : 'Gerar PDF Completo + Contrato'}
             </Button>
           </div>
         </DialogContent>
