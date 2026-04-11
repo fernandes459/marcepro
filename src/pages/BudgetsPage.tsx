@@ -114,6 +114,19 @@ export default function BudgetsPage() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Auto-fill card fee from company settings
+  useEffect(() => {
+    if (installmentMethod === 'credit' && companySettings) {
+      const fees = (companySettings as any).card_fees || {};
+      const autoFee = fees[String(installments)];
+      if (autoFee !== undefined && autoFee !== null) {
+        setCardFeePercent(Number(autoFee));
+      }
+    } else if (installmentMethod !== 'credit') {
+      setCardFeePercent(0);
+    }
+  }, [installments, installmentMethod, companySettings]);
+
   // Realtime subscription for budgets
   useEffect(() => {
     if (!user) return;
