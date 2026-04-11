@@ -287,6 +287,48 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        {/* Card Fees */}
+        <TabsContent value="fees">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-display flex items-center gap-2">
+                <CreditCard className="h-4 w-4" /> Taxas de Cartão de Crédito
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Configure a taxa (%) para cada número de parcelas. Ao selecionar "Cartão de Crédito" nos orçamentos, a taxa será aplicada automaticamente.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {Array.from({ length: 18 }, (_, i) => i + 1).map(n => (
+                  <div key={n} className="space-y-1">
+                    <Label className="text-xs font-medium">{n}x</Label>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        className="h-9 text-sm"
+                        placeholder="0"
+                        value={company.card_fees[String(n)] ?? ''}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setCompany(prev => ({
+                            ...prev,
+                            card_fees: { ...prev.card_fees, [String(n)]: val === '' ? 0 : Number(val) },
+                          }));
+                        }}
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button className="gradient-primary shadow-primary border-0" onClick={saveCompany}>Salvar Taxas</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Team */}
         <TabsContent value="team">
           <Card>
