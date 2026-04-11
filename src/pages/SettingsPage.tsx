@@ -90,7 +90,7 @@ export default function SettingsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [company, setCompany] = useState<CompanySettings>({
-    company_name: '', cnpj: '', phone: '', email: '', address: '', city: '', state: '', cep: '', default_margin: '40',
+    company_name: '', cnpj: '', phone: '', email: '', address: '', city: '', state: '', cep: '', default_margin: '40', card_fees: {},
   });
 
   // Team access
