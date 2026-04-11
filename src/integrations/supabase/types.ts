@@ -267,6 +267,7 @@ export type Database = {
       company_settings: {
         Row: {
           address: string | null
+          card_fees: Json
           cep: string | null
           city: string | null
           cnpj: string | null
@@ -283,6 +284,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          card_fees?: Json
           cep?: string | null
           city?: string | null
           cnpj?: string | null
@@ -299,6 +301,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          card_fees?: Json
           cep?: string | null
           city?: string | null
           cnpj?: string | null

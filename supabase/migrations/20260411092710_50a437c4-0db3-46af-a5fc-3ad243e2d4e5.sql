@@ -1,0 +1,1 @@
+ALTER TABLE public.company_settings ADD COLUMN card_fees jsonb DEFAULT '{}' NOT NULL;
