@@ -26,6 +26,10 @@ interface Employee {
   notes: string | null;
 }
 
+interface CardFees {
+  [installments: string]: number; // e.g. "1": 0, "2": 3.5, "12": 12
+}
+
 interface CompanySettings {
   company_name: string;
   cnpj: string;
@@ -36,6 +40,7 @@ interface CompanySettings {
   state: string;
   cep: string;
   default_margin: string;
+  card_fees: CardFees;
 }
 
 interface TeamMember {
