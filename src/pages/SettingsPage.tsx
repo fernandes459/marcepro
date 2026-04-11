@@ -124,6 +124,7 @@ export default function SettingsPage() {
         state: data.state || '',
         cep: data.cep || '',
         default_margin: String(data.default_margin || 40),
+        card_fees: (data as any).card_fees || {},
       });
     }
   }
