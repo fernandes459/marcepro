@@ -277,6 +277,8 @@ export default function BudgetsPage() {
       setUseAdvancedPayment(false);
       setSimplePaymentMethod(budget.payment_method || DEFAULT_PAYMENT_TEXT);
     }
+    setComplexityFactor(String(budget.complexity_factor || '1.0'));
+    setFinishType(budget.finish_type || '');
     setDialogOpen(true);
   };
 
