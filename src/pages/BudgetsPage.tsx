@@ -32,8 +32,27 @@ interface Budget {
   id: string; code: string; client_id: string | null; project_name: string | null;
   status: string; total_cost: number; profit_margin: number; final_price: number;
   payment_method: string | null; notes: string | null; created_at: string;
+  complexity_factor: number; finish_type: string | null;
   clients?: Client | null;
 }
+
+const COMPLEXITY_OPTIONS = [
+  { value: '1.0', label: 'Simples', multiplier: 1.0, description: 'Projeto padrão, sem detalhes complexos' },
+  { value: '1.15', label: 'Médio', multiplier: 1.15, description: 'Alguns detalhes customizados' },
+  { value: '1.3', label: 'Alto', multiplier: 1.3, description: 'Design elaborado com muitos detalhes' },
+  { value: '1.5', label: 'Premium', multiplier: 1.5, description: 'Projeto exclusivo de alta complexidade' },
+];
+
+const FINISH_OPTIONS = [
+  { value: 'laminado', label: 'Laminado', multiplier: 1.0 },
+  { value: 'mdf_cru', label: 'MDF Cru', multiplier: 1.0 },
+  { value: 'pintura_pu', label: 'Pintura PU', multiplier: 1.15 },
+  { value: 'laca', label: 'Laca', multiplier: 1.25 },
+  { value: 'verniz', label: 'Verniz Natural', multiplier: 1.1 },
+  { value: 'madeira_macica', label: 'Madeira Maciça', multiplier: 1.4 },
+  { value: 'revestimento_natural', label: 'Revestimento Natural', multiplier: 1.35 },
+  { value: 'outro', label: 'Outro', multiplier: 1.0 },
+];
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   draft: { label: 'Rascunho', className: 'bg-muted text-muted-foreground' },
