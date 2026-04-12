@@ -234,6 +234,7 @@ export default function BudgetsPage() {
         project_name: projectName || null, status: 'draft',
         total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
         payment_method: paymentDesc || null, notes: notes || null,
+        complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
       } as any).select().single();
       if (budgetError || !budgetData) { toast.error('Erro ao criar orçamento'); setSaving(false); return; }
       const budgetItems = items.filter(i => i.name.trim()).map(i => ({
