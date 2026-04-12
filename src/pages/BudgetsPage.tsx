@@ -251,7 +251,7 @@ export default function BudgetsPage() {
     setExtraTaxes(0); setExtraFreight(0); setExtraOther(0);
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
     setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
-    setEditingBudgetId(null);
+    setEditingBudgetId(null); setComplexityFactor('1.0'); setFinishType('');
   };
 
   const openEditBudget = async (budget: Budget) => {
