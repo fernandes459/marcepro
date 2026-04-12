@@ -567,7 +567,14 @@ export default function BudgetsPage() {
                   {extraTaxes > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxas</span><span className="font-medium">{formatBRL(extraTaxes)}</span></div>}
                   {extraFreight > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Frete</span><span className="font-medium">{formatBRL(extraFreight)}</span></div>}
                   {extraOther > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Outros</span><span className="font-medium">{formatBRL(extraOther)}</span></div>}
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Custo Total</span><span className="font-medium">{formatBRL(totalCost)}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal Base</span><span className="font-medium">{formatBRL(baseCost)}</span></div>
+                  {complexityMultiplier > 1 && (
+                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Complexidade ({COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.label})</span><span className="font-medium text-warning">×{complexityMultiplier}</span></div>
+                  )}
+                  {finishMultiplier > 1 && (
+                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Acabamento ({FINISH_OPTIONS.find(f => f.value === finishType)?.label})</span><span className="font-medium text-warning">×{finishMultiplier}</span></div>
+                  )}
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Custo Ajustado</span><span className="font-medium">{formatBRL(totalCost)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Lucro ({margin}%)</span><span className="font-medium text-success">{formatBRL(profit)}</span></div>
                   <div className="border-t border-border pt-2 flex justify-between items-center">
                     <span className="font-bold font-display text-base">VALOR TOTAL</span>
