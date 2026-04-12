@@ -32,8 +32,27 @@ interface Budget {
   id: string; code: string; client_id: string | null; project_name: string | null;
   status: string; total_cost: number; profit_margin: number; final_price: number;
   payment_method: string | null; notes: string | null; created_at: string;
+  complexity_factor: number; finish_type: string | null;
   clients?: Client | null;
 }
+
+const COMPLEXITY_OPTIONS = [
+  { value: '1.0', label: 'Simples', multiplier: 1.0, description: 'Projeto padrão, sem detalhes complexos' },
+  { value: '1.15', label: 'Médio', multiplier: 1.15, description: 'Alguns detalhes customizados' },
+  { value: '1.3', label: 'Alto', multiplier: 1.3, description: 'Design elaborado com muitos detalhes' },
+  { value: '1.5', label: 'Premium', multiplier: 1.5, description: 'Projeto exclusivo de alta complexidade' },
+];
+
+const FINISH_OPTIONS = [
+  { value: 'laminado', label: 'Laminado', multiplier: 1.0 },
+  { value: 'mdf_cru', label: 'MDF Cru', multiplier: 1.0 },
+  { value: 'pintura_pu', label: 'Pintura PU', multiplier: 1.15 },
+  { value: 'laca', label: 'Laca', multiplier: 1.25 },
+  { value: 'verniz', label: 'Verniz Natural', multiplier: 1.1 },
+  { value: 'madeira_macica', label: 'Madeira Maciça', multiplier: 1.4 },
+  { value: 'revestimento_natural', label: 'Revestimento Natural', multiplier: 1.35 },
+  { value: 'outro', label: 'Outro', multiplier: 1.0 },
+];
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   draft: { label: 'Rascunho', className: 'bg-muted text-muted-foreground' },
@@ -103,6 +122,8 @@ export default function BudgetsPage() {
   const [installmentMethod, setInstallmentMethod] = useState('credit');
   const [cardFeePercent, setCardFeePercent] = useState(0);
   const [simplePaymentMethod, setSimplePaymentMethod] = useState(DEFAULT_PAYMENT_TEXT);
+  const [complexityFactor, setComplexityFactor] = useState('1.0');
+  const [finishType, setFinishType] = useState('');
 
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
@@ -150,7 +171,10 @@ export default function BudgetsPage() {
   const totalMaterial = items.reduce((s, i) => s + i.materialCost * i.quantity, 0);
   const totalLabor = items.reduce((s, i) => s + i.laborCost * i.quantity, 0);
   const totalItemsCost = totalMaterial + totalLabor;
-  const totalCost = totalItemsCost + extraTaxes + extraFreight + extraOther;
+  const complexityMultiplier = COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.multiplier || 1.0;
+  const finishMultiplier = FINISH_OPTIONS.find(f => f.value === finishType)?.multiplier || 1.0;
+  const baseCost = totalItemsCost + extraTaxes + extraFreight + extraOther;
+  const totalCost = baseCost * complexityMultiplier * finishMultiplier;
   const profit = totalCost * (margin / 100);
   const finalPrice = totalCost + profit;
   const remaining = finalPrice - downPayment;
@@ -194,6 +218,7 @@ export default function BudgetsPage() {
         project_name: projectName || null,
         total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
         payment_method: paymentDesc || null, notes: notes || null,
+        complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
       } as any).eq('id', editingBudgetId);
       if (budgetError) { toast.error('Erro ao atualizar orçamento'); setSaving(false); return; }
       await supabase.from('budget_items').delete().eq('budget_id', editingBudgetId);
@@ -209,6 +234,7 @@ export default function BudgetsPage() {
         project_name: projectName || null, status: 'draft',
         total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
         payment_method: paymentDesc || null, notes: notes || null,
+        complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
       } as any).select().single();
       if (budgetError || !budgetData) { toast.error('Erro ao criar orçamento'); setSaving(false); return; }
       const budgetItems = items.filter(i => i.name.trim()).map(i => ({
@@ -227,7 +253,7 @@ export default function BudgetsPage() {
     setExtraTaxes(0); setExtraFreight(0); setExtraOther(0);
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
     setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
-    setEditingBudgetId(null);
+    setEditingBudgetId(null); setComplexityFactor('1.0'); setFinishType('');
   };
 
   const openEditBudget = async (budget: Budget) => {
@@ -251,6 +277,8 @@ export default function BudgetsPage() {
       setUseAdvancedPayment(false);
       setSimplePaymentMethod(budget.payment_method || DEFAULT_PAYMENT_TEXT);
     }
+    setComplexityFactor(String(budget.complexity_factor || '1.0'));
+    setFinishType(budget.finish_type || '');
     setDialogOpen(true);
   };
 
@@ -434,9 +462,42 @@ export default function BudgetsPage() {
                   <Input placeholder="Ex: Cozinha Planejada" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Margem de Lucro (%)</Label>
-                <Input type="number" value={margin} onChange={(e) => setMargin(Number(e.target.value))} className="max-w-[120px]" />
+
+              {/* Complexidade + Acabamento + Margem */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm">Complexidade</Label>
+                  <Select value={complexityFactor} onValueChange={setComplexityFactor}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                    <SelectContent>
+                      {COMPLEXITY_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label} ({(opt.multiplier * 100 - 100).toFixed(0)}%{opt.multiplier === 1 ? ' base' : ' a mais'})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    {COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.description}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Acabamento</Label>
+                  <Select value={finishType} onValueChange={setFinishType}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar acabamento" /></SelectTrigger>
+                    <SelectContent>
+                      {FINISH_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label} {opt.multiplier > 1 ? `(+${((opt.multiplier - 1) * 100).toFixed(0)}%)` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Margem de Lucro (%)</Label>
+                  <Input type="number" value={margin} onChange={(e) => setMargin(Number(e.target.value))} />
+                </div>
               </div>
 
               {/* Materiais */}
@@ -506,7 +567,14 @@ export default function BudgetsPage() {
                   {extraTaxes > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxas</span><span className="font-medium">{formatBRL(extraTaxes)}</span></div>}
                   {extraFreight > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Frete</span><span className="font-medium">{formatBRL(extraFreight)}</span></div>}
                   {extraOther > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Outros</span><span className="font-medium">{formatBRL(extraOther)}</span></div>}
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Custo Total</span><span className="font-medium">{formatBRL(totalCost)}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal Base</span><span className="font-medium">{formatBRL(baseCost)}</span></div>
+                  {complexityMultiplier > 1 && (
+                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Complexidade ({COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.label})</span><span className="font-medium text-warning">×{complexityMultiplier}</span></div>
+                  )}
+                  {finishMultiplier > 1 && (
+                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Acabamento ({FINISH_OPTIONS.find(f => f.value === finishType)?.label})</span><span className="font-medium text-warning">×{finishMultiplier}</span></div>
+                  )}
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Custo Ajustado</span><span className="font-medium">{formatBRL(totalCost)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Lucro ({margin}%)</span><span className="font-medium text-success">{formatBRL(profit)}</span></div>
                   <div className="border-t border-border pt-2 flex justify-between items-center">
                     <span className="font-bold font-display text-base">VALOR TOTAL</span>
