@@ -462,9 +462,42 @@ export default function BudgetsPage() {
                   <Input placeholder="Ex: Cozinha Planejada" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Margem de Lucro (%)</Label>
-                <Input type="number" value={margin} onChange={(e) => setMargin(Number(e.target.value))} className="max-w-[120px]" />
+
+              {/* Complexidade + Acabamento + Margem */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm">Complexidade</Label>
+                  <Select value={complexityFactor} onValueChange={setComplexityFactor}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                    <SelectContent>
+                      {COMPLEXITY_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label} ({(opt.multiplier * 100 - 100).toFixed(0)}%{opt.multiplier === 1 ? ' base' : ' a mais'})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    {COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.description}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Acabamento</Label>
+                  <Select value={finishType} onValueChange={setFinishType}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar acabamento" /></SelectTrigger>
+                    <SelectContent>
+                      {FINISH_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label} {opt.multiplier > 1 ? `(+${((opt.multiplier - 1) * 100).toFixed(0)}%)` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Margem de Lucro (%)</Label>
+                  <Input type="number" value={margin} onChange={(e) => setMargin(Number(e.target.value))} />
+                </div>
               </div>
 
               {/* Materiais */}
