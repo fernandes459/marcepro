@@ -171,7 +171,10 @@ export default function BudgetsPage() {
   const totalMaterial = items.reduce((s, i) => s + i.materialCost * i.quantity, 0);
   const totalLabor = items.reduce((s, i) => s + i.laborCost * i.quantity, 0);
   const totalItemsCost = totalMaterial + totalLabor;
-  const totalCost = totalItemsCost + extraTaxes + extraFreight + extraOther;
+  const complexityMultiplier = COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.multiplier || 1.0;
+  const finishMultiplier = FINISH_OPTIONS.find(f => f.value === finishType)?.multiplier || 1.0;
+  const baseCost = totalItemsCost + extraTaxes + extraFreight + extraOther;
+  const totalCost = baseCost * complexityMultiplier * finishMultiplier;
   const profit = totalCost * (margin / 100);
   const finalPrice = totalCost + profit;
   const remaining = finalPrice - downPayment;
