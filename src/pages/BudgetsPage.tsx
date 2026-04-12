@@ -122,6 +122,8 @@ export default function BudgetsPage() {
   const [installmentMethod, setInstallmentMethod] = useState('credit');
   const [cardFeePercent, setCardFeePercent] = useState(0);
   const [simplePaymentMethod, setSimplePaymentMethod] = useState(DEFAULT_PAYMENT_TEXT);
+  const [complexityFactor, setComplexityFactor] = useState('1.0');
+  const [finishType, setFinishType] = useState('');
 
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
