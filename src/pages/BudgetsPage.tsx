@@ -218,6 +218,7 @@ export default function BudgetsPage() {
         project_name: projectName || null,
         total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
         payment_method: paymentDesc || null, notes: notes || null,
+        complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
       } as any).eq('id', editingBudgetId);
       if (budgetError) { toast.error('Erro ao atualizar orçamento'); setSaving(false); return; }
       await supabase.from('budget_items').delete().eq('budget_id', editingBudgetId);
