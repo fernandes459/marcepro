@@ -152,8 +152,10 @@ export type Database = {
         Row: {
           client_id: string | null
           code: string
+          complexity_factor: number
           created_at: string
           final_price: number
+          finish_type: string | null
           id: string
           notes: string | null
           payment_method: string | null
@@ -167,8 +169,10 @@ export type Database = {
         Insert: {
           client_id?: string | null
           code: string
+          complexity_factor?: number
           created_at?: string
           final_price?: number
+          finish_type?: string | null
           id?: string
           notes?: string | null
           payment_method?: string | null
@@ -182,8 +186,10 @@ export type Database = {
         Update: {
           client_id?: string | null
           code?: string
+          complexity_factor?: number
           created_at?: string
           final_price?: number
+          finish_type?: string | null
           id?: string
           notes?: string | null
           payment_method?: string | null
