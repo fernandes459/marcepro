@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Plus, Search, Send, FileText, Loader2, Trash2, Edit, CheckCircle, XCircle,
-  Factory, Download, MessageSquare, Settings2, Eye, EyeOff,
+  Factory, Download, MessageSquare, Settings2, Eye, EyeOff, Wrench,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { generateBudgetPdf, defaultContractClauses } from '@/components/finance/BudgetPdfGenerator';
+import ModuleConfigurator, { ModuleConfig, ModuleResult } from '@/components/budget/ModuleConfigurator';
 
 interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; }
 const DEFAULT_PAYMENT_TEXT = '50% de entrada e o restante na entrega da obra';
@@ -124,6 +125,11 @@ export default function BudgetsPage() {
   const [simplePaymentMethod, setSimplePaymentMethod] = useState(DEFAULT_PAYMENT_TEXT);
   const [complexityFactor, setComplexityFactor] = useState('1.0');
   const [finishType, setFinishType] = useState('');
+  const [useParametric, setUseParametric] = useState(false);
+  const [modules, setModules] = useState<ModuleConfig[]>([{ type: 'armario_inferior', height: 800, width: 600, depth: 550, thickness: 18, shelves: 1, doors: 2 }]);
+  const [mdfPricePerM2, setMdfPricePerM2] = useState(85);
+  const [edgeTapePricePerM, setEdgeTapePricePerM] = useState(2.5);
+  const [moduleResult, setModuleResult] = useState<ModuleResult | null>(null);
 
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
@@ -171,9 +177,10 @@ export default function BudgetsPage() {
   const totalMaterial = items.reduce((s, i) => s + i.materialCost * i.quantity, 0);
   const totalLabor = items.reduce((s, i) => s + i.laborCost * i.quantity, 0);
   const totalItemsCost = totalMaterial + totalLabor;
+  const parametricCost = useParametric && moduleResult ? moduleResult.materialCost + moduleResult.edgeTapeCost : 0;
   const complexityMultiplier = COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.multiplier || 1.0;
   const finishMultiplier = FINISH_OPTIONS.find(f => f.value === finishType)?.multiplier || 1.0;
-  const baseCost = totalItemsCost + extraTaxes + extraFreight + extraOther;
+  const baseCost = totalItemsCost + parametricCost + extraTaxes + extraFreight + extraOther;
   const totalCost = baseCost * complexityMultiplier * finishMultiplier;
   const profit = totalCost * (margin / 100);
   const finalPrice = totalCost + profit;
@@ -254,6 +261,8 @@ export default function BudgetsPage() {
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
     setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
     setEditingBudgetId(null); setComplexityFactor('1.0'); setFinishType('');
+    setUseParametric(false); setModules([{ type: 'armario_inferior', height: 800, width: 600, depth: 550, thickness: 18, shelves: 1, doors: 2 }]);
+    setModuleResult(null);
   };
 
   const openEditBudget = async (budget: Budget) => {
@@ -500,6 +509,28 @@ export default function BudgetsPage() {
                 </div>
               </div>
 
+              {/* Motor de Engenharia Paramétrico */}
+              <div className="space-y-3 border border-border rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold flex items-center gap-2"><Wrench className="h-4 w-4 text-primary" /> Motor de Engenharia</Label>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">Ativar</Label>
+                    <Switch checked={useParametric} onCheckedChange={setUseParametric} />
+                  </div>
+                </div>
+                {useParametric && (
+                  <ModuleConfigurator
+                    modules={modules}
+                    onModulesChange={setModules}
+                    mdfPricePerM2={mdfPricePerM2}
+                    edgeTapePricePerM={edgeTapePricePerM}
+                    onMdfPriceChange={setMdfPricePerM2}
+                    onEdgeTapePriceChange={setEdgeTapePricePerM}
+                    onResultChange={setModuleResult}
+                  />
+                )}
+              </div>
+
               {/* Materiais */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -564,6 +595,9 @@ export default function BudgetsPage() {
                 <CardContent className="p-4 space-y-1.5">
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Material</span><span className="font-medium">{formatBRL(totalMaterial)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Mão de Obra</span><span className="font-medium">{formatBRL(totalLabor)}</span></div>
+                  {useParametric && parametricCost > 0 && (
+                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Engenharia (MDF + Fita)</span><span className="font-medium text-info">{formatBRL(parametricCost)}</span></div>
+                  )}
                   {extraTaxes > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxas</span><span className="font-medium">{formatBRL(extraTaxes)}</span></div>}
                   {extraFreight > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Frete</span><span className="font-medium">{formatBRL(extraFreight)}</span></div>}
                   {extraOther > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Outros</span><span className="font-medium">{formatBRL(extraOther)}</span></div>}
