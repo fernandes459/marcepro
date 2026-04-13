@@ -125,6 +125,11 @@ export default function BudgetsPage() {
   const [simplePaymentMethod, setSimplePaymentMethod] = useState(DEFAULT_PAYMENT_TEXT);
   const [complexityFactor, setComplexityFactor] = useState('1.0');
   const [finishType, setFinishType] = useState('');
+  const [useParametric, setUseParametric] = useState(false);
+  const [modules, setModules] = useState<ModuleConfig[]>([{ type: 'armario_inferior', height: 800, width: 600, depth: 550, thickness: 18, shelves: 1, doors: 2 }]);
+  const [mdfPricePerM2, setMdfPricePerM2] = useState(85);
+  const [edgeTapePricePerM, setEdgeTapePricePerM] = useState(2.5);
+  const [moduleResult, setModuleResult] = useState<ModuleResult | null>(null);
 
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
