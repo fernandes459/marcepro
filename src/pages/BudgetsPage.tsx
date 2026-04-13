@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { generateBudgetPdf, defaultContractClauses } from '@/components/finance/BudgetPdfGenerator';
+import ModuleConfigurator, { ModuleConfig, ModuleResult } from '@/components/budget/ModuleConfigurator';
 
 interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; }
 const DEFAULT_PAYMENT_TEXT = '50% de entrada e o restante na entrega da obra';
