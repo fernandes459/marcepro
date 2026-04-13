@@ -261,6 +261,8 @@ export default function BudgetsPage() {
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
     setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
     setEditingBudgetId(null); setComplexityFactor('1.0'); setFinishType('');
+    setUseParametric(false); setModules([{ type: 'armario_inferior', height: 800, width: 600, depth: 550, thickness: 18, shelves: 1, doors: 2 }]);
+    setModuleResult(null);
   };
 
   const openEditBudget = async (budget: Budget) => {
