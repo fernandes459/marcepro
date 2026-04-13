@@ -509,6 +509,28 @@ export default function BudgetsPage() {
                 </div>
               </div>
 
+              {/* Motor de Engenharia Paramétrico */}
+              <div className="space-y-3 border border-border rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold flex items-center gap-2"><Wrench className="h-4 w-4 text-primary" /> Motor de Engenharia</Label>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">Ativar</Label>
+                    <Switch checked={useParametric} onCheckedChange={setUseParametric} />
+                  </div>
+                </div>
+                {useParametric && (
+                  <ModuleConfigurator
+                    modules={modules}
+                    onModulesChange={setModules}
+                    mdfPricePerM2={mdfPricePerM2}
+                    edgeTapePricePerM={edgeTapePricePerM}
+                    onMdfPriceChange={setMdfPricePerM2}
+                    onEdgeTapePriceChange={setEdgeTapePricePerM}
+                    onResultChange={setModuleResult}
+                  />
+                )}
+              </div>
+
               {/* Materiais */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
