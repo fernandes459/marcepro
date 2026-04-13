@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Plus, Search, Send, FileText, Loader2, Trash2, Edit, CheckCircle, XCircle,
-  Factory, Download, MessageSquare, Settings2, Eye, EyeOff,
+  Factory, Download, MessageSquare, Settings2, Eye, EyeOff, Wrench,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
