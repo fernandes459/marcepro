@@ -595,6 +595,9 @@ export default function BudgetsPage() {
                 <CardContent className="p-4 space-y-1.5">
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Material</span><span className="font-medium">{formatBRL(totalMaterial)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Mão de Obra</span><span className="font-medium">{formatBRL(totalLabor)}</span></div>
+                  {useParametric && parametricCost > 0 && (
+                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Engenharia (MDF + Fita)</span><span className="font-medium text-info">{formatBRL(parametricCost)}</span></div>
+                  )}
                   {extraTaxes > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxas</span><span className="font-medium">{formatBRL(extraTaxes)}</span></div>}
                   {extraFreight > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Frete</span><span className="font-medium">{formatBRL(extraFreight)}</span></div>}
                   {extraOther > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Outros</span><span className="font-medium">{formatBRL(extraOther)}</span></div>}
