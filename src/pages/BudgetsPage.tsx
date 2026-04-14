@@ -111,6 +111,7 @@ export default function BudgetsPage() {
   const [companySettings, setCompanySettings] = useState<any>(null);
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const [pdfSimplified, setPdfSimplified] = useState(false);
+  const [expandedBudgetId, setExpandedBudgetId] = useState<string | null>(null);
 
   const [selectedClientId, setSelectedClientId] = useState('');
   const [projectName, setProjectName] = useState('');
