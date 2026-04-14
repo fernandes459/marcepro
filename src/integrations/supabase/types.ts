@@ -466,6 +466,65 @@ export type Database = {
           },
         ]
       }
+      payment_milestones: {
+        Row: {
+          amount: number
+          budget_id: string
+          created_at: string
+          due_date: string | null
+          id: string
+          notes: string | null
+          paid_date: string | null
+          percentage: number
+          production_stage: string | null
+          sort_order: number
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          budget_id: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          paid_date?: string | null
+          percentage?: number
+          production_stage?: string | null
+          sort_order?: number
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          budget_id?: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          paid_date?: string | null
+          percentage?: number
+          production_stage?: string | null
+          sort_order?: number
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_milestones_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_tasks: {
         Row: {
           assignee: string | null
