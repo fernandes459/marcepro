@@ -734,51 +734,96 @@ export default function BudgetsPage() {
                   {filtered.length === 0 ? (
                     <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum orçamento encontrado</td></tr>
                   ) : filtered.map((b) => (
-                    <motion.tr key={b.id} variants={itemVariants} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 text-sm font-mono font-medium">{b.code}</td>
-                      <td className="px-4 py-3 text-sm">{b.project_name || '—'}</td>
-                      <td className="px-4 py-3 text-sm font-medium hidden sm:table-cell">{(b.clients as any)?.name || '—'}</td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold">{formatBRL(b.final_price)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusConfig[b.status]?.className || ''}`}>
-                          {statusConfig[b.status]?.label || b.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1 flex-wrap">
-                          {(b.status === 'draft' || b.status === 'pending') && (
-                            <Button size="sm" variant="ghost" className="h-7 text-xs text-success" onClick={() => updateBudgetStatus(b.id, 'approved')} title="Aprovar">
-                              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Aprovar
-                            </Button>
-                          )}
-                          {(b.status === 'draft' || b.status === 'pending') && (
-                            <button onClick={() => updateBudgetStatus(b.id, 'rejected')} className="rounded p-1.5 hover:bg-destructive/10 transition-colors" title="Rejeitar">
-                              <XCircle className="h-4 w-4 text-destructive" />
+                    <React.Fragment key={b.id}>
+                      <motion.tr variants={itemVariants} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setExpandedBudgetId(expandedBudgetId === b.id ? null : b.id)}>
+                        <td className="px-4 py-3 text-sm font-mono font-medium">
+                          <div className="flex items-center gap-1.5">
+                            {expandedBudgetId === b.id ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+                            {b.code}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm">{b.project_name || '—'}</td>
+                        <td className="px-4 py-3 text-sm font-medium hidden sm:table-cell">{(b.clients as any)?.name || '—'}</td>
+                        <td className="px-4 py-3 text-sm text-right font-semibold">{formatBRL(b.final_price)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusConfig[b.status]?.className || ''}`}>
+                            {statusConfig[b.status]?.label || b.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-1 flex-wrap">
+                            {(b.status === 'draft' || b.status === 'pending') && (
+                              <Button size="sm" variant="ghost" className="h-7 text-xs text-success" onClick={() => updateBudgetStatus(b.id, 'approved')} title="Aprovar">
+                                <CheckCircle className="h-3.5 w-3.5 mr-1" /> Aprovar
+                              </Button>
+                            )}
+                            {(b.status === 'draft' || b.status === 'pending') && (
+                              <button onClick={() => updateBudgetStatus(b.id, 'rejected')} className="rounded p-1.5 hover:bg-destructive/10 transition-colors" title="Rejeitar">
+                                <XCircle className="h-4 w-4 text-destructive" />
+                              </button>
+                            )}
+                            {b.status === 'approved' && (
+                              <Button size="sm" variant="ghost" className="h-7 text-xs text-info" onClick={() => sendToProduction(b)} title="Enviar para Produção">
+                                <Factory className="h-3.5 w-3.5 mr-1" /> Produzir
+                              </Button>
+                            )}
+                            <button onClick={() => openPdfDialog(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="PDF Completo">
+                              <Download className="h-4 w-4 text-muted-foreground" />
                             </button>
-                          )}
-                          {b.status === 'approved' && (
-                            <Button size="sm" variant="ghost" className="h-7 text-xs text-info" onClick={() => sendToProduction(b)} title="Enviar para Produção">
-                              <Factory className="h-3.5 w-3.5 mr-1" /> Produzir
-                            </Button>
-                          )}
-                          <button onClick={() => openPdfDialog(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="PDF Completo">
-                            <Download className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                          <button onClick={() => sendWhatsApp(b, true)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp (resumido)">
-                            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                          <button onClick={() => sendWhatsApp(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp (completo)">
-                            <Send className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                          <button onClick={() => openEditBudget(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Editar">
-                            <Edit className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                          <button onClick={() => deleteBudget(b.id)} className="rounded p-1.5 hover:bg-destructive/10 transition-colors" title="Excluir">
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
+                            <button onClick={() => sendWhatsApp(b, true)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp (resumido)">
+                              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                            <button onClick={() => sendWhatsApp(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="WhatsApp (completo)">
+                              <Send className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                            <button onClick={() => openEditBudget(b)} className="rounded p-1.5 hover:bg-muted transition-colors" title="Editar">
+                              <Edit className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                            <button onClick={() => deleteBudget(b.id)} className="rounded p-1.5 hover:bg-destructive/10 transition-colors" title="Excluir">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                      {/* Expandable detail: DRE + Payment Milestones */}
+                      <AnimatePresence>
+                        {expandedBudgetId === b.id && (
+                          <motion.tr
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <td colSpan={6} className="px-4 py-4 bg-muted/20">
+                              <Tabs defaultValue="dre" className="w-full">
+                                <TabsList className="mb-4">
+                                  <TabsTrigger value="dre" className="text-xs gap-1.5">
+                                    <BarChart3 className="h-3.5 w-3.5" /> Saúde Financeira
+                                  </TabsTrigger>
+                                  <TabsTrigger value="milestones" className="text-xs gap-1.5">
+                                    <Milestone className="h-3.5 w-3.5" /> Marcos de Pagamento
+                                  </TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="dre">
+                                  <ContractDRE
+                                    budgetId={b.id}
+                                    finalPrice={b.final_price}
+                                    totalCost={b.total_cost}
+                                    profitMargin={b.profit_margin}
+                                  />
+                                </TabsContent>
+                                <TabsContent value="milestones">
+                                  <PaymentMilestones
+                                    budgetId={b.id}
+                                    finalPrice={b.final_price}
+                                  />
+                                </TabsContent>
+                              </Tabs>
+                            </td>
+                          </motion.tr>
+                        )}
+                      </AnimatePresence>
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
