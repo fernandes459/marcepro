@@ -36,7 +36,7 @@ interface Client {
 interface Budget {
   id: string; code: string; client_id: string | null; project_name: string | null;
   status: string; total_cost: number; profit_margin: number; final_price: number;
-  payment_method: string | null; notes: string | null; created_at: string;
+  payment_method: string | null; notes: string | null; client_description: string | null; created_at: string;
   complexity_factor: number; finish_type: string | null;
   clients?: Client | null;
 }
