@@ -150,6 +150,7 @@ export type Database = {
       }
       budgets: {
         Row: {
+          client_description: string | null
           client_id: string | null
           code: string
           complexity_factor: number
@@ -167,6 +168,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_description?: string | null
           client_id?: string | null
           code: string
           complexity_factor?: number
@@ -184,6 +186,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_description?: string | null
           client_id?: string | null
           code?: string
           complexity_factor?: number
