@@ -218,7 +218,7 @@ const [selectedClientId, setSelectedClientId] = useState('');
     setItems(updated);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !selectedClientId) { toast.error('Selecione um cliente'); return; }
     if (!projectName.trim()) { toast.error('Nome do projeto é obrigatório'); return; }
