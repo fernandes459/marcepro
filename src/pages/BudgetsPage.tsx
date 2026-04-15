@@ -229,6 +229,7 @@ const handleCreate = async (e: React.FormEvent) => {
       const { error: budgetError } = await supabase.from('budgets').update({
         client_id: selectedClientId,
         project_name: projectName || null,
+        client_description: clientDescription || null,
         total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
         payment_method: paymentDesc || null, notes: notes || null,
         complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
@@ -244,7 +245,8 @@ const handleCreate = async (e: React.FormEvent) => {
     } else {
       const { data: budgetData, error: budgetError } = await supabase.from('budgets').insert({
         user_id: user.id, client_id: selectedClientId, code: 'TEMP',
-        project_name: projectName || null, status: 'draft',
+        project_name: projectName || null, client_description: clientDescription || null,
+        status: 'draft',
         total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
         payment_method: paymentDesc || null, notes: notes || null,
         complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
@@ -275,6 +277,7 @@ const openEditBudget = async (budget: Budget) => {
     setEditingBudgetId(budget.id);
     setSelectedClientId(budget.client_id || '');
     setProjectName(budget.project_name || '');
+    setClientDescription(budget.client_description || '');
     setNotes(budget.notes || '');
     setMargin(budget.profit_margin);
     const { data: budgetItems } = await supabase.from('budget_items').select('*').eq('budget_id', budget.id);
