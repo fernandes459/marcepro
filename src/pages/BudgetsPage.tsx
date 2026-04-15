@@ -113,8 +113,9 @@ export default function BudgetsPage() {
   const [pdfSimplified, setPdfSimplified] = useState(false);
   const [expandedBudgetId, setExpandedBudgetId] = useState<string | null>(null);
 
-  const [selectedClientId, setSelectedClientId] = useState('');
+const [selectedClientId, setSelectedClientId] = useState('');
   const [projectName, setProjectName] = useState('');
+  const [clientDescription, setClientDescription] = useState('');
   const [notes, setNotes] = useState('');
   const [margin, setMargin] = useState(40);
   const [items, setItems] = useState<BudgetItem[]>([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
