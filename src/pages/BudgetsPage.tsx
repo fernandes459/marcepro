@@ -260,8 +260,8 @@ const [selectedClientId, setSelectedClientId] = useState('');
     setDialogOpen(false); resetForm(); fetchData(); setSaving(false);
   };
 
-  const resetForm = () => {
-    setSelectedClientId(''); setProjectName(''); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT); setNotes('');
+const resetForm = () => {
+    setSelectedClientId(''); setProjectName(''); setClientDescription(''); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT); setNotes('');
     setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
     setExtraTaxes(0); setExtraFreight(0); setExtraOther(0);
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
@@ -271,7 +271,7 @@ const [selectedClientId, setSelectedClientId] = useState('');
     setModuleResult(null);
   };
 
-  const openEditBudget = async (budget: Budget) => {
+const openEditBudget = async (budget: Budget) => {
     setEditingBudgetId(budget.id);
     setSelectedClientId(budget.client_id || '');
     setProjectName(budget.project_name || '');
