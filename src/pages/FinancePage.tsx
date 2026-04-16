@@ -4,7 +4,7 @@ import {
   DollarSign, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Plus, Search, Trash2, Building2, ArrowRightLeft, AlertTriangle, FileBarChart,
   Receipt, Wallet, PieChart as PieChartIcon, BarChart3, ChevronLeft,
-  CreditCard, Clock, CheckCircle2, X, Pencil,
+  CreditCard, Clock, CheckCircle2, X, Pencil, Milestone,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { TransactionDialog } from '@/components/finance/TransactionDialog';
+import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
@@ -76,7 +77,7 @@ const EXPENSE_COLORS = ['hsl(28, 85%, 56%)', 'hsl(0, 72%, 51%)', 'hsl(38, 92%, 5
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.06 } } };
 const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } };
 
-type Section = 'home' | 'lancamentos' | 'dre' | 'vencer' | 'recebidos' | 'relatorio' | 'contas';
+type Section = 'home' | 'lancamentos' | 'dre' | 'vencer' | 'recebidos' | 'relatorio' | 'contas' | 'marcos';
 
 export default function FinancePage() {
   const { user } = useAuth();
@@ -337,8 +338,8 @@ export default function FinancePage() {
     { id: 'recebidos' as Section, title: 'Recebidos', icon: CheckCircle2, value: formatBRL(paidIncome), sub: 'total recebido', color: 'text-success' },
     { id: 'relatorio' as Section, title: 'Relatório', icon: FileBarChart, value: String(clientProfitData.length), sub: 'clientes', color: 'text-info' },
     { id: 'contas' as Section, title: 'Contas', icon: Building2, value: formatBRL(totalBankBalance), sub: `${bankAccounts.length} conta(s)`, color: 'text-primary' },
+    { id: 'marcos' as Section, title: 'Marcos', icon: Milestone, value: '—', sub: 'recebimentos', color: 'text-accent' },
   ];
-
   function renderSection() {
     switch (activeSection) {
       case 'lancamentos': return renderLancamentos();
@@ -347,6 +348,7 @@ export default function FinancePage() {
       case 'recebidos': return renderRecebidos();
       case 'relatorio': return renderRelatorio();
       case 'contas': return renderContas();
+      case 'marcos': return <MilestoneReceivables />;
       default: return renderHome();
     }
   }
