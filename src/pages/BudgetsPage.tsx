@@ -333,48 +333,80 @@ const openEditBudget = async (budget: Budget) => {
     if (error) { toast.error('Erro ao atualizar status'); return; }
     if (status === 'approved' && budget && user) {
       const client = budget.clients as Client | null;
-      const paymentStr = budget.payment_method || '';
-      const entradaMatch = paymentStr.match(/Entrada:\s*R\$\s*([\d.,]+)/);
-      const downPaymentValue = entradaMatch ? parseFloat(entradaMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
-      const remainingValue = budget.final_price - downPaymentValue;
-      const parcelasMatch = paymentStr.match(/(\d+)x\s*de/);
-      const numInstallments = parcelasMatch ? parseInt(parcelasMatch[1]) : 1;
       const today = new Date().toISOString().slice(0, 10);
-      const baseDesc = `${budget.project_name || budget.code} — ${client?.name || 'Cliente'}`;
+      const baseDesc = `${budget.code} — ${client?.name || 'Cliente'}`;
 
-      if (downPaymentValue > 0) {
-        await supabase.from('financial_transactions').insert({
-          user_id: user.id, type: 'income', category: 'project',
-          description: `${baseDesc} (Entrada)`,
-          amount: downPaymentValue, date: today, status: 'paid', paid_date: today,
-          client_id: budget.client_id, budget_id: budget.id,
-          order_number: budget.code, payment_method: paymentStr.split('+')[0]?.trim() || 'PIX',
-          notes: `Entrada do orçamento ${budget.code}`,
-        } as any);
+      // Check if payment milestones exist for this budget
+      const { data: milestones } = await supabase
+        .from('payment_milestones')
+        .select('*')
+        .eq('budget_id', budget.id)
+        .order('sort_order');
+
+      if (milestones && milestones.length > 0) {
+        // Generate receivables from milestones
+        const inserts = milestones.map((ms: any, idx: number) => {
+          const dueDate = ms.due_date || addBusinessDays(new Date(), 30 * (idx + 1)).toISOString().slice(0, 10);
+          return {
+            user_id: user.id,
+            type: 'income',
+            category: 'installment',
+            description: `${baseDesc} — ${ms.title} (${ms.percentage}%)`,
+            amount: ms.amount,
+            date: today,
+            status: 'pending',
+            due_date: dueDate,
+            client_id: budget.client_id,
+            budget_id: budget.id,
+            order_number: budget.code,
+            payment_method: budget.payment_method || null,
+            notes: `Marco "${ms.title}" do orçamento ${budget.code}\nValor: ${formatBRL(ms.amount)}\nPercentual: ${ms.percentage}%`,
+          };
+        });
+        await supabase.from('financial_transactions').insert(inserts as any);
+      } else {
+        // Fallback: parse payment_method text
+        const paymentStr = budget.payment_method || '';
+        const entradaMatch = paymentStr.match(/Entrada:\s*R\$\s*([\d.,]+)/);
+        const downPaymentValue = entradaMatch ? parseFloat(entradaMatch[1].replace(/\./g, '').replace(',', '.')) : 0;
+        const remainingValue = budget.final_price - downPaymentValue;
+        const parcelasMatch = paymentStr.match(/(\d+)x\s*de/);
+        const numInstallments = parcelasMatch ? parseInt(parcelasMatch[1]) : 1;
+
+        if (downPaymentValue > 0) {
+          await supabase.from('financial_transactions').insert({
+            user_id: user.id, type: 'income', category: 'project',
+            description: `${baseDesc} (Entrada)`,
+            amount: downPaymentValue, date: today, status: 'paid', paid_date: today,
+            client_id: budget.client_id, budget_id: budget.id,
+            order_number: budget.code, payment_method: paymentStr.split('+')[0]?.trim() || 'PIX',
+            notes: `Entrada do orçamento ${budget.code}`,
+          } as any);
+        }
+        if (remainingValue > 0) {
+          const dueDate = addBusinessDays(new Date(), 30);
+          await supabase.from('financial_transactions').insert({
+            user_id: user.id, type: 'income', category: 'project',
+            description: `${baseDesc} (Restante)`,
+            amount: remainingValue, date: today, status: 'pending',
+            due_date: dueDate.toISOString().slice(0, 10),
+            client_id: budget.client_id, budget_id: budget.id,
+            order_number: budget.code,
+            payment_method: numInstallments > 1 ? `${numInstallments}x cartão` : 'A combinar',
+            notes: `Saldo restante do orçamento ${budget.code}`,
+          } as any);
+        }
+        if (downPaymentValue === 0 && remainingValue === 0) {
+          await supabase.from('financial_transactions').insert({
+            user_id: user.id, type: 'income', category: 'project',
+            description: baseDesc, amount: budget.final_price, date: today,
+            status: 'pending', client_id: budget.client_id, budget_id: budget.id,
+            order_number: budget.code, payment_method: paymentStr || null,
+            notes: `Orçamento aprovado: ${budget.code}\nValor total: ${formatBRL(budget.final_price)}`,
+          } as any);
+        }
       }
-      if (remainingValue > 0) {
-        const dueDate = addBusinessDays(new Date(), 30);
-        await supabase.from('financial_transactions').insert({
-          user_id: user.id, type: 'income', category: 'project',
-          description: `${baseDesc} (Restante)`,
-          amount: remainingValue, date: today, status: 'pending',
-          due_date: dueDate.toISOString().slice(0, 10),
-          client_id: budget.client_id, budget_id: budget.id,
-          order_number: budget.code,
-          payment_method: numInstallments > 1 ? `${numInstallments}x cartão` : 'A combinar',
-          notes: `Saldo restante do orçamento ${budget.code}\nVencimento: ${dueDate.toLocaleDateString('pt-BR')}\nTotal do projeto: ${formatBRL(budget.final_price)}`,
-        } as any);
-      }
-      if (downPaymentValue === 0 && remainingValue === 0) {
-        await supabase.from('financial_transactions').insert({
-          user_id: user.id, type: 'income', category: 'project',
-          description: baseDesc, amount: budget.final_price, date: today,
-          status: 'pending', client_id: budget.client_id, budget_id: budget.id,
-          order_number: budget.code, payment_method: paymentStr || null,
-          notes: `Orçamento aprovado: ${budget.code}\nValor total: ${formatBRL(budget.final_price)}`,
-        } as any);
-      }
-      toast.info('Lançamentos financeiros criados automaticamente');
+      toast.info('Contas a receber geradas automaticamente');
     }
     toast.success(`Status atualizado para ${statusConfig[status]?.label || status}`);
     fetchData();
