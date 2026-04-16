@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { TransactionDialog } from '@/components/finance/TransactionDialog';
+import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
