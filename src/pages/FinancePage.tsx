@@ -348,6 +348,7 @@ export default function FinancePage() {
       case 'recebidos': return renderRecebidos();
       case 'relatorio': return renderRelatorio();
       case 'contas': return renderContas();
+      case 'marcos': return <MilestoneReceivables />;
       default: return renderHome();
     }
   }
