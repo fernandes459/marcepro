@@ -4,7 +4,7 @@ import {
   DollarSign, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Plus, Search, Trash2, Building2, ArrowRightLeft, AlertTriangle, FileBarChart,
   Receipt, Wallet, PieChart as PieChartIcon, BarChart3, ChevronLeft,
-  CreditCard, Clock, CheckCircle2, X, Pencil,
+  CreditCard, Clock, CheckCircle2, X, Pencil, Milestone,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
