@@ -282,10 +282,13 @@ export type Database = {
           cnpj: string | null
           company_name: string | null
           created_at: string
+          default_commission: number
           default_margin: number | null
           email: string | null
           id: string
           logo_url: string | null
+          min_margin: number
+          monthly_goal: number
           phone: string | null
           state: string | null
           updated_at: string
@@ -299,10 +302,13 @@ export type Database = {
           cnpj?: string | null
           company_name?: string | null
           created_at?: string
+          default_commission?: number
           default_margin?: number | null
           email?: string | null
           id?: string
           logo_url?: string | null
+          min_margin?: number
+          monthly_goal?: number
           phone?: string | null
           state?: string | null
           updated_at?: string
@@ -316,10 +322,13 @@ export type Database = {
           cnpj?: string | null
           company_name?: string | null
           created_at?: string
+          default_commission?: number
           default_margin?: number | null
           email?: string | null
           id?: string
           logo_url?: string | null
+          min_margin?: number
+          monthly_goal?: number
           phone?: string | null
           state?: string | null
           updated_at?: string
