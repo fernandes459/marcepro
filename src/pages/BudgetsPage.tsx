@@ -3,8 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Send, FileText, Loader2, Trash2, Edit, CheckCircle, XCircle,
   Factory, Download, MessageSquare, Settings2, Eye, EyeOff, Wrench, ChevronDown, ChevronUp,
-  BarChart3, Milestone,
+  BarChart3, Milestone, Calculator, Handshake, User, Lock,
 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Slider } from '@/components/ui/slider';
+import { PricingPanel } from '@/components/budget/PricingPanel';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -138,6 +141,8 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const [mdfPricePerM2, setMdfPricePerM2] = useState(85);
   const [edgeTapePricePerM, setEdgeTapePricePerM] = useState(2.5);
   const [moduleResult, setModuleResult] = useState<ModuleResult | null>(null);
+  const [discountPct, setDiscountPct] = useState(0);
+  const [calcOpen, setCalcOpen] = useState(false);
 
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
@@ -191,7 +196,14 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const baseCost = totalItemsCost + parametricCost + extraTaxes + extraFreight + extraOther;
   const totalCost = baseCost * complexityMultiplier * finishMultiplier;
   const profit = totalCost * (margin / 100);
-  const finalPrice = totalCost + profit;
+  const priceBeforeDiscount = totalCost + profit;
+  const minMargin = Number(companySettings?.min_margin ?? 20);
+  const defaultCommission = Number(companySettings?.default_commission ?? 0);
+  const finalPrice = priceBeforeDiscount * (1 - discountPct / 100);
+  const realProfit = finalPrice - totalCost;
+  const realMarginPct = totalCost > 0 ? (realProfit / totalCost) * 100 : 0;
+  const isBelowMin = totalCost > 0 && realMarginPct < minMargin;
+  const commissionAmount = finalPrice * (defaultCommission / 100);
   const remaining = finalPrice - downPayment;
   const cardFeeAmount = remaining * (cardFeePercent / 100);
   const totalWithFee = remaining + (installmentMethod === 'credit' ? cardFeeAmount : 0);
@@ -224,6 +236,10 @@ const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !selectedClientId) { toast.error('Selecione um cliente'); return; }
     if (!projectName.trim()) { toast.error('Nome do projeto é obrigatório'); return; }
+    if (isBelowMin) {
+      toast.error(`Margem real (${realMarginPct.toFixed(1)}%) abaixo do mínimo configurado (${minMargin}%). Ajuste preço, custo ou desconto.`);
+      return;
+    }
     setSaving(true);
     const paymentDesc = buildPaymentDescription();
 
@@ -272,7 +288,7 @@ const resetForm = () => {
     setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
     setEditingBudgetId(null); setComplexityFactor('1.0'); setFinishType('');
     setUseParametric(false); setModules([{ type: 'armario_inferior', height: 800, width: 600, depth: 550, thickness: 18, shelves: 1, doors: 2 }]);
-    setModuleResult(null);
+    setModuleResult(null); setDiscountPct(0); setCalcOpen(false);
   };
 
 const openEditBudget = async (budget: Budget) => {
@@ -591,100 +607,147 @@ const openEditBudget = async (budget: Budget) => {
                 )}
               </div>
 
-              {/* Seção 4: Cálculos Internos */}
-              <div className="space-y-4 border border-border rounded-xl p-4 bg-muted/20">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" /> Cálculos Internos
-                </h3>
-                
-                {/* Materiais e Serviços */}
+              {/* Seção 4: Cálculos Internos (COLAPSÁVEL — oculto por padrão) */}
+              <Collapsible open={calcOpen} onOpenChange={setCalcOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between border border-border rounded-xl p-4 hover:bg-muted/30 transition-colors"
+                  >
+                    <span className="text-sm font-semibold flex items-center gap-2">
+                      <Calculator className="h-4 w-4 text-primary" /> Cálculos Internos
+                      <Badge variant="secondary" className="ml-2 text-[10px]">{formatBRL(totalCost)}</Badge>
+                    </span>
+                    {calcOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 border border-t-0 border-border rounded-b-xl p-4 bg-muted/20 -mt-px">
+                  {/* Materiais e Serviços */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-semibold">Materiais e Serviços</Label>
+                      <Button type="button" variant="outline" size="sm" onClick={addItem}><Plus className="h-3 w-3 mr-1" /> Adicionar</Button>
+                    </div>
+                    <div className="space-y-2">
+                      {items.map((item, idx) => {
+                        const itemSubtotal = (item.materialCost + item.laborCost) * item.quantity;
+                        return (
+                          <div key={idx} className="rounded-lg bg-background p-3 space-y-2 border">
+                            <div className="flex items-center gap-2">
+                              <Input placeholder="Nome do material/serviço" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} className="flex-1 text-sm" />
+                              <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="text-destructive shrink-0 h-8 w-8 p-0"><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="text-[10px] text-muted-foreground mb-1 block">Qtd</label>
+                                <Input type="number" value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} className="text-sm h-9" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-muted-foreground mb-1 block">Material (R$)</label>
+                                <CurrencyInput value={item.materialCost} onChange={(v) => updateItem(idx, 'materialCost', v)} placeholder="0,00" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-muted-foreground mb-1 block">M.O. (R$)</label>
+                                <CurrencyInput value={item.laborCost} onChange={(v) => updateItem(idx, 'laborCost', v)} placeholder="0,00" />
+                              </div>
+                            </div>
+                            {itemSubtotal > 0 && (
+                              <div className="text-right text-xs text-muted-foreground">
+                                Subtotal: <span className="font-semibold text-foreground">{formatBRL(itemSubtotal)}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Custos adicionais */}
+                  <div className="space-y-3 pt-2 border-t border-border">
+                    <Label className="text-sm font-semibold">Custos Adicionais</Label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[10px] text-muted-foreground mb-1 block">Taxas (R$)</label>
+                        <CurrencyInput value={extraTaxes} onChange={setExtraTaxes} placeholder="0,00" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground mb-1 block">Frete (R$)</label>
+                        <CurrencyInput value={extraFreight} onChange={setExtraFreight} placeholder="0,00" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground mb-1 block">Outros (R$)</label>
+                        <CurrencyInput value={extraOther} onChange={setExtraOther} placeholder="0,00" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Resumo financeiro detalhado (técnico) */}
+                  <Card className="bg-background border">
+                    <CardContent className="p-4 space-y-1.5">
+                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Material</span><span className="font-medium">{formatBRL(totalMaterial)}</span></div>
+                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Mão de Obra</span><span className="font-medium">{formatBRL(totalLabor)}</span></div>
+                      {useParametric && parametricCost > 0 && (
+                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Engenharia (MDF + Fita)</span><span className="font-medium text-info">{formatBRL(parametricCost)}</span></div>
+                      )}
+                      {extraTaxes > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxas</span><span className="font-medium">{formatBRL(extraTaxes)}</span></div>}
+                      {extraFreight > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Frete</span><span className="font-medium">{formatBRL(extraFreight)}</span></div>}
+                      {extraOther > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Outros</span><span className="font-medium">{formatBRL(extraOther)}</span></div>}
+                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal Base</span><span className="font-medium">{formatBRL(baseCost)}</span></div>
+                      {complexityMultiplier > 1 && (
+                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Complexidade ({COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.label})</span><span className="font-medium text-warning">×{complexityMultiplier}</span></div>
+                      )}
+                      {finishMultiplier > 1 && (
+                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Acabamento ({FINISH_OPTIONS.find(f => f.value === finishType)?.label})</span><span className="font-medium text-warning">×{finishMultiplier}</span></div>
+                      )}
+                      <div className="flex justify-between text-sm border-t border-border pt-2"><span className="font-semibold">Custo Total Ajustado</span><span className="font-bold">{formatBRL(totalCost)}</span></div>
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Seção 5: NEGOCIAÇÃO INTELIGENTE */}
+              <div className="space-y-3 border border-border rounded-xl p-4">
+                <Label className="text-sm font-semibold flex items-center gap-2">
+                  <Handshake className="h-4 w-4 text-primary" /> Negociação Inteligente
+                </Label>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-semibold">Materiais e Serviços</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addItem}><Plus className="h-3 w-3 mr-1" /> Adicionar</Button>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Desconto sobre o preço de tabela</span>
+                    <span className="font-semibold text-base">{discountPct.toFixed(1)}%</span>
                   </div>
-                  <div className="space-y-2">
-                    {items.map((item, idx) => {
-                      const itemSubtotal = (item.materialCost + item.laborCost) * item.quantity;
-                      return (
-                        <div key={idx} className="rounded-lg bg-background p-3 space-y-2 border">
-                          <div className="flex items-center gap-2">
-                            <Input placeholder="Nome do material/serviço" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} className="flex-1 text-sm" />
-                            <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="text-destructive shrink-0 h-8 w-8 p-0"><Trash2 className="h-3.5 w-3.5" /></Button>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            <div>
-                              <label className="text-[10px] text-muted-foreground mb-1 block">Qtd</label>
-                              <Input type="number" value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} className="text-sm h-9" />
-                            </div>
-                            <div>
-                              <label className="text-[10px] text-muted-foreground mb-1 block">Material (R$)</label>
-                              <CurrencyInput value={item.materialCost} onChange={(v) => updateItem(idx, 'materialCost', v)} placeholder="0,00" />
-                            </div>
-                            <div>
-                              <label className="text-[10px] text-muted-foreground mb-1 block">M.O. (R$)</label>
-                              <CurrencyInput value={item.laborCost} onChange={(v) => updateItem(idx, 'laborCost', v)} placeholder="0,00" />
-                            </div>
-                          </div>
-                          {itemSubtotal > 0 && (
-                            <div className="text-right text-xs text-muted-foreground">
-                              Subtotal: <span className="font-semibold text-foreground">{formatBRL(itemSubtotal)}</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                  <Slider
+                    value={[discountPct]}
+                    onValueChange={(v) => setDiscountPct(v[0])}
+                    min={0}
+                    max={30}
+                    step={0.5}
+                  />
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Preço tabela: {formatBRL(priceBeforeDiscount)}</span>
+                    {discountPct > 0 && (
+                      <span>Economia cliente: <span className="text-destructive font-semibold">-{formatBRL(priceBeforeDiscount - finalPrice)}</span></span>
+                    )}
                   </div>
+                  {defaultCommission > 0 && (
+                    <div className="text-xs flex items-center justify-between bg-muted/40 rounded-md px-3 py-2">
+                      <span className="text-muted-foreground">Impacto na comissão ({defaultCommission}%)</span>
+                      <span className="font-semibold">{formatBRL(commissionAmount)}</span>
+                    </div>
+                  )}
                 </div>
-
-                {/* Custos adicionais */}
-                <div className="space-y-3 pt-2 border-t border-border">
-                  <Label className="text-sm font-semibold">Custos Adicionais</Label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-[10px] text-muted-foreground mb-1 block">Taxas (R$)</label>
-                      <CurrencyInput value={extraTaxes} onChange={setExtraTaxes} placeholder="0,00" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground mb-1 block">Frete (R$)</label>
-                      <CurrencyInput value={extraFreight} onChange={setExtraFreight} placeholder="0,00" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground mb-1 block">Outros (R$)</label>
-                      <CurrencyInput value={extraOther} onChange={setExtraOther} placeholder="0,00" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Resumo financeiro */}
-                <Card className="bg-accent/30 border-accent sticky bottom-0 z-10">
-                  <CardContent className="p-4 space-y-1.5">
-                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Material</span><span className="font-medium">{formatBRL(totalMaterial)}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Mão de Obra</span><span className="font-medium">{formatBRL(totalLabor)}</span></div>
-                    {useParametric && parametricCost > 0 && (
-                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Engenharia (MDF + Fita)</span><span className="font-medium text-info">{formatBRL(parametricCost)}</span></div>
-                    )}
-                    {extraTaxes > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxas</span><span className="font-medium">{formatBRL(extraTaxes)}</span></div>}
-                    {extraFreight > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Frete</span><span className="font-medium">{formatBRL(extraFreight)}</span></div>}
-                    {extraOther > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Outros</span><span className="font-medium">{formatBRL(extraOther)}</span></div>}
-                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal Base</span><span className="font-medium">{formatBRL(baseCost)}</span></div>
-                    {complexityMultiplier > 1 && (
-                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Complexidade ({COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.label})</span><span className="font-medium text-warning">×{complexityMultiplier}</span></div>
-                    )}
-                    {finishMultiplier > 1 && (
-                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Acabamento ({FINISH_OPTIONS.find(f => f.value === finishType)?.label})</span><span className="font-medium text-warning">×{finishMultiplier}</span></div>
-                    )}
-                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Custo Ajustado</span><span className="font-medium">{formatBRL(totalCost)}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Lucro ({margin}%)</span><span className="font-medium text-success">{formatBRL(profit)}</span></div>
-                    <div className="border-t border-border pt-2 flex justify-between items-center">
-                      <span className="font-bold font-display text-base">VALOR TOTAL</span>
-                      <span className="font-bold font-display text-2xl">{formatBRL(finalPrice)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
 
-              {/* Seção 5: Condições de Pagamento */}
+              {/* PAINEL DE PRECIFICAÇÃO PREMIUM (sticky) */}
+              <div className="sticky bottom-0 z-10 -mx-1 pt-1">
+                <PricingPanel
+                  totalCost={totalCost}
+                  finalPrice={finalPrice}
+                  margin={margin}
+                  minMargin={minMargin}
+                />
+              </div>
+
+              {/* Seção 6: Condições de Pagamento */}
               <div className="space-y-4 border border-border rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold">Condições de Pagamento</Label>
@@ -771,9 +834,18 @@ const openEditBudget = async (budget: Budget) => {
                 <p className="text-xs text-muted-foreground">Estas notas são apenas para uso interno e não aparecem nos PDFs ou WhatsApp.</p>
               </div>
               
-              <Button type="submit" className="w-full gradient-primary shadow-primary border-0" disabled={saving}>
+              <Button
+                type="submit"
+                className={`w-full border-0 ${isBelowMin ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : 'gradient-primary shadow-primary'}`}
+                disabled={saving || isBelowMin}
+              >
                 {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                <FileText className="h-4 w-4 mr-2" /> {editingBudgetId ? 'Salvar Alterações' : 'Salvar Orçamento'}
+                {isBelowMin ? <Lock className="h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
+                {isBelowMin
+                  ? `Bloqueado — margem abaixo de ${minMargin}%`
+                  : editingBudgetId
+                    ? 'Salvar Alterações'
+                    : 'Salvar Orçamento'}
               </Button>
             </form>
           </DialogContent>
