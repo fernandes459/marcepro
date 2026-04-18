@@ -1,139 +1,146 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================================
+   MARCENARIA PRO — Premium Design System
+   "Marcenaria Artesanal": fundo bege claro, tons suaves de
+   madeira, cards arredondados, sombras leves, tipografia
+   serifada nos títulos.
+   Todas as cores em HSL.
+   ========================================================= */
+
 @layer base {
   :root {
-    --background: 40 33% 98%;
-    --foreground: 224 30% 14%;
+    /* Base — bege quente, papel artesanal */
+    --background: 36 33% 96%;
+    --foreground: 25 25% 16%;
 
     --card: 0 0% 100%;
-    --card-foreground: 224 30% 14%;
+    --card-foreground: 25 25% 16%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 224 30% 14%;
+    --popover-foreground: 25 25% 16%;
 
-    --primary: 28 85% 56%;
-    --primary-foreground: 0 0% 100%;
+    /* Primária — madeira nobre (terracota/carvalho) */
+    --primary: 22 55% 42%;
+    --primary-foreground: 36 33% 98%;
 
-    --secondary: 220 16% 96%;
-    --secondary-foreground: 224 30% 14%;
+    --secondary: 36 25% 92%;
+    --secondary-foreground: 25 25% 16%;
 
-    --muted: 220 16% 96%;
-    --muted-foreground: 220 10% 46%;
+    --muted: 36 20% 93%;
+    --muted-foreground: 25 12% 42%;
 
-    --accent: 28 85% 95%;
-    --accent-foreground: 28 85% 36%;
+    --accent: 32 50% 90%;
+    --accent-foreground: 22 55% 32%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 65% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 152 60% 42%;
+    --success: 145 45% 38%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
+    --warning: 35 85% 48%;
     --warning-foreground: 0 0% 100%;
 
-    --info: 210 80% 52%;
+    --info: 200 60% 42%;
     --info-foreground: 0 0% 100%;
 
-    --border: 220 16% 90%;
-    --input: 220 16% 90%;
-    --ring: 28 85% 56%;
+    --border: 32 18% 86%;
+    --input: 32 18% 86%;
+    --ring: 22 55% 42%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
-    --sidebar-background: 224 30% 14%;
-    --sidebar-foreground: 220 16% 80%;
-    --sidebar-primary: 28 85% 56%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 224 30% 20%;
-    --sidebar-accent-foreground: 220 16% 90%;
-    --sidebar-border: 224 30% 22%;
-    --sidebar-ring: 28 85% 56%;
+    /* Sidebar — madeira escura, aconchegante */
+    --sidebar-background: 25 30% 14%;
+    --sidebar-foreground: 36 22% 82%;
+    --sidebar-primary: 22 65% 52%;
+    --sidebar-primary-foreground: 36 33% 98%;
+    --sidebar-accent: 25 28% 20%;
+    --sidebar-accent-foreground: 36 25% 92%;
+    --sidebar-border: 25 25% 22%;
+    --sidebar-ring: 22 55% 50%;
 
-    --font-display: 'Plus Jakarta Sans', sans-serif;
-    --font-body: 'Inter', sans-serif;
+    /* Tipografia */
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-body: 'Inter', system-ui, sans-serif;
 
-    --gradient-primary: linear-gradient(135deg, hsl(28, 85%, 56%), hsl(16, 85%, 52%));
-    --gradient-warm: linear-gradient(135deg, hsl(28, 85%, 56%), hsl(38, 92%, 50%));
-    --gradient-dark: linear-gradient(135deg, hsl(224, 30%, 14%), hsl(224, 30%, 22%));
-    --shadow-sm: 0 1px 2px 0 hsl(224 30% 14% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(224 30% 14% / 0.07), 0 2px 4px -2px hsl(224 30% 14% / 0.05);
-    --shadow-lg: 0 10px 25px -3px hsl(224 30% 14% / 0.08), 0 4px 10px -4px hsl(224 30% 14% / 0.04);
-    --shadow-primary: 0 4px 14px 0 hsl(28 85% 56% / 0.35);
+    /* Gradientes premium */
+    --gradient-primary: linear-gradient(135deg, hsl(22 55% 42%), hsl(18 60% 36%));
+    --gradient-warm: linear-gradient(135deg, hsl(32 60% 60%), hsl(22 55% 42%));
+    --gradient-surface: linear-gradient(180deg, hsl(36 33% 98%), hsl(36 25% 94%));
+    --gradient-dark: linear-gradient(135deg, hsl(25 30% 14%), hsl(25 25% 22%));
+
+    /* Sombras suaves, papel/madeira */
+    --shadow-sm: 0 1px 2px 0 hsl(25 25% 16% / 0.04);
+    --shadow-md: 0 4px 12px -2px hsl(25 25% 16% / 0.06), 0 2px 4px -2px hsl(25 25% 16% / 0.04);
+    --shadow-lg: 0 12px 28px -6px hsl(25 25% 16% / 0.08), 0 4px 12px -4px hsl(25 25% 16% / 0.04);
+    --shadow-primary: 0 6px 20px -4px hsl(22 55% 42% / 0.32);
+    --shadow-card: 0 1px 3px 0 hsl(25 25% 16% / 0.04), 0 1px 2px 0 hsl(25 25% 16% / 0.02);
   }
 
   .dark {
-    --background: 224 30% 8%;
-    --foreground: 220 16% 92%;
-    --card: 224 30% 12%;
-    --card-foreground: 220 16% 92%;
-    --popover: 224 30% 12%;
-    --popover-foreground: 220 16% 92%;
-    --primary: 28 85% 56%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 224 30% 18%;
-    --secondary-foreground: 220 16% 92%;
-    --muted: 224 30% 18%;
-    --muted-foreground: 220 10% 55%;
-    --accent: 28 85% 15%;
-    --accent-foreground: 28 85% 70%;
-    --destructive: 0 62% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 224 30% 20%;
-    --input: 224 30% 20%;
-    --ring: 28 85% 56%;
-    --sidebar-background: 224 30% 6%;
-    --sidebar-foreground: 220 16% 80%;
-    --sidebar-primary: 28 85% 56%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 224 30% 14%;
-    --sidebar-accent-foreground: 220 16% 90%;
-    --sidebar-border: 224 30% 16%;
-    --sidebar-ring: 28 85% 56%;
+    --background: 25 22% 9%;
+    --foreground: 36 22% 92%;
+    --card: 25 22% 12%;
+    --card-foreground: 36 22% 92%;
+    --popover: 25 22% 12%;
+    --popover-foreground: 36 22% 92%;
+    --primary: 22 65% 55%;
+    --primary-foreground: 25 22% 9%;
+    --secondary: 25 20% 18%;
+    --secondary-foreground: 36 22% 92%;
+    --muted: 25 20% 18%;
+    --muted-foreground: 36 12% 60%;
+    --accent: 22 40% 22%;
+    --accent-foreground: 32 60% 78%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 36 22% 92%;
+    --border: 25 18% 22%;
+    --input: 25 18% 22%;
+    --ring: 22 65% 55%;
+    --sidebar-background: 25 25% 7%;
+    --sidebar-foreground: 36 22% 80%;
+    --sidebar-primary: 22 65% 55%;
+    --sidebar-primary-foreground: 25 22% 9%;
+    --sidebar-accent: 25 22% 14%;
+    --sidebar-accent-foreground: 36 22% 88%;
+    --sidebar-border: 25 22% 18%;
+    --sidebar-ring: 22 65% 55%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-family: var(--font-body);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
+    font-feature-settings: 'ss01';
+    letter-spacing: -0.01em;
   }
 }
 
 @layer utilities {
-  .font-display {
-    font-family: var(--font-display);
-  }
+  .font-display { font-family: var(--font-display); }
+  .font-body    { font-family: var(--font-body); }
 
-  .font-body {
-    font-family: var(--font-body);
-  }
+  .gradient-primary { background: var(--gradient-primary); }
+  .gradient-warm    { background: var(--gradient-warm); }
+  .gradient-surface { background: var(--gradient-surface); }
+  .gradient-dark    { background: var(--gradient-dark); }
 
-  .gradient-primary {
-    background: var(--gradient-primary);
-  }
-
-  .gradient-warm {
-    background: var(--gradient-warm);
-  }
-
-  .gradient-dark {
-    background: var(--gradient-dark);
-  }
-
-  .shadow-primary {
-    box-shadow: var(--shadow-primary);
-  }
+  .shadow-primary { box-shadow: var(--shadow-primary); }
+  .shadow-card    { box-shadow: var(--shadow-card); }
+  .shadow-soft    { box-shadow: var(--shadow-md); }
+  .shadow-premium { box-shadow: var(--shadow-lg); }
 }
