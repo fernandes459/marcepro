@@ -141,6 +141,8 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const [mdfPricePerM2, setMdfPricePerM2] = useState(85);
   const [edgeTapePricePerM, setEdgeTapePricePerM] = useState(2.5);
   const [moduleResult, setModuleResult] = useState<ModuleResult | null>(null);
+  const [discountPct, setDiscountPct] = useState(0);
+  const [calcOpen, setCalcOpen] = useState(false);
 
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
