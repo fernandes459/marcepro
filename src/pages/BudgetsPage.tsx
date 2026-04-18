@@ -3,8 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Send, FileText, Loader2, Trash2, Edit, CheckCircle, XCircle,
   Factory, Download, MessageSquare, Settings2, Eye, EyeOff, Wrench, ChevronDown, ChevronUp,
-  BarChart3, Milestone,
+  BarChart3, Milestone, Calculator, Handshake, User, Lock,
 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Slider } from '@/components/ui/slider';
+import { PricingPanel } from '@/components/budget/PricingPanel';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
