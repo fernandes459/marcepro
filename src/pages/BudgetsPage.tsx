@@ -747,9 +747,7 @@ const openEditBudget = async (budget: Budget) => {
                 />
               </div>
 
-              </div>
-
-              {/* Seção 5: Condições de Pagamento */}
+              {/* Seção 6: Condições de Pagamento */}
               <div className="space-y-4 border border-border rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold">Condições de Pagamento</Label>
