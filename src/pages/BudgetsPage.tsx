@@ -834,9 +834,18 @@ const openEditBudget = async (budget: Budget) => {
                 <p className="text-xs text-muted-foreground">Estas notas são apenas para uso interno e não aparecem nos PDFs ou WhatsApp.</p>
               </div>
               
-              <Button type="submit" className="w-full gradient-primary shadow-primary border-0" disabled={saving}>
+              <Button
+                type="submit"
+                className={`w-full border-0 ${isBelowMin ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : 'gradient-primary shadow-primary'}`}
+                disabled={saving || isBelowMin}
+              >
                 {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                <FileText className="h-4 w-4 mr-2" /> {editingBudgetId ? 'Salvar Alterações' : 'Salvar Orçamento'}
+                {isBelowMin ? <Lock className="h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
+                {isBelowMin
+                  ? `Bloqueado — margem abaixo de ${minMargin}%`
+                  : editingBudgetId
+                    ? 'Salvar Alterações'
+                    : 'Salvar Orçamento'}
               </Button>
             </form>
           </DialogContent>
