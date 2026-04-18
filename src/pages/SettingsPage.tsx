@@ -40,6 +40,9 @@ interface CompanySettings {
   state: string;
   cep: string;
   default_margin: string;
+  min_margin: string;
+  default_commission: string;
+  monthly_goal: string;
   card_fees: CardFees;
 }
 
@@ -90,7 +93,8 @@ export default function SettingsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [company, setCompany] = useState<CompanySettings>({
-    company_name: '', cnpj: '', phone: '', email: '', address: '', city: '', state: '', cep: '', default_margin: '40', card_fees: {},
+    company_name: '', cnpj: '', phone: '', email: '', address: '', city: '', state: '', cep: '',
+    default_margin: '40', min_margin: '20', default_commission: '0', monthly_goal: '0', card_fees: {},
   });
 
   // Team access
@@ -124,6 +128,9 @@ export default function SettingsPage() {
         state: data.state || '',
         cep: data.cep || '',
         default_margin: String(data.default_margin || 40),
+        min_margin: String((data as any).min_margin ?? 20),
+        default_commission: String((data as any).default_commission ?? 0),
+        monthly_goal: String((data as any).monthly_goal ?? 0),
         card_fees: (data as any).card_fees || {},
       });
     }
@@ -147,6 +154,9 @@ export default function SettingsPage() {
       state: company.state || null,
       cep: company.cep || null,
       default_margin: parseFloat(company.default_margin) || 40,
+      min_margin: parseFloat(company.min_margin) || 0,
+      default_commission: parseFloat(company.default_commission) || 0,
+      monthly_goal: parseFloat(company.monthly_goal) || 0,
       card_fees: company.card_fees,
     } as any;
     if (existing) {
@@ -280,8 +290,37 @@ export default function SettingsPage() {
                   <div className="space-y-2"><Label>UF</Label><Input value={company.state} onChange={e => setCompany({ ...company, state: e.target.value })} maxLength={2} /></div>
                   <div className="space-y-2"><Label>CEP</Label><Input value={company.cep} onChange={e => setCompany({ ...company, cep: e.target.value })} /></div>
                 </div>
-                <div className="space-y-2"><Label>Margem de Lucro Padrão (%)</Label><Input type="number" value={company.default_margin} onChange={e => setCompany({ ...company, default_margin: e.target.value })} /></div>
               </div>
+
+              <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold font-display">Gestão de Vendas e Lucro</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Parâmetros usados em orçamentos, negociações e dashboard</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Margem padrão (%)</Label>
+                    <Input type="number" value={company.default_margin} onChange={e => setCompany({ ...company, default_margin: e.target.value })} />
+                    <p className="text-[10px] text-muted-foreground">Aplicada em novos orçamentos</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Margem mínima (%)</Label>
+                    <Input type="number" value={company.min_margin} onChange={e => setCompany({ ...company, min_margin: e.target.value })} />
+                    <p className="text-[10px] text-muted-foreground">Bloqueia descontos abaixo deste valor</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Comissão padrão (%)</Label>
+                    <Input type="number" value={company.default_commission} onChange={e => setCompany({ ...company, default_commission: e.target.value })} />
+                    <p className="text-[10px] text-muted-foreground">% sobre venda para vendedores</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Meta mensal (R$)</Label>
+                    <Input type="number" value={company.monthly_goal} onChange={e => setCompany({ ...company, monthly_goal: e.target.value })} />
+                    <p className="text-[10px] text-muted-foreground">Meta de faturamento do mês</p>
+                  </div>
+                </div>
+              </div>
+
               <Button className="gradient-primary shadow-primary border-0" onClick={saveCompany}>Salvar Configurações</Button>
             </CardContent>
           </Card>
