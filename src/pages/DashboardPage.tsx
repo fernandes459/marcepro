@@ -1,223 +1,140 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import {
-  DollarSign, TrendingUp, TrendingDown, Users, FileText, ArrowUpRight, ArrowDownRight,
-  Factory, AlertTriangle, Calendar, Wallet, Target, Activity, BarChart3,
-  ChevronRight, Clock, CheckCircle2,
+  TrendingUp, Target, Factory, AlertTriangle, Calendar as CalendarIcon,
+  Wrench, Truck, Hammer, Clock, ArrowRight, CheckCircle2, Flame, Activity,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, Legend,
-  ComposedChart,
-} from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
 
-const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.06 } } };
-const itemVariants = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
+const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
+const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
 
-const statusMap: Record<string, { label: string; className: string }> = {
-  approved: { label: 'Aprovado', className: 'bg-success/10 text-success border-success/20' },
-  pending: { label: 'Pendente', className: 'bg-warning/10 text-warning border-warning/20' },
-  draft: { label: 'Rascunho', className: 'bg-muted text-muted-foreground border-border' },
-  rejected: { label: 'Rejeitado', className: 'bg-destructive/10 text-destructive border-destructive/20' },
+const stageLabels: Record<string, string> = {
+  corte: 'Corte', borda: 'Borda', usinagem: 'Usinagem',
+  montagem: 'Montagem', assistencia: 'Assistência', entregue: 'Entregue',
 };
 
-const COLORS = ['hsl(152, 60%, 42%)', 'hsl(38, 92%, 50%)', 'hsl(0, 72%, 51%)', 'hsl(220, 16%, 75%)', 'hsl(28, 85%, 56%)', 'hsl(210, 80%, 52%)'];
-const EXPENSE_COLORS = ['hsl(28, 85%, 56%)', 'hsl(0, 72%, 51%)', 'hsl(38, 92%, 50%)', 'hsl(210, 80%, 52%)', 'hsl(152, 60%, 42%)', 'hsl(280, 60%, 50%)', 'hsl(220, 16%, 65%)'];
-
-const categoryLabels: Record<string, string> = {
-  material: 'Material', labor: 'Mão de Obra', rent: 'Aluguel', salary: 'Salários',
-  fuel: 'Combustível', food: 'Alimentação', tools: 'Ferramentas', maintenance: 'Manutenção',
-  taxes: 'Impostos', utilities: 'Água/Luz/Internet', transport: 'Frete', marketing: 'Marketing',
-  other_expense: 'Outros', project: 'Projeto', installment: 'Parcela', service: 'Serviço', other_income: 'Outros',
+const eventIcons: Record<string, typeof Hammer> = {
+  montagem: Hammer,
+  entrega: Truck,
+  assistencia: Wrench,
+  producao: Factory,
 };
 
-const stageLabels: Record<string, string> = { corte: 'Corte', borda: 'Borda', usinagem: 'Usinagem', montagem: 'Montagem', entregue: 'Entregue' };
-const stageMap: Record<string, number> = { corte: 0, borda: 1, usinagem: 2, montagem: 3, entregue: 4 };
+const eventColors: Record<string, string> = {
+  montagem: 'text-info bg-info/10 border-info/20',
+  entrega: 'text-success bg-success/10 border-success/20',
+  assistencia: 'text-destructive bg-destructive/10 border-destructive/20',
+  producao: 'text-primary bg-primary/10 border-primary/20',
+};
+
+interface Tx { id: string; type: string; amount: number; date: string; due_date: string | null; status: string; }
+interface Budget { id: string; status: string; final_price: number; clients?: { name: string } | null; }
+interface Task { id: string; stage: string; project_name: string; client_name: string; due_date: string | null; }
+
+function inferEventType(stage: string): keyof typeof eventColors {
+  if (stage === 'assistencia') return 'assistencia';
+  if (stage === 'montagem') return 'montagem';
+  if (stage === 'entregue') return 'entrega';
+  return 'producao';
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [budgets, setBudgets] = useState<any[]>([]);
-  const [clients, setClients] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Tx[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [monthlyGoal, setMonthlyGoal] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const fetchDashboardData = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (!user) return;
-
-    const [txRes, budRes, cliRes, taskRes, bankRes] = await Promise.all([
-      supabase.from('financial_transactions').select('*').order('date', { ascending: false }),
-      supabase.from('budgets').select('*, clients(name)').order('created_at', { ascending: false }),
-      supabase.from('clients').select('id, name'),
-      supabase.from('production_tasks').select('*'),
-      supabase.from('bank_accounts').select('*'),
+    const [txRes, budRes, taskRes, settingsRes] = await Promise.all([
+      supabase.from('financial_transactions').select('id, type, amount, date, due_date, status'),
+      supabase.from('budgets').select('id, status, final_price, clients(name)').order('created_at', { ascending: false }),
+      supabase.from('production_tasks').select('id, stage, project_name, client_name, due_date'),
+      supabase.from('company_settings').select('monthly_goal').maybeSingle(),
     ]);
-
-    if (txRes.data) setTransactions(txRes.data);
-    if (budRes.data) setBudgets(budRes.data);
-    if (cliRes.data) setClients(cliRes.data);
-    if (taskRes.data) setTasks(taskRes.data);
-    if (bankRes.data) setBankAccounts(bankRes.data);
+    if (txRes.data) setTransactions(txRes.data as Tx[]);
+    if (budRes.data) setBudgets(budRes.data as unknown as Budget[]);
+    if (taskRes.data) setTasks(taskRes.data as Task[]);
+    if (settingsRes.data) setMonthlyGoal(Number(settingsRes.data.monthly_goal) || 0);
     setLoading(false);
   }, [user]);
 
-  useEffect(() => {
-    void fetchDashboardData();
-  }, [fetchDashboardData]);
+  useEffect(() => { void fetchData(); }, [fetchData]);
 
   useEffect(() => {
     if (!user) return;
-
     const channel = supabase
-      .channel(`dashboard-live-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'financial_transactions' }, () => {
-        void fetchDashboardData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => {
-        void fetchDashboardData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
-        void fetchDashboardData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => {
-        void fetchDashboardData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts' }, () => {
-        void fetchDashboardData();
-      })
+      .channel(`dashboard-exec-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'financial_transactions' }, () => void fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => void fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => void fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'company_settings' }, () => void fetchData())
       .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchData, user]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchDashboardData, user]);
+  const today = useMemo(() => new Date(), []);
+  const todayISO = today.toISOString().slice(0, 10);
+  const currentMonth = todayISO.slice(0, 7);
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  
-  const monthTx = useMemo(() => 
-    transactions.filter(t => t.date?.startsWith(currentMonth)),
+  // ===== KPIs do mês =====
+  const monthIncome = useMemo(
+    () => transactions.filter(t => t.type === 'income' && t.date?.startsWith(currentMonth)).reduce((s, t) => s + Number(t.amount), 0),
     [transactions, currentMonth]
   );
-  
-  const monthIncome = useMemo(() => 
-    monthTx.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
-    [monthTx]
-  );
-  const monthExpense = useMemo(() => 
-    monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
-    [monthTx]
+  const monthExpense = useMemo(
+    () => transactions.filter(t => t.type === 'expense' && t.date?.startsWith(currentMonth)).reduce((s, t) => s + Number(t.amount), 0),
+    [transactions, currentMonth]
   );
   const monthProfit = monthIncome - monthExpense;
-  const totalBankBalance = useMemo(() => 
-    bankAccounts.reduce((s, a) => s + Number(a.current_balance), 0),
-    [bankAccounts]
+  const margin = monthIncome > 0 ? (monthProfit / monthIncome) * 100 : 0;
+  const goalProgress = monthlyGoal > 0 ? Math.min(100, (monthIncome / monthlyGoal) * 100) : 0;
+  const goalRemaining = Math.max(0, monthlyGoal - monthIncome);
+
+  // ===== Projetos =====
+  const activeProjects = useMemo(() => tasks.filter(t => t.stage !== 'entregue'), [tasks]);
+  const overdueProjects = useMemo(
+    () => activeProjects.filter(t => t.due_date && t.due_date < todayISO),
+    [activeProjects, todayISO]
+  );
+  const assistanceProjects = useMemo(() => tasks.filter(t => t.stage === 'assistencia'), [tasks]);
+
+  // ===== Agenda da semana =====
+  const weekEvents = useMemo(() => {
+    const start = new Date(today);
+    const end = new Date(today);
+    end.setDate(end.getDate() + 7);
+    const startISO = start.toISOString().slice(0, 10);
+    const endISO = end.toISOString().slice(0, 10);
+    return tasks
+      .filter(t => t.due_date && t.due_date >= startISO && t.due_date <= endISO)
+      .sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1))
+      .slice(0, 8)
+      .map(t => ({ ...t, eventType: inferEventType(t.stage) }));
+  }, [tasks, today]);
+
+  const weekSummary = useMemo(() => {
+    const counts = { montagem: 0, entrega: 0, assistencia: 0, producao: 0 };
+    weekEvents.forEach(e => { counts[e.eventType] = (counts[e.eventType] ?? 0) + 1; });
+    return counts;
+  }, [weekEvents]);
+
+  // ===== Alertas críticos =====
+  const overdueReceivables = useMemo(
+    () => transactions.filter(t => t.type === 'income' && t.status === 'pending' && t.due_date && t.due_date < todayISO),
+    [transactions, todayISO]
   );
 
-  const prevMonth = new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().slice(0, 7);
-  const prevMonthIncome = useMemo(() => 
-    transactions.filter(t => t.date?.startsWith(prevMonth) && t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
-    [transactions, prevMonth]
-  );
-  const prevMonthExpense = useMemo(() => 
-    transactions.filter(t => t.date?.startsWith(prevMonth) && t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
-    [transactions, prevMonth]
-  );
-  const incomeChange = prevMonthIncome > 0 ? ((monthIncome - prevMonthIncome) / prevMonthIncome * 100) : 0;
-  const expenseChange = prevMonthExpense > 0 ? ((monthExpense - prevMonthExpense) / prevMonthExpense * 100) : 0;
-
-  const today = new Date().toISOString().slice(0, 10);
-  const overdueItems = useMemo(() => 
-    transactions.filter(t => t.status === 'pending' && t.due_date && t.due_date < today),
-    [transactions, today]
-  );
-  const pendingReceivable = useMemo(() => 
-    transactions.filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0),
-    [transactions]
-  );
-  const pendingPayable = useMemo(() => 
-    transactions.filter(t => t.type === 'expense' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0),
-    [transactions]
-  );
-
-  const openBudgets = useMemo(() => budgets.filter(b => b.status === 'draft' || b.status === 'pending').length, [budgets]);
-  const approvedBudgets = useMemo(() => budgets.filter(b => b.status === 'approved').length, [budgets]);
-  const activeTasks = useMemo(() => tasks.filter(t => t.stage !== 'entregue'), [tasks]);
-
-  // Timeline - last 6 months with accumulated
-  const timelineData = useMemo(() => {
-    const months: Record<string, { month: string; receita: number; despesa: number; lucro: number; acumulado: number }> = {};
-    let accumulated = 0;
-    transactions.forEach(t => {
-      const m = t.date?.slice(0, 7);
-      if (!m) return;
-      if (!months[m]) months[m] = { month: m, receita: 0, despesa: 0, lucro: 0, acumulado: 0 };
-      if (t.type === 'income') months[m].receita += Number(t.amount);
-      else months[m].despesa += Number(t.amount);
-    });
-    const sorted = Object.values(months).sort((a, b) => a.month.localeCompare(b.month)).slice(-6);
-    sorted.forEach(m => {
-      m.lucro = m.receita - m.despesa;
-      accumulated += m.lucro;
-      m.acumulado = accumulated;
-      m.month = new Date(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-    });
-    return sorted;
-  }, [transactions]);
-
-  // Expense by category pie
-  const expenseByCat = useMemo(() => {
-    const counts: Record<string, number> = {};
-    monthTx.filter(t => t.type === 'expense').forEach(t => {
-      const cat = categoryLabels[t.category] || t.category;
-      counts[cat] = (counts[cat] || 0) + Number(t.amount);
-    });
-    return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [monthTx]);
-
-  // Budget status pie
-  const budgetStatusData = useMemo(() => {
-    const counts: Record<string, number> = {};
-    budgets.forEach(b => { counts[b.status] = (counts[b.status] || 0) + 1; });
-    return [
-      { name: 'Aprovados', value: counts.approved || 0 },
-      { name: 'Pendentes', value: counts.pending || 0 },
-      { name: 'Rejeitados', value: counts.rejected || 0 },
-      { name: 'Rascunhos', value: counts.draft || 0 },
-    ].filter(d => d.value > 0);
-  }, [budgets]);
-
-  // Client profit ranking
-  const topClients = useMemo(() => {
-    const map: Record<string, { name: string; income: number; expense: number }> = {};
-    transactions.forEach(t => {
-      if (!t.client_id) return;
-      const client = clients.find(c => c.id === t.client_id);
-      if (!client) return;
-      if (!map[t.client_id]) map[t.client_id] = { name: client.name, income: 0, expense: 0 };
-      if (t.type === 'income') map[t.client_id].income += Number(t.amount);
-      else map[t.client_id].expense += Number(t.amount);
-    });
-    return Object.values(map).map(c => ({ ...c, profit: c.income - c.expense, margin: c.income > 0 ? ((c.income - c.expense) / c.income * 100) : 0 }))
-      .sort((a, b) => b.profit - a.profit).slice(0, 5);
-  }, [transactions, clients]);
-
-  // Upcoming due dates
-  const upcoming = useMemo(() => {
-    const in7days = new Date(); in7days.setDate(in7days.getDate() + 7);
-    const fut = in7days.toISOString().slice(0, 10);
-    return transactions
-      .filter(t => t.status === 'pending' && t.due_date && t.due_date >= today && t.due_date <= fut)
-      .sort((a, b) => a.due_date.localeCompare(b.due_date)).slice(0, 5);
-  }, [transactions, today]);
-
-  const margin = monthIncome > 0 ? (monthProfit / monthIncome * 100) : 0;
+  const hasCriticalAlerts = assistanceProjects.length > 0 || overdueProjects.length > 0 || overdueReceivables.length > 0;
 
   if (loading) {
     return (
@@ -231,395 +148,277 @@ export default function DashboardPage() {
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold font-display">Dashboard</h1>
-        <p className="text-muted-foreground text-sm">Visão geral do seu negócio em tempo real</p>
+        <h1 className="text-3xl font-bold font-display tracking-tight">Bom dia, mestre 👋</h1>
+        <p className="text-muted-foreground text-sm">
+          {today.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </p>
       </div>
 
-      {/* Overdue Alert */}
-      {overdueItems.length > 0 && (
-        <motion.div variants={itemVariants}>
-          <Card className="border-destructive/50 bg-destructive/5">
-            <CardContent className="p-4 flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-destructive">{overdueItems.length} conta(s) vencida(s)!</p>
-                <p className="text-xs text-muted-foreground">Total: {formatBRL(overdueItems.reduce((s: number, t: any) => s + Number(t.amount), 0))}</p>
-              </div>
-              <ChevronRight className="h-4 w-4 text-destructive" />
-            </CardContent>
-          </Card>
+      {/* ============ ALERTAS CRÍTICOS (TOPO) ============ */}
+      {hasCriticalAlerts && (
+        <motion.div variants={itemVariants} className="grid gap-3 sm:grid-cols-3">
+          {assistanceProjects.length > 0 && (
+            <Link to="/producao">
+              <Card className="border-destructive/40 bg-destructive/5 hover:shadow-soft transition-all">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-destructive/15">
+                    <Wrench className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-destructive uppercase tracking-wide">Ação Necessária</p>
+                    <p className="text-sm font-bold">{assistanceProjects.length} assistência(s) pendente(s)</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-destructive shrink-0" />
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+          {overdueProjects.length > 0 && (
+            <Link to="/producao">
+              <Card className="border-warning/40 bg-warning/5 hover:shadow-soft transition-all">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-warning/15">
+                    <Flame className="h-5 w-5 text-warning" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-warning uppercase tracking-wide">Atenção</p>
+                    <p className="text-sm font-bold">{overdueProjects.length} projeto(s) atrasado(s)</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-warning shrink-0" />
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+          {overdueReceivables.length > 0 && (
+            <Link to="/financeiro">
+              <Card className="border-destructive/40 bg-destructive/5 hover:shadow-soft transition-all">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-destructive/15">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-destructive uppercase tracking-wide">A Receber</p>
+                    <p className="text-sm font-bold">{overdueReceivables.length} conta(s) vencida(s)</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-destructive shrink-0" />
+                </CardContent>
+              </Card>
+            </Link>
+          )}
         </motion.div>
       )}
 
-      {/* Main KPIs Row */}
+      {/* ============ 4 KPIs EXECUTIVOS ============ */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        {[
-          {
-            title: 'Faturamento', value: formatBRL(monthIncome),
-            change: incomeChange, icon: TrendingUp,
-            sub: 'vs mês anterior', color: 'text-success',
-          },
-          {
-            title: 'Despesas', value: formatBRL(monthExpense),
-            change: expenseChange, icon: TrendingDown,
-            sub: 'vs mês anterior', color: 'text-destructive', invertPositive: true,
-          },
-          {
-            title: 'Lucro Líquido', value: formatBRL(monthProfit),
-            change: margin, icon: Target,
-            sub: `${margin.toFixed(1)}% margem`, color: monthProfit >= 0 ? 'text-success' : 'text-destructive',
-            noCompare: true,
-          },
-          {
-            title: 'Saldo em Contas', value: formatBRL(totalBankBalance),
-            change: 0, icon: Wallet,
-            sub: `${bankAccounts.length} conta(s)`, color: totalBankBalance >= 0 ? 'text-foreground' : 'text-destructive',
-            noCompare: true,
-          },
-        ].map((kpi) => (
-          <motion.div key={kpi.title} variants={itemVariants}>
-            <Card className="relative overflow-hidden group hover:shadow-md transition-shadow">
-              <CardContent className="p-4 sm:p-5">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1 min-w-0">
-                    <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">{kpi.title}</p>
-                    <p className={`text-lg sm:text-2xl font-bold font-display ${kpi.color}`}>{kpi.value}</p>
-                  </div>
-                  <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-accent shrink-0">
-                    <kpi.icon className="h-4 w-4 sm:h-5 sm:w-5 text-accent-foreground" />
-                  </div>
+        {/* Faturamento */}
+        <motion.div variants={itemVariants}>
+          <Card className="overflow-hidden hover:shadow-soft transition-all">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Faturamento</p>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-success/10">
+                  <TrendingUp className="h-4 w-4 text-success" />
                 </div>
-                <div className="mt-2 flex items-center gap-1 text-[10px] sm:text-xs">
-                  {!kpi.noCompare && (
-                    <>
-                      {(kpi.invertPositive ? kpi.change <= 0 : kpi.change >= 0) ? (
-                        <ArrowUpRight className="h-3 w-3 text-success" />
-                      ) : (
-                        <ArrowDownRight className="h-3 w-3 text-destructive" />
-                      )}
-                      <span className={(kpi.invertPositive ? kpi.change <= 0 : kpi.change >= 0) ? 'text-success font-medium' : 'text-destructive font-medium'}>
-                        {kpi.change >= 0 ? '+' : ''}{kpi.change.toFixed(1)}%
-                      </span>
-                    </>
-                  )}
-                  <span className="text-muted-foreground">{kpi.sub}</span>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-        {[
-          { label: 'A Receber', value: formatBRL(pendingReceivable), icon: ArrowUpRight, color: 'text-success' },
-          { label: 'A Pagar', value: formatBRL(pendingPayable), icon: ArrowDownRight, color: 'text-destructive' },
-          { label: 'Orçamentos Abertos', value: String(openBudgets), icon: FileText, color: 'text-warning' },
-          { label: 'Produção Ativa', value: String(activeTasks.length), icon: Factory, color: 'text-info' },
-        ].map(stat => (
-          <motion.div key={stat.label} variants={itemVariants}>
-            <Card className="border-dashed">
-              <CardContent className="p-3 sm:p-4 flex items-center gap-3">
-                <stat.icon className={`h-4 w-4 ${stat.color} shrink-0`} />
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{stat.label}</p>
-                  <p className={`text-sm sm:text-base font-bold font-display ${stat.color}`}>{stat.value}</p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Main Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Timeline Chart */}
-        <motion.div variants={itemVariants} className="lg:col-span-2">
-          <Card className="h-full">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm sm:text-base font-display flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-primary" /> Timeline Financeira
-                </CardTitle>
-                <Badge variant="outline" className="text-[10px]">Últimos 6 meses</Badge>
               </div>
-            </CardHeader>
-            <CardContent>
-              {timelineData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={timelineData} barGap={4}>
-                    <defs>
-                      <linearGradient id="gradReceita" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(152, 60%, 42%)" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="hsl(152, 60%, 42%)" stopOpacity={0.2} />
-                      </linearGradient>
-                      <linearGradient id="gradDespesa" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(0, 72%, 51%)" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="hsl(0, 72%, 51%)" stopOpacity={0.2} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 16%, 90%)" vertical={false} />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} fontSize={11} />
-                    <YAxis yAxisId="left" axisLine={false} tickLine={false} fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip formatter={(value: number) => formatBRL(value)} contentStyle={{ borderRadius: '0.75rem', border: '1px solid hsl(220, 16%, 90%)', fontSize: '12px' }} />
-                    <Legend wrapperStyle={{ fontSize: '11px' }} />
-                    <Bar yAxisId="left" dataKey="receita" fill="url(#gradReceita)" radius={[6, 6, 0, 0]} name="Receita" />
-                    <Bar yAxisId="left" dataKey="despesa" fill="url(#gradDespesa)" radius={[6, 6, 0, 0]} name="Despesa" />
-                    <Line yAxisId="right" type="monotone" dataKey="acumulado" stroke="hsl(28, 85%, 56%)" strokeWidth={2.5} dot={{ r: 4, fill: 'hsl(28, 85%, 56%)' }} name="Acumulado" />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                  <BarChart3 className="h-10 w-10 mb-2 opacity-30" />
-                  <p className="text-sm">Registre lançamentos para ver a timeline.</p>
+              <p className="text-2xl sm:text-3xl font-bold font-display text-foreground tabular-nums">
+                {formatBRL(monthIncome)}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-1">Recebido neste mês</p>
+              {monthlyGoal > 0 && (
+                <div className="mt-3 space-y-1">
+                  <Progress value={goalProgress} className="h-1.5" />
+                  <p className="text-[10px] text-muted-foreground">
+                    {goalProgress.toFixed(0)}% da meta · faltam <span className="font-semibold text-foreground">{formatBRL(goalRemaining)}</span>
+                  </p>
                 </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Expense Breakdown */}
+        {/* Lucro */}
         <motion.div variants={itemVariants}>
-          <Card className="h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm sm:text-base font-display">Despesas por Categoria</CardTitle>
-              <p className="text-[10px] text-muted-foreground">Mês atual</p>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center">
-              {expenseByCat.length > 0 ? (
-                <>
-                  <div className="relative">
-                    <ResponsiveContainer width={180} height={180}>
-                      <PieChart>
-                        <Pie data={expenseByCat} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value">
-                          {expenseByCat.map((_, i) => <Cell key={i} fill={EXPENSE_COLORS[i % EXPENSE_COLORS.length]} />)}
-                        </Pie>
-                        <Tooltip formatter={(value: number) => formatBRL(value)} contentStyle={{ borderRadius: '0.5rem', fontSize: '11px' }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-xl font-bold font-display">{formatBRL(monthExpense)}</span>
-                      <span className="text-[10px] text-muted-foreground">Total</span>
-                    </div>
-                  </div>
-                  <div className="w-full mt-3 space-y-1.5 max-h-[140px] overflow-y-auto">
-                    {expenseByCat.map((d, i) => (
-                      <div key={d.name} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: EXPENSE_COLORS[i % EXPENSE_COLORS.length] }} />
-                          <span className="truncate">{d.name}</span>
-                        </div>
-                        <span className="font-medium shrink-0 ml-2">{formatBRL(d.value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground py-12">Nenhuma despesa neste mês.</p>
-              )}
+          <Card className="overflow-hidden hover:shadow-soft transition-all">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Lucro do Mês</p>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent">
+                  <Target className="h-4 w-4 text-accent-foreground" />
+                </div>
+              </div>
+              <p className={`text-2xl sm:text-3xl font-bold font-display tabular-nums ${monthProfit >= 0 ? 'text-foreground' : 'text-destructive'}`}>
+                {formatBRL(monthProfit)}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Margem <span className={`font-semibold ${margin >= 20 ? 'text-success' : margin >= 10 ? 'text-warning' : 'text-destructive'}`}>{margin.toFixed(1)}%</span>
+              </p>
             </CardContent>
           </Card>
+        </motion.div>
+
+        {/* Projetos ativos */}
+        <motion.div variants={itemVariants}>
+          <Link to="/producao">
+            <Card className="overflow-hidden hover:shadow-soft hover:border-primary/30 transition-all cursor-pointer h-full">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Projetos Ativos</p>
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-info/10">
+                    <Factory className="h-4 w-4 text-info" />
+                  </div>
+                </div>
+                <p className="text-2xl sm:text-3xl font-bold font-display text-foreground tabular-nums">
+                  {activeProjects.length}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">Em produção agora</p>
+              </CardContent>
+            </Card>
+          </Link>
+        </motion.div>
+
+        {/* Atrasados */}
+        <motion.div variants={itemVariants}>
+          <Link to="/producao">
+            <Card className={`overflow-hidden hover:shadow-soft transition-all cursor-pointer h-full ${overdueProjects.length > 0 ? 'border-destructive/30' : ''}`}>
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Atrasados</p>
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${overdueProjects.length > 0 ? 'bg-destructive/10' : 'bg-muted'}`}>
+                    <AlertTriangle className={`h-4 w-4 ${overdueProjects.length > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
+                  </div>
+                </div>
+                <p className={`text-2xl sm:text-3xl font-bold font-display tabular-nums ${overdueProjects.length > 0 ? 'text-destructive' : 'text-foreground'}`}>
+                  {overdueProjects.length}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {overdueProjects.length === 0 ? 'Tudo em dia ✓' : 'Requer atenção'}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         </motion.div>
       </div>
 
-      {/* Middle Row: Client Ranking + Budget Status + Upcoming */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Top Clients */}
-        <motion.div variants={itemVariants}>
-          <Card className="h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm sm:text-base font-display flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" /> Top Clientes (Lucro)
+      {/* ============ AGENDA DA SEMANA ============ */}
+      <motion.div variants={itemVariants}>
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle className="text-base font-display flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4 text-primary" />
+                Agenda da Semana
               </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {topClients.length > 0 ? (
-                <div className="space-y-3">
-                  {topClients.map((c, i) => (
-                    <div key={c.name} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-muted-foreground w-4">{i + 1}.</span>
-                          <span className="text-sm font-medium truncate">{c.name}</span>
+              <div className="flex flex-wrap gap-2">
+                {weekSummary.montagem > 0 && (
+                  <Badge variant="outline" className="text-[10px] gap-1 bg-info/5 text-info border-info/20">
+                    <Hammer className="h-3 w-3" /> {weekSummary.montagem} montagem(ns)
+                  </Badge>
+                )}
+                {weekSummary.entrega > 0 && (
+                  <Badge variant="outline" className="text-[10px] gap-1 bg-success/5 text-success border-success/20">
+                    <Truck className="h-3 w-3" /> {weekSummary.entrega} entrega(s)
+                  </Badge>
+                )}
+                {weekSummary.assistencia > 0 && (
+                  <Badge variant="outline" className="text-[10px] gap-1 bg-destructive/5 text-destructive border-destructive/20">
+                    <Wrench className="h-3 w-3" /> {weekSummary.assistencia} assistência(s)
+                  </Badge>
+                )}
+                {weekSummary.producao > 0 && (
+                  <Badge variant="outline" className="text-[10px] gap-1 bg-primary/5 text-primary border-primary/20">
+                    <Factory className="h-3 w-3" /> {weekSummary.producao} produção
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {weekEvents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                <CheckCircle2 className="h-10 w-10 mb-2 opacity-30" />
+                <p className="text-sm">Nenhum compromisso nos próximos 7 dias</p>
+              </div>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {weekEvents.map(ev => {
+                  const Icon = eventIcons[ev.eventType] ?? Factory;
+                  const dueDate = new Date(ev.due_date! + 'T12:00:00');
+                  const isOverdue = ev.due_date! < todayISO;
+                  return (
+                    <Link key={ev.id} to="/producao">
+                      <div className={`flex items-center gap-3 rounded-xl border p-3 transition-all hover:shadow-soft hover:scale-[1.01] ${eventColors[ev.eventType]}`}>
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background/60">
+                          <Icon className="h-4 w-4" />
                         </div>
-                        <span className={`text-xs font-bold ${c.profit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                          {formatBRL(c.profit)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Progress value={Math.max(0, Math.min(100, c.margin))} className="h-1.5 flex-1" />
-                        <span className="text-[10px] text-muted-foreground w-10 text-right">{c.margin.toFixed(0)}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">Vincule lançamentos a clientes.</p>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Budget Status */}
-        <motion.div variants={itemVariants}>
-          <Card className="h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm sm:text-base font-display flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" /> Orçamentos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {budgetStatusData.length > 0 ? (
-                <>
-                  <div className="flex items-center justify-center">
-                    <div className="relative">
-                      <ResponsiveContainer width={160} height={160}>
-                        <PieChart>
-                          <Pie data={budgetStatusData} cx="50%" cy="50%" innerRadius={50} outerRadius={72} paddingAngle={4} dataKey="value">
-                            {budgetStatusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-xl font-bold font-display">{budgets.length}</span>
-                        <span className="text-[10px] text-muted-foreground">Total</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2 mt-2">
-                    {budgetStatusData.map((d, i) => (
-                      <div key={d.name} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                          <span>{d.name}</span>
-                        </div>
-                        <span className="font-medium">{d.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">Nenhum orçamento.</p>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Upcoming */}
-        <motion.div variants={itemVariants}>
-          <Card className="h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm sm:text-base font-display flex items-center gap-2">
-                <Clock className="h-4 w-4 text-warning" /> Próximos Vencimentos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {upcoming.length > 0 ? (
-                <div className="space-y-2.5">
-                  {upcoming.map(tx => {
-                    const clientName = tx.client_id ? clients.find((c: any) => c.id === tx.client_id)?.name : null;
-                    return (
-                      <div key={tx.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium truncate">{tx.description}</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {clientName && `${clientName} • `}
-                            {new Date(tx.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate text-foreground">{ev.client_name}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {ev.project_name} · {stageLabels[ev.stage] ?? ev.stage}
                           </p>
                         </div>
-                        <span className={`text-xs font-bold shrink-0 ml-2 ${tx.type === 'income' ? 'text-success' : 'text-destructive'}`}>
-                          {formatBRL(Number(tx.amount))}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                  <CheckCircle2 className="h-8 w-8 mb-2 opacity-30" />
-                  <p className="text-sm">Nenhum vencimento próximo</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* Bottom Row: Recent Budgets + Production */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <motion.div variants={itemVariants}>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm sm:text-base font-display">Orçamentos Recentes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2.5">
-                {budgets.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Nenhum orçamento ainda.</p>
-                ) : budgets.slice(0, 5).map((b: any) => (
-                  <div key={b.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{b.project_name || b.clients?.name || b.code}</p>
-                      <p className="text-[10px] text-muted-foreground">{new Date(b.created_at).toLocaleDateString('pt-BR')}</p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className="text-sm font-semibold">{formatBRL(b.final_price)}</span>
-                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${statusMap[b.status]?.className || ''}`}>
-                        {statusMap[b.status]?.label || b.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm sm:text-base font-display flex items-center gap-2">
-                <Factory className="h-4 w-4 text-primary" /> Produção em Andamento
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {activeTasks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Nenhuma tarefa em andamento.</p>
-                ) : activeTasks.slice(0, 4).map((t: any) => {
-                  const progress = ((stageMap[t.stage] || 0) / 4) * 100;
-                  return (
-                    <div key={t.id} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{t.project_name} — {t.client_name}</p>
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                            <Factory className="h-3 w-3" />
-                            <span>{stageLabels[t.stage] || t.stage}</span>
-                            {t.due_date && (
-                              <>
-                                <span>•</span>
-                                <Calendar className="h-3 w-3" />
-                                <span>{new Date(t.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
-                              </>
-                            )}
-                          </div>
+                        <div className="text-right shrink-0">
+                          <p className={`text-xs font-bold ${isOverdue ? 'text-destructive' : 'text-foreground'}`}>
+                            {dueDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {dueDate.toLocaleDateString('pt-BR', { weekday: 'short' })}
+                          </p>
                         </div>
-                        <Badge variant="outline" className="text-[10px] shrink-0 ml-2">{progress.toFixed(0)}%</Badge>
                       </div>
-                      <div className="h-2 rounded-full bg-muted">
-                        <div className="h-2 rounded-full gradient-primary transition-all duration-500" style={{ width: `${progress}%` }} />
-                      </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* ============ AÇÕES RÁPIDAS ============ */}
+      <motion.div variants={itemVariants} className="grid gap-3 sm:grid-cols-3">
+        <Link to="/orcamentos">
+          <Card className="hover:shadow-soft hover:border-primary/30 transition-all cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-primary">
+                <Activity className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Novo Orçamento</p>
+                <p className="text-[11px] text-muted-foreground">Comece a vender agora</p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </CardContent>
           </Card>
-        </motion.div>
-      </div>
+        </Link>
+        <Link to="/producao">
+          <Card className="hover:shadow-soft hover:border-primary/30 transition-all cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-info/10">
+                <Factory className="h-5 w-5 text-info" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Ver Produção</p>
+                <p className="text-[11px] text-muted-foreground">{activeProjects.length} em andamento</p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </Link>
+        <Link to="/financeiro">
+          <Card className="hover:shadow-soft hover:border-primary/30 transition-all cursor-pointer">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/10">
+                <Clock className="h-5 w-5 text-success" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Financeiro</p>
+                <p className="text-[11px] text-muted-foreground">Lançamentos e contas</p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </Link>
+      </motion.div>
     </motion.div>
   );
 }
