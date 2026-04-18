@@ -40,6 +40,9 @@ interface CompanySettings {
   state: string;
   cep: string;
   default_margin: string;
+  min_margin: string;
+  default_commission: string;
+  monthly_goal: string;
   card_fees: CardFees;
 }
 
@@ -90,7 +93,8 @@ export default function SettingsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [company, setCompany] = useState<CompanySettings>({
-    company_name: '', cnpj: '', phone: '', email: '', address: '', city: '', state: '', cep: '', default_margin: '40', card_fees: {},
+    company_name: '', cnpj: '', phone: '', email: '', address: '', city: '', state: '', cep: '',
+    default_margin: '40', min_margin: '20', default_commission: '0', monthly_goal: '0', card_fees: {},
   });
 
   // Team access
@@ -124,6 +128,9 @@ export default function SettingsPage() {
         state: data.state || '',
         cep: data.cep || '',
         default_margin: String(data.default_margin || 40),
+        min_margin: String((data as any).min_margin ?? 20),
+        default_commission: String((data as any).default_commission ?? 0),
+        monthly_goal: String((data as any).monthly_goal ?? 0),
         card_fees: (data as any).card_fees || {},
       });
     }
@@ -147,6 +154,9 @@ export default function SettingsPage() {
       state: company.state || null,
       cep: company.cep || null,
       default_margin: parseFloat(company.default_margin) || 40,
+      min_margin: parseFloat(company.min_margin) || 0,
+      default_commission: parseFloat(company.default_commission) || 0,
+      monthly_goal: parseFloat(company.monthly_goal) || 0,
       card_fees: company.card_fees,
     } as any;
     if (existing) {
