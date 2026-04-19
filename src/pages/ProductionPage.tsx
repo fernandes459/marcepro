@@ -153,37 +153,51 @@ export default function ProductionPage() {
   }) {
     if (!checklistTask || !user) return;
 
-    const { error } = await supabase.from('production_tasks').update({
-      stage: 'entregue',
-      assembly_checklist: data.checklist,
-      assembly_completed_at: new Date().toISOString(),
-      assembly_completed_by: data.completedBy,
-      has_pending_issues: data.hasPendingIssues,
-    }).eq('id', checklistTask.id);
+    try {
+      const { error } = await supabase.from('production_tasks').update({
+        stage: 'entregue',
+        assembly_checklist: data.checklist as unknown as Record<string, boolean>,
+        assembly_completed_at: new Date().toISOString(),
+        assembly_completed_by: data.completedBy,
+        has_pending_issues: data.hasPendingIssues,
+      }).eq('id', checklistTask.id);
 
-    if (error) { toast.error('Erro ao finalizar montagem'); return; }
+      if (error) {
+        console.error('[checklist] update error', error);
+        toast.error(`Erro ao finalizar montagem: ${error.message}`);
+        return;
+      }
 
-    if (data.hasPendingIssues && data.pendingDescription) {
-      const { error: aErr } = await supabase.from('technical_assistance').insert({
-        user_id: user.id,
-        production_task_id: checklistTask.id,
-        budget_id: checklistTask.budget_id,
-        client_name: checklistTask.client_name,
-        project_name: checklistTask.project_name,
-        description: data.pendingDescription,
-        priority: data.pendingPriority ?? 'normal',
-        assignee: data.completedBy,
-        status: 'open',
-      });
-      if (aErr) toast.error('Montagem finalizada, mas falhou ao abrir assistência');
-      else toast.success('Montagem concluída • Assistência aberta');
-    } else {
-      toast.success('Montagem concluída e entregue!');
+      if (data.hasPendingIssues && data.pendingDescription) {
+        const { error: aErr } = await supabase.from('technical_assistance').insert({
+          user_id: user.id,
+          production_task_id: checklistTask.id,
+          budget_id: checklistTask.budget_id,
+          client_name: checklistTask.client_name,
+          project_name: checklistTask.project_name,
+          description: data.pendingDescription,
+          priority: data.pendingPriority ?? 'normal',
+          assignee: data.completedBy,
+          status: 'open',
+        });
+        if (aErr) {
+          console.error('[checklist] assistance error', aErr);
+          toast.error(`Montagem finalizada, mas falhou ao abrir assistência: ${aErr.message}`);
+        } else {
+          toast.success('Montagem concluída • Assistência aberta');
+        }
+      } else {
+        toast.success('Montagem concluída e entregue!');
+      }
+
+      setChecklistOpen(false);
+      setChecklistTask(null);
+      fetchTasks();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erro inesperado';
+      console.error('[checklist] exception', e);
+      toast.error(msg);
     }
-
-    setChecklistOpen(false);
-    setChecklistTask(null);
-    fetchTasks();
   }
 
   async function deleteTask(taskId: string) {
