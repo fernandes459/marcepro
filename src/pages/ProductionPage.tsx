@@ -81,7 +81,7 @@ export default function ProductionPage() {
   });
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
 
-  useEffect(() => { if (user) { fetchTasks(); fetchEmployees(); } }, [user]);
+  useEffect(() => { if (user) { fetchTasks(); fetchEmployees(); fetchClients(); } }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -99,8 +99,13 @@ export default function ProductionPage() {
   }
 
   async function fetchEmployees() {
-    const { data } = await supabase.from('employees').select('id, name').eq('status', 'active');
+    const { data } = await supabase.from('employees').select('id, name').eq('status', 'active').order('name');
     if (data) setEmployees(data);
+  }
+
+  async function fetchClients() {
+    const { data } = await supabase.from('clients').select('id, name').order('name');
+    if (data) setClients(data);
   }
 
   function openNewTask(stage: string) {
