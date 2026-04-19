@@ -491,6 +491,7 @@ export default function ProductionPage() {
         onOpenChange={(v) => { setChecklistOpen(v); if (!v) setChecklistTask(null); }}
         initial={checklistTask?.assembly_checklist ?? undefined}
         initialAssignee={checklistTask?.assignee ?? ''}
+        employees={employees}
         onConfirm={handleChecklistConfirm}
       />
     </motion.div>
