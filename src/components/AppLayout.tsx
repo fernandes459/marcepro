@@ -5,6 +5,7 @@ import {
   Users,
   FileText,
   Factory,
+  LifeBuoy,
   DollarSign,
   Settings,
   Menu,
@@ -20,6 +21,7 @@ const navItems = [
   { path: '/clientes', label: 'Clientes', icon: Users },
   { path: '/orcamentos', label: 'Orçamentos', icon: FileText },
   { path: '/producao', label: 'Produção', icon: Factory },
+  { path: '/assistencia', label: 'Assistência', icon: LifeBuoy },
   { path: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
