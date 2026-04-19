@@ -31,6 +31,7 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   initial?: AssemblyChecklist;
   initialAssignee?: string;
+  employees?: { id: string; name: string }[];
   onConfirm: (data: {
     checklist: AssemblyChecklist;
     completedBy: string;
@@ -44,7 +45,7 @@ const DEFAULT: AssemblyChecklist = {
   estrutura: false, portas: false, gavetas: false, acabamento: false, limpeza: false,
 };
 
-export function AssemblyChecklistDialog({ open, onOpenChange, initial, initialAssignee, onConfirm }: Props) {
+export function AssemblyChecklistDialog({ open, onOpenChange, initial, initialAssignee, employees = [], onConfirm }: Props) {
   const [checklist, setChecklist] = useState<AssemblyChecklist>(initial ?? DEFAULT);
   const [completedBy, setCompletedBy] = useState(initialAssignee ?? '');
   const [hasPending, setHasPending] = useState<'no' | 'yes'>('no');
@@ -142,11 +143,20 @@ export function AssemblyChecklistDialog({ open, onOpenChange, initial, initialAs
           {/* Responsável */}
           <div className="space-y-2">
             <Label>Responsável pela conferência *</Label>
-            <Input
-              value={completedBy}
-              onChange={e => setCompletedBy(e.target.value)}
-              placeholder="Nome do montador / supervisor"
-            />
+            {employees.length > 0 ? (
+              <Select value={completedBy} onValueChange={setCompletedBy}>
+                <SelectTrigger><SelectValue placeholder="Selecionar funcionário" /></SelectTrigger>
+                <SelectContent>
+                  {employees.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                value={completedBy}
+                onChange={e => setCompletedBy(e.target.value)}
+                placeholder="Nome do montador / supervisor"
+              />
+            )}
           </div>
 
           {/* Pendência */}

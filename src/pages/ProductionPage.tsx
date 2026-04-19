@@ -67,6 +67,7 @@ export default function ProductionPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogStage, setDialogStage] = useState('corte');
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [materialsDialogOpen, setMaterialsDialogOpen] = useState(false);
   const [selectedTaskMaterials, setSelectedTaskMaterials] = useState<BudgetItem[]>([]);
   const [selectedTaskForMaterials, setSelectedTaskForMaterials] = useState<ProductionTask | null>(null);
@@ -80,7 +81,7 @@ export default function ProductionPage() {
   });
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
 
-  useEffect(() => { if (user) { fetchTasks(); fetchEmployees(); } }, [user]);
+  useEffect(() => { if (user) { fetchTasks(); fetchEmployees(); fetchClients(); } }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -98,8 +99,13 @@ export default function ProductionPage() {
   }
 
   async function fetchEmployees() {
-    const { data } = await supabase.from('employees').select('id, name').eq('status', 'active');
+    const { data } = await supabase.from('employees').select('id, name').eq('status', 'active').order('name');
     if (data) setEmployees(data);
+  }
+
+  async function fetchClients() {
+    const { data } = await supabase.from('clients').select('id, name').order('name');
+    if (data) setClients(data);
   }
 
   function openNewTask(stage: string) {
@@ -147,37 +153,51 @@ export default function ProductionPage() {
   }) {
     if (!checklistTask || !user) return;
 
-    const { error } = await supabase.from('production_tasks').update({
-      stage: 'entregue',
-      assembly_checklist: data.checklist,
-      assembly_completed_at: new Date().toISOString(),
-      assembly_completed_by: data.completedBy,
-      has_pending_issues: data.hasPendingIssues,
-    }).eq('id', checklistTask.id);
+    try {
+      const { error } = await supabase.from('production_tasks').update({
+        stage: 'entregue',
+        assembly_checklist: data.checklist as unknown as Record<string, boolean>,
+        assembly_completed_at: new Date().toISOString(),
+        assembly_completed_by: data.completedBy,
+        has_pending_issues: data.hasPendingIssues,
+      }).eq('id', checklistTask.id);
 
-    if (error) { toast.error('Erro ao finalizar montagem'); return; }
+      if (error) {
+        console.error('[checklist] update error', error);
+        toast.error(`Erro ao finalizar montagem: ${error.message}`);
+        return;
+      }
 
-    if (data.hasPendingIssues && data.pendingDescription) {
-      const { error: aErr } = await supabase.from('technical_assistance').insert({
-        user_id: user.id,
-        production_task_id: checklistTask.id,
-        budget_id: checklistTask.budget_id,
-        client_name: checklistTask.client_name,
-        project_name: checklistTask.project_name,
-        description: data.pendingDescription,
-        priority: data.pendingPriority ?? 'normal',
-        assignee: data.completedBy,
-        status: 'open',
-      });
-      if (aErr) toast.error('Montagem finalizada, mas falhou ao abrir assistência');
-      else toast.success('Montagem concluída • Assistência aberta');
-    } else {
-      toast.success('Montagem concluída e entregue!');
+      if (data.hasPendingIssues && data.pendingDescription) {
+        const { error: aErr } = await supabase.from('technical_assistance').insert({
+          user_id: user.id,
+          production_task_id: checklistTask.id,
+          budget_id: checklistTask.budget_id,
+          client_name: checklistTask.client_name,
+          project_name: checklistTask.project_name,
+          description: data.pendingDescription,
+          priority: data.pendingPriority ?? 'normal',
+          assignee: data.completedBy,
+          status: 'open',
+        });
+        if (aErr) {
+          console.error('[checklist] assistance error', aErr);
+          toast.error(`Montagem finalizada, mas falhou ao abrir assistência: ${aErr.message}`);
+        } else {
+          toast.success('Montagem concluída • Assistência aberta');
+        }
+      } else {
+        toast.success('Montagem concluída e entregue!');
+      }
+
+      setChecklistOpen(false);
+      setChecklistTask(null);
+      fetchTasks();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erro inesperado';
+      console.error('[checklist] exception', e);
+      toast.error(msg);
     }
-
-    setChecklistOpen(false);
-    setChecklistTask(null);
-    fetchTasks();
   }
 
   async function deleteTask(taskId: string) {
@@ -362,7 +382,16 @@ export default function ProductionPage() {
             </div>
             <div className="space-y-2">
               <Label>Cliente *</Label>
-              <Input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} placeholder="Nome do cliente" />
+              {clients.length > 0 ? (
+                <Select value={form.client_name} onValueChange={v => setForm({ ...form, client_name: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
+                  <SelectContent>
+                    {clients.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} placeholder="Cadastre clientes em /clientes" />
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -462,6 +491,7 @@ export default function ProductionPage() {
         onOpenChange={(v) => { setChecklistOpen(v); if (!v) setChecklistTask(null); }}
         initial={checklistTask?.assembly_checklist ?? undefined}
         initialAssignee={checklistTask?.assignee ?? ''}
+        employees={employees}
         onConfirm={handleChecklistConfirm}
       />
     </motion.div>
