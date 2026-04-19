@@ -382,7 +382,16 @@ export default function ProductionPage() {
             </div>
             <div className="space-y-2">
               <Label>Cliente *</Label>
-              <Input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} placeholder="Nome do cliente" />
+              {clients.length > 0 ? (
+                <Select value={form.client_name} onValueChange={v => setForm({ ...form, client_name: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
+                  <SelectContent>
+                    {clients.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} placeholder="Cadastre clientes em /clientes" />
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
