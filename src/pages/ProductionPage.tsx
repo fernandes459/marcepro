@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Factory, GripVertical, Clock, User, Plus, X, ChevronRight, AlertCircle, Package, Pencil } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { GripVertical, Clock, User, Plus, X, ChevronRight, Package, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
+import { cn } from '@/lib/utils';
+import { AssemblyChecklistDialog, type AssemblyChecklist } from '@/components/production/AssemblyChecklistDialog';
 
 interface ProductionTask {
   id: string;
@@ -23,6 +24,10 @@ interface ProductionTask {
   priority: string;
   notes: string | null;
   budget_id: string | null;
+  assembly_checklist: AssemblyChecklist | null;
+  assembly_completed_at: string | null;
+  assembly_completed_by: string | null;
+  has_pending_issues: boolean;
 }
 
 interface BudgetItem {
@@ -35,10 +40,11 @@ interface BudgetItem {
 }
 
 const stages = [
-  { id: 'corte', title: 'Corte', color: 'hsl(210, 80%, 52%)' },
-  { id: 'borda', title: 'Borda', color: 'hsl(38, 92%, 50%)' },
-  { id: 'usinagem', title: 'Usinagem', color: 'hsl(28, 85%, 56%)' },
-  { id: 'montagem', title: 'Montagem', color: 'hsl(152, 60%, 42%)' },
+  { id: 'corte',     title: 'Corte',     color: 'hsl(210, 80%, 52%)' },
+  { id: 'borda',     title: 'Borda',     color: 'hsl(38, 92%, 50%)' },
+  { id: 'usinagem',  title: 'Usinagem',  color: 'hsl(28, 85%, 56%)' },
+  { id: 'montagem',  title: 'Montagem',  color: 'hsl(152, 60%, 42%)' },
+  { id: 'entregue',  title: 'Entregue',  color: 'hsl(120, 40%, 40%)' },
 ];
 
 const priorityColors: Record<string, string> = {
@@ -51,19 +57,13 @@ const priorityLabels: Record<string, string> = {
   low: 'Baixa', normal: 'Normal', high: 'Alta', urgent: 'Urgente',
 };
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
-};
-const colVariants = {
-  hidden: { opacity: 0, x: -16 },
-  visible: { opacity: 1, x: 0 },
-};
+const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } };
+const colVariants = { hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0 } };
 
 export default function ProductionPage() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<ProductionTask[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogStage, setDialogStage] = useState('corte');
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
@@ -71,29 +71,29 @@ export default function ProductionPage() {
   const [selectedTaskMaterials, setSelectedTaskMaterials] = useState<BudgetItem[]>([]);
   const [selectedTaskForMaterials, setSelectedTaskForMaterials] = useState<ProductionTask | null>(null);
 
+  // Assembly checklist
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [checklistTask, setChecklistTask] = useState<ProductionTask | null>(null);
+
   const [form, setForm] = useState({
     project_name: '', client_name: '', assignee: '', due_date: '', priority: 'normal', notes: '',
   });
-
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
 
   useEffect(() => { if (user) { fetchTasks(); fetchEmployees(); } }, [user]);
 
-  // Realtime subscription for production tasks
   useEffect(() => {
     if (!user) return;
     const channel = supabase
       .channel(`production-live-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => {
-        fetchTasks();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => fetchTasks())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   async function fetchTasks() {
     const { data } = await supabase.from('production_tasks').select('*').order('created_at', { ascending: true });
-    if (data) setTasks(data as ProductionTask[]);
+    if (data) setTasks(data as unknown as ProductionTask[]);
     setLoading(false);
   }
 
@@ -127,8 +127,57 @@ export default function ProductionPage() {
   }
 
   async function moveTask(taskId: string, newStage: string) {
+    const task = tasks.find(t => t.id === taskId);
+    // If moving FROM montagem TO entregue → must run checklist first
+    if (task && task.stage === 'montagem' && newStage === 'entregue' && !task.assembly_completed_at) {
+      setChecklistTask(task);
+      setChecklistOpen(true);
+      return;
+    }
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, stage: newStage } : t));
     await supabase.from('production_tasks').update({ stage: newStage }).eq('id', taskId);
+  }
+
+  async function handleChecklistConfirm(data: {
+    checklist: AssemblyChecklist;
+    completedBy: string;
+    hasPendingIssues: boolean;
+    pendingDescription?: string;
+    pendingPriority?: 'low' | 'normal' | 'high' | 'urgent';
+  }) {
+    if (!checklistTask || !user) return;
+
+    const { error } = await supabase.from('production_tasks').update({
+      stage: 'entregue',
+      assembly_checklist: data.checklist,
+      assembly_completed_at: new Date().toISOString(),
+      assembly_completed_by: data.completedBy,
+      has_pending_issues: data.hasPendingIssues,
+    }).eq('id', checklistTask.id);
+
+    if (error) { toast.error('Erro ao finalizar montagem'); return; }
+
+    if (data.hasPendingIssues && data.pendingDescription) {
+      const { error: aErr } = await supabase.from('technical_assistance').insert({
+        user_id: user.id,
+        production_task_id: checklistTask.id,
+        budget_id: checklistTask.budget_id,
+        client_name: checklistTask.client_name,
+        project_name: checklistTask.project_name,
+        description: data.pendingDescription,
+        priority: data.pendingPriority ?? 'normal',
+        assignee: data.completedBy,
+        status: 'open',
+      });
+      if (aErr) toast.error('Montagem finalizada, mas falhou ao abrir assistência');
+      else toast.success('Montagem concluída • Assistência aberta');
+    } else {
+      toast.success('Montagem concluída e entregue!');
+    }
+
+    setChecklistOpen(false);
+    setChecklistTask(null);
+    fetchTasks();
   }
 
   async function deleteTask(taskId: string) {
@@ -156,12 +205,18 @@ export default function ProductionPage() {
 
   const tasksByStage = (stageId: string) => tasks.filter(t => t.stage === stageId);
 
+  function checklistProgress(task: ProductionTask): { count: number; total: number } {
+    const c = task.assembly_checklist;
+    if (!c) return { count: 0, total: 5 };
+    return { count: Object.values(c).filter(Boolean).length, total: 5 };
+  }
+
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold font-display">Produção</h1>
-          <p className="text-muted-foreground text-sm mt-1">Kanban do cronograma de produção</p>
+          <p className="text-muted-foreground text-sm mt-1">Pipeline com checklist obrigatório de montagem antes da entrega</p>
         </div>
         <Button className="gradient-primary shadow-primary border-0" onClick={() => openNewTask('corte')}>
           <Plus className="h-4 w-4 mr-2" /> Nova Tarefa
@@ -189,6 +244,9 @@ export default function ProductionPage() {
               {tasksByStage(col.id).map((task) => {
                 const nextStageIdx = stages.findIndex(s => s.id === task.stage) + 1;
                 const nextStage = nextStageIdx < stages.length ? stages[nextStageIdx] : null;
+                const isMontagem = task.stage === 'montagem';
+                const isEntregue = task.stage === 'entregue';
+                const progress = checklistProgress(task);
 
                 return (
                   <Card
@@ -209,10 +267,31 @@ export default function ProductionPage() {
                             </button>
                           </div>
                           <p className="text-xs text-muted-foreground">{task.client_name}</p>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${priorityColors[task.priority]}`}>
                               {priorityLabels[task.priority]}
                             </span>
+                            {isMontagem && (
+                              <span className={cn(
+                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                                progress.count === progress.total
+                                  ? 'bg-success/10 text-success'
+                                  : 'bg-warning/10 text-warning',
+                              )}>
+                                <ShieldCheck className="h-3 w-3" />
+                                Checklist {progress.count}/{progress.total}
+                              </span>
+                            )}
+                            {isEntregue && task.assembly_completed_at && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-success/10 text-success px-2 py-0.5 text-[10px] font-semibold">
+                                <CheckCircle2 className="h-3 w-3" /> Conferida
+                              </span>
+                            )}
+                            {task.has_pending_issues && (
+                              <span className="inline-flex rounded-full bg-destructive/10 text-destructive px-2 py-0.5 text-[10px] font-semibold">
+                                Pendência aberta
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center justify-between">
                             {task.assignee && (
@@ -226,18 +305,22 @@ export default function ProductionPage() {
                               </div>
                             )}
                           </div>
-                          <div className="flex gap-1">
+                          <div className="flex gap-1 flex-wrap">
                             {task.budget_id && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-xs h-7 flex-1"
-                                onClick={() => openMaterials(task)}
-                              >
+                              <Button size="sm" variant="outline" className="text-xs h-7 flex-1" onClick={() => openMaterials(task)}>
                                 <Package className="h-3 w-3 mr-1" /> Materiais
                               </Button>
                             )}
-                            {nextStage && (
+                            {isMontagem && !task.assembly_completed_at && (
+                              <Button
+                                size="sm"
+                                className="text-xs h-7 flex-1 gradient-primary border-0"
+                                onClick={() => { setChecklistTask(task); setChecklistOpen(true); }}
+                              >
+                                <ShieldCheck className="h-3 w-3 mr-1" /> Checklist
+                              </Button>
+                            )}
+                            {nextStage && !(isMontagem && !task.assembly_completed_at && nextStage.id === 'entregue') && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -372,6 +455,15 @@ export default function ProductionPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Assembly Checklist Dialog */}
+      <AssemblyChecklistDialog
+        open={checklistOpen}
+        onOpenChange={(v) => { setChecklistOpen(v); if (!v) setChecklistTask(null); }}
+        initial={checklistTask?.assembly_checklist ?? undefined}
+        initialAssignee={checklistTask?.assignee ?? ''}
+        onConfirm={handleChecklistConfirm}
+      />
     </motion.div>
   );
 }
