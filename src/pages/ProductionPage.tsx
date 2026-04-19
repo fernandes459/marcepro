@@ -67,6 +67,7 @@ export default function ProductionPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogStage, setDialogStage] = useState('corte');
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [materialsDialogOpen, setMaterialsDialogOpen] = useState(false);
   const [selectedTaskMaterials, setSelectedTaskMaterials] = useState<BudgetItem[]>([]);
   const [selectedTaskForMaterials, setSelectedTaskForMaterials] = useState<ProductionTask | null>(null);
