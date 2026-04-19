@@ -143,11 +143,20 @@ export function AssemblyChecklistDialog({ open, onOpenChange, initial, initialAs
           {/* Responsável */}
           <div className="space-y-2">
             <Label>Responsável pela conferência *</Label>
-            <Input
-              value={completedBy}
-              onChange={e => setCompletedBy(e.target.value)}
-              placeholder="Nome do montador / supervisor"
-            />
+            {employees.length > 0 ? (
+              <Select value={completedBy} onValueChange={setCompletedBy}>
+                <SelectTrigger><SelectValue placeholder="Selecionar funcionário" /></SelectTrigger>
+                <SelectContent>
+                  {employees.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                value={completedBy}
+                onChange={e => setCompletedBy(e.target.value)}
+                placeholder="Nome do montador / supervisor"
+              />
+            )}
           </div>
 
           {/* Pendência */}
