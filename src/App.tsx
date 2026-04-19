@@ -11,6 +11,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import ClientsPage from "@/pages/ClientsPage";
 import BudgetsPage from "@/pages/BudgetsPage";
 import ProductionPage from "@/pages/ProductionPage";
+import AssistancePage from "@/pages/AssistancePage";
 import FinancePage from "@/pages/FinancePage";
 import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "./pages/NotFound.tsx";
@@ -39,6 +40,7 @@ function ProtectedRoutes() {
         <Route path="/clientes" element={<ClientsPage />} />
         <Route path="/orcamentos" element={<BudgetsPage />} />
         <Route path="/producao" element={<ProductionPage />} />
+        <Route path="/assistencia" element={<AssistancePage />} />
         <Route path="/financeiro" element={<FinancePage />} />
         <Route path="/configuracoes" element={<SettingsPage />} />
         <Route path="*" element={<NotFound />} />

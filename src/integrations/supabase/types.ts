@@ -539,11 +539,15 @@ export type Database = {
       }
       production_tasks: {
         Row: {
+          assembly_checklist: Json | null
+          assembly_completed_at: string | null
+          assembly_completed_by: string | null
           assignee: string | null
           budget_id: string | null
           client_name: string
           created_at: string
           due_date: string | null
+          has_pending_issues: boolean
           id: string
           notes: string | null
           priority: string
@@ -553,11 +557,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          assembly_checklist?: Json | null
+          assembly_completed_at?: string | null
+          assembly_completed_by?: string | null
           assignee?: string | null
           budget_id?: string | null
           client_name: string
           created_at?: string
           due_date?: string | null
+          has_pending_issues?: boolean
           id?: string
           notes?: string | null
           priority?: string
@@ -567,11 +575,15 @@ export type Database = {
           user_id: string
         }
         Update: {
+          assembly_checklist?: Json | null
+          assembly_completed_at?: string | null
+          assembly_completed_by?: string | null
           assignee?: string | null
           budget_id?: string | null
           client_name?: string
           created_at?: string
           due_date?: string | null
+          has_pending_issues?: boolean
           id?: string
           notes?: string | null
           priority?: string
@@ -586,6 +598,75 @@ export type Database = {
             columns: ["budget_id"]
             isOneToOne: false
             referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technical_assistance: {
+        Row: {
+          assignee: string | null
+          budget_id: string | null
+          client_name: string
+          created_at: string
+          description: string
+          id: string
+          opened_at: string
+          priority: string
+          production_task_id: string | null
+          project_name: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assignee?: string | null
+          budget_id?: string | null
+          client_name: string
+          created_at?: string
+          description: string
+          id?: string
+          opened_at?: string
+          priority?: string
+          production_task_id?: string | null
+          project_name: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assignee?: string | null
+          budget_id?: string | null
+          client_name?: string
+          created_at?: string
+          description?: string
+          id?: string
+          opened_at?: string
+          priority?: string
+          production_task_id?: string | null
+          project_name?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technical_assistance_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_assistance_production_task_id_fkey"
+            columns: ["production_task_id"]
+            isOneToOne: false
+            referencedRelation: "production_tasks"
             referencedColumns: ["id"]
           },
         ]
