@@ -31,6 +31,7 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   initial?: AssemblyChecklist;
   initialAssignee?: string;
+  employees?: { id: string; name: string }[];
   onConfirm: (data: {
     checklist: AssemblyChecklist;
     completedBy: string;
