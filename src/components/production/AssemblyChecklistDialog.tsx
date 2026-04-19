@@ -45,7 +45,7 @@ const DEFAULT: AssemblyChecklist = {
   estrutura: false, portas: false, gavetas: false, acabamento: false, limpeza: false,
 };
 
-export function AssemblyChecklistDialog({ open, onOpenChange, initial, initialAssignee, onConfirm }: Props) {
+export function AssemblyChecklistDialog({ open, onOpenChange, initial, initialAssignee, employees = [], onConfirm }: Props) {
   const [checklist, setChecklist] = useState<AssemblyChecklist>(initial ?? DEFAULT);
   const [completedBy, setCompletedBy] = useState(initialAssignee ?? '');
   const [hasPending, setHasPending] = useState<'no' | 'yes'>('no');
