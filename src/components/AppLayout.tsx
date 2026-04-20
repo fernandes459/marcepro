@@ -7,6 +7,7 @@ import {
   Factory,
   LifeBuoy,
   DollarSign,
+  TrendingUp,
   Settings,
   Menu,
   X,
@@ -23,6 +24,7 @@ const navItems = [
   { path: '/producao', label: 'Produção', icon: Factory },
   { path: '/assistencia', label: 'Assistência', icon: LifeBuoy },
   { path: '/financeiro', label: 'Financeiro', icon: DollarSign },
+  { path: '/gestao', label: 'Gestão', icon: TrendingUp },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
