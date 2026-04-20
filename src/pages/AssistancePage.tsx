@@ -47,6 +47,8 @@ const statusMeta: Record<Status, { label: string; className: string }> = {
 export default function AssistancePage() {
   const { user } = useAuth();
   const [items, setItems] = useState<Assistance[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'active' | 'resolved' | 'all'>('active');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -55,7 +57,16 @@ export default function AssistancePage() {
     client_name: '', project_name: '', description: '', priority: 'normal' as Priority, assignee: '',
   });
 
-  useEffect(() => { if (user) fetchData(); }, [user]);
+  useEffect(() => { if (user) { fetchData(); fetchAux(); } }, [user]);
+
+  async function fetchAux() {
+    const [c, e] = await Promise.all([
+      supabase.from('clients').select('id, name').order('name'),
+      supabase.from('employees').select('id, name').eq('status', 'active').order('name'),
+    ]);
+    if (c.data) setClients(c.data);
+    if (e.data) setEmployees(e.data);
+  }
 
   useEffect(() => {
     if (!user) return;
