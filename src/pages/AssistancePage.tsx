@@ -47,6 +47,8 @@ const statusMeta: Record<Status, { label: string; className: string }> = {
 export default function AssistancePage() {
   const { user } = useAuth();
   const [items, setItems] = useState<Assistance[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'active' | 'resolved' | 'all'>('active');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -55,7 +57,16 @@ export default function AssistancePage() {
     client_name: '', project_name: '', description: '', priority: 'normal' as Priority, assignee: '',
   });
 
-  useEffect(() => { if (user) fetchData(); }, [user]);
+  useEffect(() => { if (user) { fetchData(); fetchAux(); } }, [user]);
+
+  async function fetchAux() {
+    const [c, e] = await Promise.all([
+      supabase.from('clients').select('id, name').order('name'),
+      supabase.from('employees').select('id, name').eq('status', 'active').order('name'),
+    ]);
+    if (c.data) setClients(c.data);
+    if (e.data) setEmployees(e.data);
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -272,7 +283,16 @@ export default function AssistancePage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Cliente *</Label>
-                <Input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} />
+                <Select value={form.client_name} onValueChange={(v) => setForm({ ...form, client_name: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
+                  <SelectContent>
+                    {clients.length === 0 ? (
+                      <div className="px-2 py-3 text-xs text-muted-foreground">Nenhum cliente cadastrado</div>
+                    ) : clients.map(c => (
+                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Projeto *</Label>
@@ -298,7 +318,16 @@ export default function AssistancePage() {
               </div>
               <div className="space-y-2">
                 <Label>Responsável</Label>
-                <Input value={form.assignee} onChange={e => setForm({ ...form, assignee: e.target.value })} placeholder="Nome do técnico" />
+                <Select value={form.assignee} onValueChange={(v) => setForm({ ...form, assignee: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione um funcionário" /></SelectTrigger>
+                  <SelectContent>
+                    {employees.length === 0 ? (
+                      <div className="px-2 py-3 text-xs text-muted-foreground">Nenhum funcionário ativo</div>
+                    ) : employees.map(e => (
+                      <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <Button className="w-full gradient-primary border-0" onClick={handleSave}>Abrir Assistência</Button>
