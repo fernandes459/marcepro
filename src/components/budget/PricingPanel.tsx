@@ -106,17 +106,16 @@ export function PricingPanel({ totalCost, finalPrice, margin, minMargin, classNa
           </div>
         </div>
 
-        {/* Status badge */}
-        <Badge
-          variant="outline"
+        {/* Status badge — div instead of Badge to avoid forwardRef warning when wrapped by motion parents */}
+        <div
           className={cn(
-            'w-full justify-center gap-2 py-2 text-xs font-semibold border',
+            'inline-flex w-full items-center justify-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold',
             statusMeta.className,
           )}
         >
           <StatusIcon className="h-3.5 w-3.5" />
           {statusMeta.label}
-        </Badge>
+        </div>
       </CardContent>
     </Card>
   );
