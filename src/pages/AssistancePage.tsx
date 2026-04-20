@@ -318,7 +318,16 @@ export default function AssistancePage() {
               </div>
               <div className="space-y-2">
                 <Label>Responsável</Label>
-                <Input value={form.assignee} onChange={e => setForm({ ...form, assignee: e.target.value })} placeholder="Nome do técnico" />
+                <Select value={form.assignee} onValueChange={(v) => setForm({ ...form, assignee: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione um funcionário" /></SelectTrigger>
+                  <SelectContent>
+                    {employees.length === 0 ? (
+                      <div className="px-2 py-3 text-xs text-muted-foreground">Nenhum funcionário ativo</div>
+                    ) : employees.map(e => (
+                      <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <Button className="w-full gradient-primary border-0" onClick={handleSave}>Abrir Assistência</Button>
