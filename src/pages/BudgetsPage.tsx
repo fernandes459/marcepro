@@ -232,6 +232,17 @@ const [selectedClientId, setSelectedClientId] = useState('');
     setItems(updated);
   };
 
+const EXTRAS_BLOCK_RE = /\n?<!--BUDGET_META:(.*?)-->\n?/s;
+  const buildNotesWithMeta = (raw: string) => {
+    const meta = JSON.stringify({
+      extraTaxes, extraFreight, extraOther, discountPct,
+      useAdvancedPayment, downPayment, downPaymentMethod,
+      installments, installmentMethod, cardFeePercent,
+    });
+    const cleaned = (raw || '').replace(EXTRAS_BLOCK_RE, '').trim();
+    return `${cleaned}\n<!--BUDGET_META:${meta}-->`.trim();
+  };
+
 const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !selectedClientId) { toast.error('Selecione um cliente'); return; }
@@ -242,6 +253,7 @@ const handleCreate = async (e: React.FormEvent) => {
     }
     setSaving(true);
     const paymentDesc = buildPaymentDescription();
+    const notesWithMeta = buildNotesWithMeta(notes);
 
     if (editingBudgetId) {
       const { error: budgetError } = await supabase.from('budgets').update({
@@ -249,7 +261,7 @@ const handleCreate = async (e: React.FormEvent) => {
         project_name: projectName || null,
         client_description: clientDescription || null,
         total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
-        payment_method: paymentDesc || null, notes: notes || null,
+        payment_method: paymentDesc || null, notes: notesWithMeta,
         complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
       } as any).eq('id', editingBudgetId);
       if (budgetError) { toast.error('Erro ao atualizar orçamento'); setSaving(false); return; }
@@ -266,7 +278,7 @@ const handleCreate = async (e: React.FormEvent) => {
         project_name: projectName || null, client_description: clientDescription || null,
         status: 'draft',
         total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
-        payment_method: paymentDesc || null, notes: notes || null,
+        payment_method: paymentDesc || null, notes: notesWithMeta,
         complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
       } as any).select().single();
       if (budgetError || !budgetData) { toast.error('Erro ao criar orçamento'); setSaving(false); return; }
@@ -296,18 +308,41 @@ const openEditBudget = async (budget: Budget) => {
     setSelectedClientId(budget.client_id || '');
     setProjectName(budget.project_name || '');
     setClientDescription(budget.client_description || '');
-    setNotes(budget.notes || '');
+
+    // Extract persisted meta (extras, discount, advanced payment) from notes block
+    const rawNotes = budget.notes || '';
+    const metaMatch = rawNotes.match(/<!--BUDGET_META:(.*?)-->/s);
+    let meta: any = {};
+    if (metaMatch) {
+      try { meta = JSON.parse(metaMatch[1]); } catch { meta = {}; }
+    }
+    setNotes(rawNotes.replace(/\n?<!--BUDGET_META:.*?-->\n?/s, '').trim());
+
     setMargin(budget.profit_margin);
+    setExtraTaxes(Number(meta.extraTaxes) || 0);
+    setExtraFreight(Number(meta.extraFreight) || 0);
+    setExtraOther(Number(meta.extraOther) || 0);
+    setDiscountPct(Number(meta.discountPct) || 0);
+
     const { data: budgetItems } = await supabase.from('budget_items').select('*').eq('budget_id', budget.id);
     if (budgetItems && budgetItems.length > 0) {
       setItems(budgetItems.map((i: any) => ({
         name: i.name, quantity: i.quantity, unitPrice: i.unit_price,
         materialCost: i.material_cost, laborCost: i.labor_cost,
       })));
+      setCalcOpen(true); // open the internal calc panel so user sees their items immediately
     } else {
       setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
     }
-    if (budget.payment_method && budget.payment_method.includes('Entrada:')) {
+
+    if (meta.useAdvancedPayment) {
+      setUseAdvancedPayment(true);
+      setDownPayment(Number(meta.downPayment) || 0);
+      setDownPaymentMethod(meta.downPaymentMethod || 'pix');
+      setInstallments(Number(meta.installments) || 1);
+      setInstallmentMethod(meta.installmentMethod || 'credit');
+      setCardFeePercent(Number(meta.cardFeePercent) || 0);
+    } else if (budget.payment_method && budget.payment_method.includes('Entrada:')) {
       setUseAdvancedPayment(true);
     } else {
       setUseAdvancedPayment(false);
