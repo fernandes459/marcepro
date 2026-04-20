@@ -283,7 +283,16 @@ export default function AssistancePage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Cliente *</Label>
-                <Input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} />
+                <Select value={form.client_name} onValueChange={(v) => setForm({ ...form, client_name: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
+                  <SelectContent>
+                    {clients.length === 0 ? (
+                      <div className="px-2 py-3 text-xs text-muted-foreground">Nenhum cliente cadastrado</div>
+                    ) : clients.map(c => (
+                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Projeto *</Label>
