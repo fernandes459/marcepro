@@ -253,6 +253,7 @@ const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !selectedClientId) { toast.error('Selecione um cliente'); return; }
     if (!projectName.trim()) { toast.error('Nome do projeto é obrigatório'); return; }
+    if (!salespersonId) { toast.error('Selecione o vendedor responsável'); return; }
     if (isBelowMin) {
       toast.error(`Margem real (${realMarginPct.toFixed(1)}%) abaixo do mínimo configurado (${minMargin}%). Ajuste preço, custo ou desconto.`);
       return;
