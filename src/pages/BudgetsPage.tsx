@@ -633,6 +633,22 @@ const openEditBudget = async (budget: Budget) => {
                   </div>
                 </div>
                 <div className="space-y-2">
+                  <Label>Vendedor responsável *</Label>
+                  {employees.length === 0 ? (
+                    <p className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2">
+                      Nenhum colaborador ativo cadastrado. Cadastre um vendedor em <span className="font-semibold">Configurações → Equipe</span>.
+                    </p>
+                  ) : (
+                    <Select value={salespersonId} onValueChange={setSalespersonId}>
+                      <SelectTrigger><SelectValue placeholder="Selecionar vendedor" /></SelectTrigger>
+                      <SelectContent>{employees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    Ao aprovar o orçamento, será gerada automaticamente uma ordem de comissão de {Number(companySettings?.default_commission ?? 10) || 10}% sobre (mão de obra + margem).
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <Label>Descrição para o Cliente</Label>
                   <Textarea 
                     placeholder="Descreva o projeto como será apresentado no orçamento simplificado..." 
