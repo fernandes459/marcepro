@@ -604,6 +604,8 @@ export type Database = {
       }
       technical_assistance: {
         Row: {
+          activity_type: string
+          address: string | null
           assignee: string | null
           budget_id: string | null
           client_name: string
@@ -611,16 +613,20 @@ export type Database = {
           description: string
           id: string
           opened_at: string
+          phone: string | null
           priority: string
           production_task_id: string | null
           project_name: string
           resolution_notes: string | null
           resolved_at: string | null
+          scheduled_at: string | null
           status: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          activity_type?: string
+          address?: string | null
           assignee?: string | null
           budget_id?: string | null
           client_name: string
@@ -628,16 +634,20 @@ export type Database = {
           description: string
           id?: string
           opened_at?: string
+          phone?: string | null
           priority?: string
           production_task_id?: string | null
           project_name: string
           resolution_notes?: string | null
           resolved_at?: string | null
+          scheduled_at?: string | null
           status?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          activity_type?: string
+          address?: string | null
           assignee?: string | null
           budget_id?: string | null
           client_name?: string
@@ -645,11 +655,13 @@ export type Database = {
           description?: string
           id?: string
           opened_at?: string
+          phone?: string | null
           priority?: string
           production_task_id?: string | null
           project_name?: string
           resolution_notes?: string | null
           resolved_at?: string | null
+          scheduled_at?: string | null
           status?: string
           updated_at?: string
           user_id?: string

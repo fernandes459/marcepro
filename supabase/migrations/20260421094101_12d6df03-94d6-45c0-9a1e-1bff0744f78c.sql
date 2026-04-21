@@ -1,0 +1,5 @@
+ALTER TABLE public.technical_assistance
+  ADD COLUMN IF NOT EXISTS activity_type TEXT NOT NULL DEFAULT 'assistance',
+  ADD COLUMN IF NOT EXISTS address TEXT,
+  ADD COLUMN IF NOT EXISTS phone TEXT,
+  ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP WITH TIME ZONE;
