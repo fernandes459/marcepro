@@ -329,6 +329,7 @@ const openEditBudget = async (budget: Budget) => {
     setExtraFreight(Number(meta.extraFreight) || 0);
     setExtraOther(Number(meta.extraOther) || 0);
     setDiscountPct(Number(meta.discountPct) || 0);
+    setSalespersonId(meta.salespersonId || '');
 
     const { data: budgetItems } = await supabase.from('budget_items').select('*').eq('budget_id', budget.id);
     if (budgetItems && budgetItems.length > 0) {
