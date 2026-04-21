@@ -466,6 +466,62 @@ const openEditBudget = async (budget: Budget) => {
         }
       }
       toast.info('Contas a receber geradas automaticamente');
+
+      // Comissão automática para o vendedor responsável
+      try {
+        const rawNotes = budget.notes || '';
+        const metaMatch = rawNotes.match(/<!--BUDGET_META:(.*?)-->/s);
+        let meta: any = {};
+        if (metaMatch) { try { meta = JSON.parse(metaMatch[1]); } catch { /* noop */ } }
+        const sellerId = meta.salespersonId as string | null | undefined;
+        if (sellerId) {
+          // Evita duplicidade caso o orçamento seja re-aprovado
+          const { data: existing } = await supabase
+            .from('financial_transactions')
+            .select('id')
+            .eq('budget_id', budget.id)
+            .eq('category', 'commission')
+            .limit(1);
+          if (!existing || existing.length === 0) {
+            const { data: bItems } = await supabase
+              .from('budget_items')
+              .select('labor_cost, quantity')
+              .eq('budget_id', budget.id);
+            const laborTotal = (bItems || []).reduce(
+              (s: number, i: any) => s + Number(i.labor_cost || 0) * Number(i.quantity || 1),
+              0,
+            );
+            const profit = Number(budget.final_price) - Number(budget.total_cost);
+            const commissionBase = laborTotal + Math.max(0, profit);
+            const commissionPct = Number(companySettings?.default_commission ?? 10) || 10;
+            const commissionAmt = +(commissionBase * (commissionPct / 100)).toFixed(2);
+            const seller = employees.find((e) => e.id === sellerId);
+            const sellerName = seller?.name || 'Vendedor';
+            if (commissionAmt > 0) {
+              const dueDate = addBusinessDays(new Date(), 30).toISOString().slice(0, 10);
+              await supabase.from('financial_transactions').insert({
+                user_id: user.id,
+                type: 'expense',
+                category: 'commission',
+                subcategory: sellerName,
+                description: `Comissão ${sellerName} — ${baseDesc}`,
+                amount: commissionAmt,
+                date: today,
+                due_date: dueDate,
+                status: 'pending',
+                client_id: budget.client_id,
+                budget_id: budget.id,
+                order_number: budget.code,
+                notes: `Ordem de comissão gerada na aprovação do orçamento ${budget.code}.\nVendedor: ${sellerName}\nBase: M.O. (${formatBRL(laborTotal)}) + Margem (${formatBRL(Math.max(0, profit))}) = ${formatBRL(commissionBase)}\nPercentual: ${commissionPct}%\nLiberar pagamento após entrega.`,
+              } as any);
+              toast.info(`Comissão de ${formatBRL(commissionAmt)} criada para ${sellerName}`);
+            }
+          }
+        }
+      } catch (commErr) {
+        // eslint-disable-next-line no-console
+        console.error('[commission]', commErr);
+      }
     }
     toast.success(`Status atualizado para ${statusConfig[status]?.label || status}`);
     fetchData();
