@@ -15,15 +15,25 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-type EventType = 'montagem' | 'entrega' | 'assistencia';
+type EventType = 'montagem' | 'entrega' | 'assistencia' | 'medicao';
 interface CalEvent {
-  id: string; date: string; title: string; subtitle: string; type: EventType;
+  id: string;
+  date: string;          // YYYY-MM-DD
+  time?: string | null;  // HH:mm
+  title: string;
+  subtitle: string;
+  type: EventType;
+  assignee?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  description?: string | null;
 }
 
 const typeMeta: Record<EventType, { label: string; className: string; dot: string; icon: typeof Factory }> = {
-  montagem:    { label: 'Montagem',    className: 'bg-info/10 text-info border-info/30',                 dot: 'bg-info',        icon: Factory },
-  entrega:     { label: 'Entrega',     className: 'bg-success/10 text-success border-success/30',       dot: 'bg-success',     icon: Truck },
-  assistencia: { label: 'Assistência', className: 'bg-destructive/10 text-destructive border-destructive/30', dot: 'bg-destructive', icon: LifeBuoy },
+  montagem:    { label: 'Montagem',    className: 'bg-info/10 text-info border-info/30',                       dot: 'bg-info',        icon: Factory },
+  entrega:     { label: 'Entrega',     className: 'bg-success/10 text-success border-success/30',              dot: 'bg-success',     icon: Truck },
+  assistencia: { label: 'Assistência', className: 'bg-destructive/10 text-destructive border-destructive/30',  dot: 'bg-destructive', icon: LifeBuoy },
+  medicao:     { label: 'Medição',     className: 'bg-primary/10 text-primary border-primary/30',              dot: 'bg-primary',     icon: Target },
 };
 
 export default function ManagementPage() {
