@@ -36,6 +36,7 @@ interface Client {
   cpf_cnpj: string | null; address: string | null; neighborhood: string | null;
   state: string | null; cep: string | null; address_number: string | null; complement: string | null;
 }
+interface Employee { id: string; name: string; }
 interface Budget {
   id: string; code: string; client_id: string | null; project_name: string | null;
   status: string; total_cost: number; profit_margin: number; final_price: number;
@@ -103,6 +104,7 @@ export default function BudgetsPage() {
   const { user } = useAuth();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -143,16 +145,19 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const [moduleResult, setModuleResult] = useState<ModuleResult | null>(null);
   const [discountPct, setDiscountPct] = useState(0);
   const [calcOpen, setCalcOpen] = useState(false);
+  const [salespersonId, setSalespersonId] = useState<string>('');
 
   const fetchData = async () => {
-    const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
+    const [budgetsRes, clientsRes, settingsRes, employeesRes] = await Promise.all([
       supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
       supabase.from('company_settings').select('*').limit(1).maybeSingle(),
+      supabase.from('employees').select('id, name').eq('status', 'active').order('name'),
     ]);
     if (budgetsRes.data) setBudgets(budgetsRes.data as any);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
     if (settingsRes.data) setCompanySettings(settingsRes.data);
+    if (employeesRes.data) setEmployees(employeesRes.data as Employee[]);
     setLoading(false);
   };
 
@@ -238,6 +243,7 @@ const EXTRAS_BLOCK_RE = /\n?<!--BUDGET_META:(.*?)-->\n?/s;
       extraTaxes, extraFreight, extraOther, discountPct,
       useAdvancedPayment, downPayment, downPaymentMethod,
       installments, installmentMethod, cardFeePercent,
+      salespersonId: salespersonId || null,
     });
     const cleaned = (raw || '').replace(EXTRAS_BLOCK_RE, '').trim();
     return `${cleaned}\n<!--BUDGET_META:${meta}-->`.trim();
@@ -247,6 +253,7 @@ const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !selectedClientId) { toast.error('Selecione um cliente'); return; }
     if (!projectName.trim()) { toast.error('Nome do projeto é obrigatório'); return; }
+    if (!salespersonId) { toast.error('Selecione o vendedor responsável'); return; }
     if (isBelowMin) {
       toast.error(`Margem real (${realMarginPct.toFixed(1)}%) abaixo do mínimo configurado (${minMargin}%). Ajuste preço, custo ou desconto.`);
       return;
@@ -300,7 +307,7 @@ const resetForm = () => {
     setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
     setEditingBudgetId(null); setComplexityFactor('1.0'); setFinishType('');
     setUseParametric(false); setModules([{ type: 'armario_inferior', height: 800, width: 600, depth: 550, thickness: 18, shelves: 1, doors: 2 }]);
-    setModuleResult(null); setDiscountPct(0); setCalcOpen(false);
+    setModuleResult(null); setDiscountPct(0); setCalcOpen(false); setSalespersonId('');
   };
 
 const openEditBudget = async (budget: Budget) => {
@@ -323,6 +330,7 @@ const openEditBudget = async (budget: Budget) => {
     setExtraFreight(Number(meta.extraFreight) || 0);
     setExtraOther(Number(meta.extraOther) || 0);
     setDiscountPct(Number(meta.discountPct) || 0);
+    setSalespersonId(meta.salespersonId || '');
 
     const { data: budgetItems } = await supabase.from('budget_items').select('*').eq('budget_id', budget.id);
     if (budgetItems && budgetItems.length > 0) {
@@ -458,6 +466,62 @@ const openEditBudget = async (budget: Budget) => {
         }
       }
       toast.info('Contas a receber geradas automaticamente');
+
+      // Comissão automática para o vendedor responsável
+      try {
+        const rawNotes = budget.notes || '';
+        const metaMatch = rawNotes.match(/<!--BUDGET_META:(.*?)-->/s);
+        let meta: any = {};
+        if (metaMatch) { try { meta = JSON.parse(metaMatch[1]); } catch { /* noop */ } }
+        const sellerId = meta.salespersonId as string | null | undefined;
+        if (sellerId) {
+          // Evita duplicidade caso o orçamento seja re-aprovado
+          const { data: existing } = await supabase
+            .from('financial_transactions')
+            .select('id')
+            .eq('budget_id', budget.id)
+            .eq('category', 'commission')
+            .limit(1);
+          if (!existing || existing.length === 0) {
+            const { data: bItems } = await supabase
+              .from('budget_items')
+              .select('labor_cost, quantity')
+              .eq('budget_id', budget.id);
+            const laborTotal = (bItems || []).reduce(
+              (s: number, i: any) => s + Number(i.labor_cost || 0) * Number(i.quantity || 1),
+              0,
+            );
+            const profit = Number(budget.final_price) - Number(budget.total_cost);
+            const commissionBase = laborTotal + Math.max(0, profit);
+            const commissionPct = Number(companySettings?.default_commission ?? 10) || 10;
+            const commissionAmt = +(commissionBase * (commissionPct / 100)).toFixed(2);
+            const seller = employees.find((e) => e.id === sellerId);
+            const sellerName = seller?.name || 'Vendedor';
+            if (commissionAmt > 0) {
+              const dueDate = addBusinessDays(new Date(), 30).toISOString().slice(0, 10);
+              await supabase.from('financial_transactions').insert({
+                user_id: user.id,
+                type: 'expense',
+                category: 'commission',
+                subcategory: sellerName,
+                description: `Comissão ${sellerName} — ${baseDesc}`,
+                amount: commissionAmt,
+                date: today,
+                due_date: dueDate,
+                status: 'pending',
+                client_id: budget.client_id,
+                budget_id: budget.id,
+                order_number: budget.code,
+                notes: `Ordem de comissão gerada na aprovação do orçamento ${budget.code}.\nVendedor: ${sellerName}\nBase: M.O. (${formatBRL(laborTotal)}) + Margem (${formatBRL(Math.max(0, profit))}) = ${formatBRL(commissionBase)}\nPercentual: ${commissionPct}%\nLiberar pagamento após entrega.`,
+              } as any);
+              toast.info(`Comissão de ${formatBRL(commissionAmt)} criada para ${sellerName}`);
+            }
+          }
+        }
+      } catch (commErr) {
+        // eslint-disable-next-line no-console
+        console.error('[commission]', commErr);
+      }
     }
     toast.success(`Status atualizado para ${statusConfig[status]?.label || status}`);
     fetchData();
@@ -567,6 +631,22 @@ const openEditBudget = async (budget: Budget) => {
                     <Label>Nome do Projeto *</Label>
                     <Input placeholder="Ex: Cozinha Planejada" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Vendedor responsável *</Label>
+                  {employees.length === 0 ? (
+                    <p className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2">
+                      Nenhum colaborador ativo cadastrado. Cadastre um vendedor em <span className="font-semibold">Configurações → Equipe</span>.
+                    </p>
+                  ) : (
+                    <Select value={salespersonId} onValueChange={setSalespersonId}>
+                      <SelectTrigger><SelectValue placeholder="Selecionar vendedor" /></SelectTrigger>
+                      <SelectContent>{employees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    Ao aprovar o orçamento, será gerada automaticamente uma ordem de comissão de {Number(companySettings?.default_commission ?? 10) || 10}% sobre (mão de obra + margem).
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>Descrição para o Cliente</Label>
