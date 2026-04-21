@@ -145,6 +145,7 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const [moduleResult, setModuleResult] = useState<ModuleResult | null>(null);
   const [discountPct, setDiscountPct] = useState(0);
   const [calcOpen, setCalcOpen] = useState(false);
+  const [salespersonId, setSalespersonId] = useState<string>('');
 
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
