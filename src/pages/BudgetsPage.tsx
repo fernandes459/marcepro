@@ -104,6 +104,7 @@ export default function BudgetsPage() {
   const { user } = useAuth();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
