@@ -36,6 +36,7 @@ interface Client {
   cpf_cnpj: string | null; address: string | null; neighborhood: string | null;
   state: string | null; cep: string | null; address_number: string | null; complement: string | null;
 }
+interface Employee { id: string; name: string; }
 interface Budget {
   id: string; code: string; client_id: string | null; project_name: string | null;
   status: string; total_cost: number; profit_margin: number; final_price: number;
