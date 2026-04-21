@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Calendar as CalendarIcon, Target, Award, ChevronLeft, ChevronRight,
   Factory, Truck, LifeBuoy, TrendingUp, DollarSign, Trophy,
+  MapPin, Phone, User as UserIcon, Filter,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
