@@ -148,14 +148,16 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const [salespersonId, setSalespersonId] = useState<string>('');
 
   const fetchData = async () => {
-    const [budgetsRes, clientsRes, settingsRes] = await Promise.all([
+    const [budgetsRes, clientsRes, settingsRes, employeesRes] = await Promise.all([
       supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
       supabase.from('company_settings').select('*').limit(1).maybeSingle(),
+      supabase.from('employees').select('id, name').eq('status', 'active').order('name'),
     ]);
     if (budgetsRes.data) setBudgets(budgetsRes.data as any);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
     if (settingsRes.data) setCompanySettings(settingsRes.data);
+    if (employeesRes.data) setEmployees(employeesRes.data as Employee[]);
     setLoading(false);
   };
 
