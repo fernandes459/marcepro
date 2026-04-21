@@ -243,6 +243,7 @@ const EXTRAS_BLOCK_RE = /\n?<!--BUDGET_META:(.*?)-->\n?/s;
       extraTaxes, extraFreight, extraOther, discountPct,
       useAdvancedPayment, downPayment, downPaymentMethod,
       installments, installmentMethod, cardFeePercent,
+      salespersonId: salespersonId || null,
     });
     const cleaned = (raw || '').replace(EXTRAS_BLOCK_RE, '').trim();
     return `${cleaned}\n<!--BUDGET_META:${meta}-->`.trim();
