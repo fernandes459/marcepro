@@ -73,8 +73,15 @@ function CalendarView({ userId }: { userId?: string }) {
   const [cursor, setCursor] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
 
   useEffect(() => { if (userId) load(); }, [userId, cursor]);
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from('employees').select('id, name').eq('status', 'active').order('name')
+      .then(({ data }) => { if (data) setEmployees(data); });
+  }, [userId]);
 
   async function load() {
     const start = new Date(cursor.getFullYear(), cursor.getMonth(), 1).toISOString().slice(0, 10);
@@ -82,23 +89,40 @@ function CalendarView({ userId }: { userId?: string }) {
 
     const [tasks, assists] = await Promise.all([
       supabase.from('production_tasks')
-        .select('id, project_name, client_name, due_date, stage')
+        .select('id, project_name, client_name, due_date, stage, assignee')
         .not('due_date', 'is', null)
         .gte('due_date', start).lte('due_date', end),
       supabase.from('technical_assistance')
-        .select('id, project_name, client_name, opened_at, priority')
-        .gte('opened_at', start + 'T00:00:00').lte('opened_at', end + 'T23:59:59'),
+        .select('id, project_name, client_name, opened_at, scheduled_at, priority, assignee, address, phone, description, activity_type')
+        .or(
+          `and(scheduled_at.gte.${start}T00:00:00,scheduled_at.lte.${end}T23:59:59),` +
+          `and(scheduled_at.is.null,opened_at.gte.${start}T00:00:00,opened_at.lte.${end}T23:59:59)`
+        ),
     ]);
 
     const evs: CalEvent[] = [];
     (tasks.data || []).forEach((t: any) => {
       const type: EventType = t.stage === 'entregue' ? 'entrega' : 'montagem';
-      evs.push({ id: `t-${t.id}`, date: t.due_date, title: t.project_name, subtitle: t.client_name, type });
+      evs.push({
+        id: `t-${t.id}`, date: t.due_date, title: t.project_name,
+        subtitle: t.client_name, type, assignee: t.assignee,
+      });
     });
     (assists.data || []).forEach((a: any) => {
+      const when = a.scheduled_at || a.opened_at;
+      const d = new Date(when);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const timeStr = a.scheduled_at
+        ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+        : null;
+      const typeMap: Record<string, EventType> = {
+        assembly: 'montagem', assistance: 'assistencia', measurement: 'medicao',
+      };
       evs.push({
-        id: `a-${a.id}`, date: a.opened_at.slice(0, 10),
-        title: a.project_name, subtitle: a.client_name, type: 'assistencia',
+        id: `a-${a.id}`, date: dateStr, time: timeStr,
+        title: a.project_name, subtitle: a.client_name,
+        type: typeMap[a.activity_type] || 'assistencia',
+        assignee: a.assignee, address: a.address, phone: a.phone, description: a.description,
       });
     });
     setEvents(evs);
@@ -112,105 +136,163 @@ function CalendarView({ userId }: { userId?: string }) {
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
 
+  const filteredEvents = useMemo(() => {
+    if (assigneeFilter === 'all') return events;
+    return events.filter(e => e.assignee === assigneeFilter);
+  }, [events, assigneeFilter]);
+
   const eventsByDate = useMemo(() => {
     const m = new Map<string, CalEvent[]>();
-    events.forEach(e => {
+    filteredEvents.forEach(e => {
       const arr = m.get(e.date) || [];
       arr.push(e); m.set(e.date, arr);
     });
+    m.forEach(arr => arr.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99')));
     return m;
-  }, [events]);
+  }, [filteredEvents]);
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const selectedEvents = selectedDate ? (eventsByDate.get(selectedDate) || []) : [];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+    <div className="space-y-4">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="font-display capitalize">{monthLabel}</CardTitle>
-          <div className="flex gap-1">
-            <Button size="icon" variant="outline" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => { const d = new Date(); d.setDate(1); setCursor(d); }}>Hoje</Button>
-            <Button size="icon" variant="outline" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+        <CardContent className="p-3 flex flex-col sm:flex-row gap-3 sm:items-center">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span>Calendário do colaborador:</span>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground mb-2">
-            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => <div key={d}>{d}</div>)}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {cells.map((day, idx) => {
-              if (day === null) return <div key={idx} />;
-              const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const dayEvents = eventsByDate.get(dateStr) || [];
-              const isToday = dateStr === todayStr;
-              const isSelected = dateStr === selectedDate;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedDate(dateStr)}
-                  className={cn(
-                    'aspect-square rounded-lg border p-1 text-left text-xs transition-all hover:border-primary',
-                    isSelected ? 'border-primary bg-primary/5 shadow-primary' : 'border-border',
-                    isToday && !isSelected && 'border-primary/40 bg-primary/5',
-                  )}
-                >
-                  <div className={cn('font-semibold mb-1', isToday && 'text-primary')}>{day}</div>
-                  <div className="flex flex-wrap gap-0.5">
-                    {dayEvents.slice(0, 3).map(e => (
-                      <span key={e.id} className={cn('h-1.5 w-1.5 rounded-full', typeMeta[e.type].dot)} />
-                    ))}
-                    {dayEvents.length > 3 && <span className="text-[9px] text-muted-foreground">+{dayEvents.length - 3}</span>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-border text-xs">
-            {(Object.keys(typeMeta) as EventType[]).map(t => (
-              <div key={t} className="flex items-center gap-1.5">
-                <span className={cn('h-2 w-2 rounded-full', typeMeta[t].dot)} />
-                <span className="text-muted-foreground">{typeMeta[t].label}</span>
-              </div>
-            ))}
-          </div>
+          <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+            <SelectTrigger className="sm:w-[260px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os colaboradores</SelectItem>
+              {employees.map(e => (
+                <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Badge variant="outline" className="sm:ml-auto">
+            {filteredEvents.length} evento{filteredEvents.length === 1 ? '' : 's'} no mês
+          </Badge>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-base">
-            {selectedDate
-              ? new Date(selectedDate + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
-              : 'Selecione um dia'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {!selectedDate ? (
-            <p className="text-sm text-muted-foreground">Clique em um dia para ver os eventos.</p>
-          ) : selectedEvents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum evento neste dia.</p>
-          ) : selectedEvents.map(e => {
-            const meta = typeMeta[e.type];
-            const Icon = meta.icon;
-            return (
-              <div key={e.id} className="flex items-start gap-2 p-3 rounded-lg border border-border">
-                <div className={cn('rounded p-1.5 shrink-0', meta.className)}><Icon className="h-3.5 w-3.5" /></div>
-                <div className="flex-1 min-w-0">
-                  <Badge variant="outline" className={cn('text-[10px] mb-1', meta.className)}>{meta.label}</Badge>
-                  <p className="text-sm font-medium truncate">{e.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{e.subtitle}</p>
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="font-display capitalize">{monthLabel}</CardTitle>
+            <div className="flex gap-1">
+              <Button size="icon" variant="outline" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { const d = new Date(); d.setDate(1); setCursor(d); }}>Hoje</Button>
+              <Button size="icon" variant="outline" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground mb-2">
+              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => <div key={d}>{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {cells.map((day, idx) => {
+                if (day === null) return <div key={idx} />;
+                const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayEvents = eventsByDate.get(dateStr) || [];
+                const isToday = dateStr === todayStr;
+                const isSelected = dateStr === selectedDate;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedDate(dateStr)}
+                    className={cn(
+                      'aspect-square rounded-lg border p-1 text-left text-xs transition-all hover:border-primary',
+                      isSelected ? 'border-primary bg-primary/5 shadow-primary' : 'border-border',
+                      isToday && !isSelected && 'border-primary/40 bg-primary/5',
+                    )}
+                  >
+                    <div className={cn('font-semibold mb-1', isToday && 'text-primary')}>{day}</div>
+                    <div className="flex flex-wrap gap-0.5">
+                      {dayEvents.slice(0, 3).map(e => (
+                        <span key={e.id} className={cn('h-1.5 w-1.5 rounded-full', typeMeta[e.type].dot)} />
+                      ))}
+                      {dayEvents.length > 3 && <span className="text-[9px] text-muted-foreground">+{dayEvents.length - 3}</span>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-border text-xs">
+              {(Object.keys(typeMeta) as EventType[]).map(t => (
+                <div key={t} className="flex items-center gap-1.5">
+                  <span className={cn('h-2 w-2 rounded-full', typeMeta[t].dot)} />
+                  <span className="text-muted-foreground">{typeMeta[t].label}</span>
                 </div>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-display text-base">
+              {selectedDate
+                ? new Date(selectedDate + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
+                : 'Selecione um dia'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!selectedDate ? (
+              <p className="text-sm text-muted-foreground">Clique em um dia para ver os eventos.</p>
+            ) : selectedEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum evento neste dia.</p>
+            ) : selectedEvents.map(e => {
+              const meta = typeMeta[e.type];
+              const Icon = meta.icon;
+              return (
+                <div key={e.id} className="rounded-lg border border-border p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <div className={cn('rounded p-1.5 shrink-0', meta.className)}><Icon className="h-3.5 w-3.5" /></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <Badge variant="outline" className={cn('text-[10px]', meta.className)}>{meta.label}</Badge>
+                        {e.time && (<span className="text-xs font-semibold text-primary">{e.time}</span>)}
+                      </div>
+                      <p className="text-sm font-medium truncate">{e.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{e.subtitle}</p>
+                    </div>
+                  </div>
+                  {e.description && (
+                    <p className="text-xs leading-relaxed bg-muted/30 rounded p-2 whitespace-pre-wrap">{e.description}</p>
+                  )}
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    {e.assignee && (
+                      <div className="flex items-center gap-1.5">
+                        <UserIcon className="h-3.5 w-3.5" /> <span>{e.assignee}</span>
+                      </div>
+                    )}
+                    {e.phone && (
+                      <a href={`tel:${e.phone}`} className="flex items-center gap-1.5 hover:text-primary">
+                        <Phone className="h-3.5 w-3.5" /> {e.phone}
+                      </a>
+                    )}
+                    {e.address && (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.address)}`}
+                        target="_blank" rel="noreferrer"
+                        className="flex items-start gap-1.5 hover:text-primary"
+                      >
+                        <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" /> <span>{e.address}</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
