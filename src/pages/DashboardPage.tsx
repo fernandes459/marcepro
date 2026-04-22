@@ -8,6 +8,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
@@ -38,6 +41,30 @@ interface Tx { id: string; type: string; amount: number; date: string; due_date:
 interface Budget { id: string; status: string; final_price: number; clients?: { name: string } | null; }
 interface Task { id: string; stage: string; project_name: string; client_name: string; due_date: string | null; }
 
+type FilterMode = 'month' | 'custom';
+
+function getMonthOptions() {
+  return Array.from({ length: 12 }, (_, index) => ({
+    value: String(index + 1).padStart(2, '0'),
+    label: new Date(2026, index, 1).toLocaleDateString('pt-BR', { month: 'long' }),
+  }));
+}
+
+function getYearOptions(currentYear: number) {
+  return Array.from({ length: 5 }, (_, index) => String(currentYear - 2 + index));
+}
+
+function isDateWithinRange(value: string | null | undefined, start: string, end: string) {
+  if (!value) return false;
+  return value >= start && value <= end;
+}
+
+function getMonthRange(year: string, month: string) {
+  const start = `${year}-${month}-01`;
+  const end = new Date(Number(year), Number(month), 0).toISOString().slice(0, 10);
+  return { start, end };
+}
+
 function inferEventType(stage: string): keyof typeof eventColors {
   if (stage === 'assistencia') return 'assistencia';
   if (stage === 'montagem') return 'montagem';
@@ -52,6 +79,13 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [monthlyGoal, setMonthlyGoal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const today = useMemo(() => new Date(), []);
+  const todayISO = today.toISOString().slice(0, 10);
+  const [filterMode, setFilterMode] = useState<FilterMode>('month');
+  const [selectedMonth, setSelectedMonth] = useState(todayISO.slice(5, 7));
+  const [selectedYear, setSelectedYear] = useState(todayISO.slice(0, 4));
+  const [customStart, setCustomStart] = useState(`${todayISO.slice(0, 7)}-01`);
+  const [customEnd, setCustomEnd] = useState(todayISO);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -82,18 +116,48 @@ export default function DashboardPage() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData, user]);
 
-  const today = useMemo(() => new Date(), []);
-  const todayISO = today.toISOString().slice(0, 10);
-  const currentMonth = todayISO.slice(0, 7);
+  const monthOptions = useMemo(() => getMonthOptions(), []);
+  const yearOptions = useMemo(() => getYearOptions(today.getFullYear()), [today]);
+  const period = useMemo(() => {
+    if (filterMode === 'custom') {
+      const start = customStart || `${selectedYear}-${selectedMonth}-01`;
+      const end = customEnd || todayISO;
+      return {
+        start: start <= end ? start : end,
+        end: end >= start ? end : start,
+      };
+    }
+
+    return getMonthRange(selectedYear, selectedMonth);
+  }, [customEnd, customStart, filterMode, selectedMonth, selectedYear, todayISO]);
+
+  const filteredTransactions = useMemo(
+    () => transactions.filter((tx) => isDateWithinRange(tx.date, period.start, period.end)),
+    [period.end, period.start, transactions]
+  );
+  const filteredTasks = useMemo(
+    () => tasks.filter((task) => isDateWithinRange(task.due_date, period.start, period.end)),
+    [period.end, period.start, tasks]
+  );
+  const periodLabel = useMemo(() => {
+    if (filterMode === 'custom') {
+      return `${new Date(`${period.start}T12:00:00`).toLocaleDateString('pt-BR')} → ${new Date(`${period.end}T12:00:00`).toLocaleDateString('pt-BR')}`;
+    }
+
+    return new Date(`${selectedYear}-${selectedMonth}-01T12:00:00`).toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric',
+    });
+  }, [filterMode, period.end, period.start, selectedMonth, selectedYear]);
 
   // ===== KPIs do mês =====
   const monthIncome = useMemo(
-    () => transactions.filter(t => t.type === 'income' && t.date?.startsWith(currentMonth)).reduce((s, t) => s + Number(t.amount), 0),
-    [transactions, currentMonth]
+    () => filteredTransactions.filter(t => t.type === 'income' && t.status === 'paid').reduce((s, t) => s + Number(t.amount), 0),
+    [filteredTransactions]
   );
   const monthExpense = useMemo(
-    () => transactions.filter(t => t.type === 'expense' && t.date?.startsWith(currentMonth)).reduce((s, t) => s + Number(t.amount), 0),
-    [transactions, currentMonth]
+    () => filteredTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
+    [filteredTransactions]
   );
   const monthProfit = monthIncome - monthExpense;
   const margin = monthIncome > 0 ? (monthProfit / monthIncome) * 100 : 0;
@@ -101,12 +165,12 @@ export default function DashboardPage() {
   const goalRemaining = Math.max(0, monthlyGoal - monthIncome);
 
   // ===== Projetos =====
-  const activeProjects = useMemo(() => tasks.filter(t => t.stage !== 'entregue'), [tasks]);
+  const activeProjects = useMemo(() => filteredTasks.filter(t => t.stage !== 'entregue'), [filteredTasks]);
   const overdueProjects = useMemo(
     () => activeProjects.filter(t => t.due_date && t.due_date < todayISO),
     [activeProjects, todayISO]
   );
-  const assistanceProjects = useMemo(() => tasks.filter(t => t.stage === 'assistencia'), [tasks]);
+  const assistanceProjects = useMemo(() => filteredTasks.filter(t => t.stage === 'assistencia'), [filteredTasks]);
 
   // ===== Agenda da semana =====
   const weekEvents = useMemo(() => {
@@ -115,12 +179,12 @@ export default function DashboardPage() {
     end.setDate(end.getDate() + 7);
     const startISO = start.toISOString().slice(0, 10);
     const endISO = end.toISOString().slice(0, 10);
-    return tasks
+    return filteredTasks
       .filter(t => t.due_date && t.due_date >= startISO && t.due_date <= endISO)
       .sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1))
       .slice(0, 8)
       .map(t => ({ ...t, eventType: inferEventType(t.stage) }));
-  }, [tasks, today]);
+  }, [filteredTasks, today]);
 
   const weekSummary = useMemo(() => {
     const counts = { montagem: 0, entrega: 0, assistencia: 0, producao: 0 };
@@ -130,8 +194,8 @@ export default function DashboardPage() {
 
   // ===== Alertas críticos =====
   const overdueReceivables = useMemo(
-    () => transactions.filter(t => t.type === 'income' && t.status === 'pending' && t.due_date && t.due_date < todayISO),
-    [transactions, todayISO]
+    () => filteredTransactions.filter(t => t.type === 'income' && t.status === 'pending' && t.due_date && t.due_date < todayISO),
+    [filteredTransactions, todayISO]
   );
 
   const hasCriticalAlerts = assistanceProjects.length > 0 || overdueProjects.length > 0 || overdueReceivables.length > 0;
@@ -147,11 +211,78 @@ export default function DashboardPage() {
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold font-display tracking-tight">Bom dia, mestre 👋</h1>
-        <p className="text-muted-foreground text-sm">
-          {today.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold font-display tracking-tight">Bom dia, mestre 👋</h1>
+          <p className="text-muted-foreground text-sm">
+            {today.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
+          <p className="text-xs text-muted-foreground">Período analisado: {periodLabel}</p>
+        </div>
+
+        <Card className="w-full lg:w-auto">
+          <CardContent className="grid gap-3 p-4 sm:grid-cols-4">
+            <div className="space-y-2 sm:col-span-1">
+              <Label htmlFor="dashboard-filter-mode">Filtro</Label>
+              <Select value={filterMode} onValueChange={(value: FilterMode) => setFilterMode(value)}>
+                <SelectTrigger id="dashboard-filter-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="month">Mês/Ano</SelectItem>
+                  <SelectItem value="custom">Período</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {filterMode === 'month' ? (
+              <>
+                <div className="space-y-2 sm:col-span-1">
+                  <Label htmlFor="dashboard-month">Mês</Label>
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger id="dashboard-month">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map((month) => (
+                        <SelectItem key={month.value} value={month.value}>
+                          {month.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 sm:col-span-1">
+                  <Label htmlFor="dashboard-year">Ano</Label>
+                  <Select value={selectedYear} onValueChange={setSelectedYear}>
+                    <SelectTrigger id="dashboard-year">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((year) => (
+                        <SelectItem key={year} value={year}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2 sm:col-span-1">
+                  <Label htmlFor="dashboard-start">Início</Label>
+                  <Input id="dashboard-start" type="date" value={customStart} max={customEnd || undefined} onChange={(event) => setCustomStart(event.target.value)} />
+                </div>
+                <div className="space-y-2 sm:col-span-1">
+                  <Label htmlFor="dashboard-end">Fim</Label>
+                  <Input id="dashboard-end" type="date" value={customEnd} min={customStart || undefined} onChange={(event) => setCustomEnd(event.target.value)} />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* ============ ALERTAS CRÍTICOS (TOPO) ============ */}
@@ -223,7 +354,7 @@ export default function DashboardPage() {
               <p className="text-2xl sm:text-3xl font-bold font-display text-foreground tabular-nums">
                 {formatBRL(monthIncome)}
               </p>
-              <p className="text-[11px] text-muted-foreground mt-1">Recebido neste mês</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Recebido no período</p>
               {monthlyGoal > 0 && (
                 <div className="mt-3 space-y-1">
                   <Progress value={goalProgress} className="h-1.5" />
@@ -241,7 +372,7 @@ export default function DashboardPage() {
           <Card className="overflow-hidden hover:shadow-soft transition-all">
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Lucro do Mês</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Lucro Líquido</p>
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent">
                   <Target className="h-4 w-4 text-accent-foreground" />
                 </div>

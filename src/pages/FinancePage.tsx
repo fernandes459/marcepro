@@ -41,6 +41,30 @@ interface BankAccount {
   agency: string | null; account_number: string | null; initial_balance: number;
 }
 
+type PeriodFilterMode = 'month' | 'custom';
+
+function getMonthOptions() {
+  return Array.from({ length: 12 }, (_, index) => ({
+    value: String(index + 1).padStart(2, '0'),
+    label: new Date(2026, index, 1).toLocaleDateString('pt-BR', { month: 'long' }),
+  }));
+}
+
+function getYearOptions(currentYear: number) {
+  return Array.from({ length: 5 }, (_, index) => String(currentYear - 2 + index));
+}
+
+function getMonthRange(year: string, month: string) {
+  const start = `${year}-${month}-01`;
+  const end = new Date(Number(year), Number(month), 0).toISOString().slice(0, 10);
+  return { start, end };
+}
+
+function isDateWithinRange(value: string | null | undefined, start: string, end: string) {
+  if (!value) return false;
+  return value >= start && value <= end;
+}
+
 const expenseCategories = [
   { value: 'material', label: 'Material / Insumos' },
   { value: 'labor', label: 'Mão de Obra' },
@@ -82,6 +106,7 @@ type Section = 'home' | 'lancamentos' | 'dre' | 'vencer' | 'recebidos' | 'relato
 export default function FinancePage() {
   const { user } = useAuth();
   const pageRef = useRef<HTMLDivElement>(null);
+  const today = new Date().toISOString().slice(0, 10);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -93,6 +118,11 @@ export default function FinancePage() {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterClient, setFilterClient] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [periodMode, setPeriodMode] = useState<PeriodFilterMode>('month');
+  const [selectedMonth, setSelectedMonth] = useState(today.slice(5, 7));
+  const [selectedYear, setSelectedYear] = useState(today.slice(0, 4));
+  const [customStart, setCustomStart] = useState(`${today.slice(0, 7)}-01`);
+  const [customEnd, setCustomEnd] = useState(today);
   const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
   
@@ -250,29 +280,48 @@ export default function FinancePage() {
     setDialogOpen(true);
   }
 
+  const monthOptions = useMemo(() => getMonthOptions(), []);
+  const yearOptions = useMemo(() => getYearOptions(new Date().getFullYear()), []);
+  const period = useMemo(() => {
+    if (periodMode === 'custom') {
+      const start = customStart || `${selectedYear}-${selectedMonth}-01`;
+      const end = customEnd || today;
+      return {
+        start: start <= end ? start : end,
+        end: end >= start ? end : start,
+      };
+    }
+
+    return getMonthRange(selectedYear, selectedMonth);
+  }, [customEnd, customStart, periodMode, selectedMonth, selectedYear, today]);
+
+  const periodTransactions = useMemo(
+    () => transactions.filter((transaction) => isDateWithinRange(transaction.date, period.start, period.end)),
+    [period.end, period.start, transactions]
+  );
+
   // Computed
-  const today = new Date().toISOString().slice(0, 10);
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
-  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
+  const totalIncome = periodTransactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
+  const totalExpense = periodTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
   const profit = totalIncome - totalExpense;
   const totalBankBalance = bankAccounts.reduce((s, a) => s + Number(a.current_balance), 0);
-  const pendingReceivable = transactions.filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
-  const pendingPayable = transactions.filter(t => t.type === 'expense' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
-  const overdueItems = transactions.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
-  const paidIncome = transactions.filter(t => t.type === 'income' && t.status === 'paid').reduce((s, t) => s + Number(t.amount), 0);
+  const pendingReceivable = periodTransactions.filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
+  const pendingPayable = periodTransactions.filter(t => t.type === 'expense' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
+  const overdueItems = periodTransactions.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
+  const paidIncome = periodTransactions.filter(t => t.type === 'income' && t.status === 'paid').reduce((s, t) => s + Number(t.amount), 0);
 
   const filtered = useMemo(() => {
-    return transactions.filter(t => {
+    return periodTransactions.filter(t => {
       if (filterType !== 'all' && t.type !== filterType) return false;
       if (filterClient !== 'all' && t.client_id !== filterClient) return false;
       if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [transactions, filterType, filterClient, search]);
+  }, [periodTransactions, filterType, filterClient, search]);
 
   const chartData = useMemo(() => {
     const months: Record<string, { month: string; entrada: number; saida: number }> = {};
-    transactions.forEach(t => {
+    periodTransactions.forEach(t => {
       const m = t.date.slice(0, 7);
       if (!months[m]) months[m] = { month: m, entrada: 0, saida: 0 };
       if (t.type === 'income') months[m].entrada += Number(t.amount);
@@ -281,11 +330,11 @@ export default function FinancePage() {
     return Object.values(months).sort((a, b) => a.month.localeCompare(b.month)).slice(-6).map(m => ({
       ...m, month: new Date(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short' }),
     }));
-  }, [transactions]);
+  }, [periodTransactions]);
 
   const clientProfitData = useMemo(() => {
     const map: Record<string, { name: string; income: number; material: number; fuel: number; food: number; transport: number; other: number }> = {};
-    transactions.forEach(t => {
+    periodTransactions.forEach(t => {
       if (!t.client_id) return;
       const client = clients.find(c => c.id === t.client_id);
       if (!client) return;
@@ -305,11 +354,10 @@ export default function FinancePage() {
       profit: c.income - (c.material + c.fuel + c.food + c.transport + c.other),
       margin: c.income > 0 ? ((c.income - (c.material + c.fuel + c.food + c.transport + c.other)) / c.income * 100) : 0,
     })).sort((a, b) => b.profit - a.profit);
-  }, [transactions, clients]);
+  }, [periodTransactions, clients]);
 
   const dreData = useMemo(() => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const monthTx = transactions.filter(t => t.date.startsWith(currentMonth));
+    const monthTx = periodTransactions;
     const revenue = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
     const fixedExp = monthTx.filter(t => t.type === 'expense' && t.is_fixed).reduce((s, t) => s + Number(t.amount), 0);
     const varExp = monthTx.filter(t => t.type === 'expense' && !t.is_fixed).reduce((s, t) => s + Number(t.amount), 0);
@@ -318,23 +366,33 @@ export default function FinancePage() {
       byCategory[t.category] = (byCategory[t.category] || 0) + Number(t.amount);
     });
     return { revenue, fixedExp, varExp, totalExp: fixedExp + varExp, profit: revenue - fixedExp - varExp, byCategory };
-  }, [transactions]);
+  }, [periodTransactions]);
 
   const expenseByCat = useMemo(() => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
     const counts: Record<string, number> = {};
-    transactions.filter(t => t.date.startsWith(currentMonth) && t.type === 'expense').forEach(t => {
+    periodTransactions.filter(t => t.type === 'expense').forEach(t => {
       const cat = categoryLabels[t.category] || t.category;
       counts[cat] = (counts[cat] || 0) + Number(t.amount);
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [transactions]);
+  }, [periodTransactions]);
+
+  const periodLabel = useMemo(() => {
+    if (periodMode === 'custom') {
+      return `${new Date(`${period.start}T12:00:00`).toLocaleDateString('pt-BR')} → ${new Date(`${period.end}T12:00:00`).toLocaleDateString('pt-BR')}`;
+    }
+
+    return new Date(`${selectedYear}-${selectedMonth}-01T12:00:00`).toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric',
+    });
+  }, [period.end, period.start, periodMode, selectedMonth, selectedYear]);
 
   // Mini cards config
   const miniCards = [
-    { id: 'lancamentos' as Section, title: 'Lançamentos', icon: Receipt, value: String(transactions.length), sub: 'registros', color: 'text-primary' },
-    { id: 'dre' as Section, title: 'DRE', icon: BarChart3, value: formatBRL(dreData.profit), sub: 'resultado mensal', color: dreData.profit >= 0 ? 'text-success' : 'text-destructive' },
-    { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(transactions.filter(t => t.status === 'pending' || t.status === 'overdue').length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
+    { id: 'lancamentos' as Section, title: 'Lançamentos', icon: Receipt, value: String(periodTransactions.length), sub: 'registros', color: 'text-primary' },
+    { id: 'dre' as Section, title: 'DRE', icon: BarChart3, value: formatBRL(dreData.profit), sub: 'resultado do período', color: dreData.profit >= 0 ? 'text-success' : 'text-destructive' },
+    { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(periodTransactions.filter(t => t.status === 'pending' || t.status === 'overdue').length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
     { id: 'recebidos' as Section, title: 'Recebidos', icon: CheckCircle2, value: formatBRL(paidIncome), sub: 'total recebido', color: 'text-success' },
     { id: 'relatorio' as Section, title: 'Relatório', icon: FileBarChart, value: String(clientProfitData.length), sub: 'clientes', color: 'text-info' },
     { id: 'contas' as Section, title: 'Contas', icon: Building2, value: formatBRL(totalBankBalance), sub: `${bankAccounts.length} conta(s)`, color: 'text-primary' },
@@ -358,12 +416,12 @@ export default function FinancePage() {
       <>
         {/* KPI Summary */}
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          {[
-            { title: 'Receita Total', value: formatBRL(totalIncome), icon: TrendingUp, positive: true },
-            { title: 'Despesas', value: formatBRL(totalExpense), icon: TrendingDown, positive: false },
-            { title: 'Lucro Líquido', value: formatBRL(profit), icon: DollarSign, positive: profit >= 0 },
-            { title: 'Saldo Bancário', value: formatBRL(totalBankBalance), icon: Building2, positive: totalBankBalance >= 0 },
-          ].map((kpi) => (
+            {[
+              { title: 'Faturamento', value: formatBRL(totalIncome), icon: TrendingUp, positive: true },
+              { title: 'Custos', value: formatBRL(totalExpense), icon: TrendingDown, positive: false },
+              { title: 'Lucro Líquido', value: formatBRL(profit), icon: DollarSign, positive: profit >= 0 },
+              { title: 'A Receber', value: formatBRL(pendingReceivable), icon: Wallet, positive: pendingReceivable >= 0 },
+            ].map((kpi) => (
             <motion.div key={kpi.title} variants={itemVariants}>
               <Card className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
@@ -533,7 +591,7 @@ export default function FinancePage() {
     return (
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base font-display">DRE — {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base font-display">DRE — {periodLabel}</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between py-2 border-b border-border">
@@ -599,7 +657,7 @@ export default function FinancePage() {
                 </div>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground py-12">Nenhuma despesa neste mês.</p>
+              <p className="text-sm text-muted-foreground py-12">Nenhuma despesa no período.</p>
             )}
           </CardContent>
         </Card>
@@ -608,7 +666,7 @@ export default function FinancePage() {
   }
 
   function renderAVencer() {
-    const upcoming = transactions.filter(t => t.status === 'pending' || t.status === 'overdue').sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
+    const upcoming = periodTransactions.filter(t => t.status === 'pending' || t.status === 'overdue').sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
     return (
       <Card>
         <CardHeader>
@@ -818,9 +876,61 @@ export default function FinancePage() {
               {activeSection === 'home' ? 'Controle completo de receitas, despesas e contas' :
                 miniCards.find(c => c.id === activeSection)?.title || 'Financeiro'}
             </p>
+            <p className="text-xs text-muted-foreground mt-1">Período analisado: {periodLabel}</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-end justify-end">
+          <div className="grid gap-2 sm:grid-cols-4">
+            <div className="space-y-2">
+              <Label htmlFor="finance-filter-mode">Filtro</Label>
+              <Select value={periodMode} onValueChange={(value: PeriodFilterMode) => setPeriodMode(value)}>
+                <SelectTrigger id="finance-filter-mode" className="w-full sm:w-[120px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="month">Mês/Ano</SelectItem>
+                  <SelectItem value="custom">Período</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {periodMode === 'month' ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="finance-month">Mês</Label>
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger id="finance-month" className="w-full sm:w-[140px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map((month) => (
+                        <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="finance-year">Ano</Label>
+                  <Select value={selectedYear} onValueChange={setSelectedYear}>
+                    <SelectTrigger id="finance-year" className="w-full sm:w-[110px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((year) => (
+                        <SelectItem key={year} value={year}>{year}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="finance-start">Início</Label>
+                  <Input id="finance-start" type="date" value={customStart} max={customEnd || undefined} onChange={e => setCustomStart(e.target.value)} className="w-full sm:w-[150px]" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="finance-end">Fim</Label>
+                  <Input id="finance-end" type="date" value={customEnd} min={customStart || undefined} onChange={e => setCustomEnd(e.target.value)} className="w-full sm:w-[150px]" />
+                </div>
+              </>
+            )}
+          </div>
+
           <Button className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Novo Lançamento
           </Button>
