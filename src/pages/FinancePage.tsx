@@ -311,17 +311,17 @@ export default function FinancePage() {
   const paidIncome = periodTransactions.filter(t => t.type === 'income' && t.status === 'paid').reduce((s, t) => s + Number(t.amount), 0);
 
   const filtered = useMemo(() => {
-    return transactions.filter(t => {
+    return periodTransactions.filter(t => {
       if (filterType !== 'all' && t.type !== filterType) return false;
       if (filterClient !== 'all' && t.client_id !== filterClient) return false;
       if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [transactions, filterType, filterClient, search]);
+  }, [periodTransactions, filterType, filterClient, search]);
 
   const chartData = useMemo(() => {
     const months: Record<string, { month: string; entrada: number; saida: number }> = {};
-    transactions.forEach(t => {
+    periodTransactions.forEach(t => {
       const m = t.date.slice(0, 7);
       if (!months[m]) months[m] = { month: m, entrada: 0, saida: 0 };
       if (t.type === 'income') months[m].entrada += Number(t.amount);
@@ -330,11 +330,11 @@ export default function FinancePage() {
     return Object.values(months).sort((a, b) => a.month.localeCompare(b.month)).slice(-6).map(m => ({
       ...m, month: new Date(m.month + '-01').toLocaleDateString('pt-BR', { month: 'short' }),
     }));
-  }, [transactions]);
+  }, [periodTransactions]);
 
   const clientProfitData = useMemo(() => {
     const map: Record<string, { name: string; income: number; material: number; fuel: number; food: number; transport: number; other: number }> = {};
-    transactions.forEach(t => {
+    periodTransactions.forEach(t => {
       if (!t.client_id) return;
       const client = clients.find(c => c.id === t.client_id);
       if (!client) return;
@@ -354,11 +354,10 @@ export default function FinancePage() {
       profit: c.income - (c.material + c.fuel + c.food + c.transport + c.other),
       margin: c.income > 0 ? ((c.income - (c.material + c.fuel + c.food + c.transport + c.other)) / c.income * 100) : 0,
     })).sort((a, b) => b.profit - a.profit);
-  }, [transactions, clients]);
+  }, [periodTransactions, clients]);
 
   const dreData = useMemo(() => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const monthTx = transactions.filter(t => t.date.startsWith(currentMonth));
+    const monthTx = periodTransactions;
     const revenue = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
     const fixedExp = monthTx.filter(t => t.type === 'expense' && t.is_fixed).reduce((s, t) => s + Number(t.amount), 0);
     const varExp = monthTx.filter(t => t.type === 'expense' && !t.is_fixed).reduce((s, t) => s + Number(t.amount), 0);
@@ -367,23 +366,33 @@ export default function FinancePage() {
       byCategory[t.category] = (byCategory[t.category] || 0) + Number(t.amount);
     });
     return { revenue, fixedExp, varExp, totalExp: fixedExp + varExp, profit: revenue - fixedExp - varExp, byCategory };
-  }, [transactions]);
+  }, [periodTransactions]);
 
   const expenseByCat = useMemo(() => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
     const counts: Record<string, number> = {};
-    transactions.filter(t => t.date.startsWith(currentMonth) && t.type === 'expense').forEach(t => {
+    periodTransactions.filter(t => t.type === 'expense').forEach(t => {
       const cat = categoryLabels[t.category] || t.category;
       counts[cat] = (counts[cat] || 0) + Number(t.amount);
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [transactions]);
+  }, [periodTransactions]);
+
+  const periodLabel = useMemo(() => {
+    if (periodMode === 'custom') {
+      return `${new Date(`${period.start}T12:00:00`).toLocaleDateString('pt-BR')} → ${new Date(`${period.end}T12:00:00`).toLocaleDateString('pt-BR')}`;
+    }
+
+    return new Date(`${selectedYear}-${selectedMonth}-01T12:00:00`).toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric',
+    });
+  }, [period.end, period.start, periodMode, selectedMonth, selectedYear]);
 
   // Mini cards config
   const miniCards = [
-    { id: 'lancamentos' as Section, title: 'Lançamentos', icon: Receipt, value: String(transactions.length), sub: 'registros', color: 'text-primary' },
-    { id: 'dre' as Section, title: 'DRE', icon: BarChart3, value: formatBRL(dreData.profit), sub: 'resultado mensal', color: dreData.profit >= 0 ? 'text-success' : 'text-destructive' },
-    { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(transactions.filter(t => t.status === 'pending' || t.status === 'overdue').length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
+    { id: 'lancamentos' as Section, title: 'Lançamentos', icon: Receipt, value: String(periodTransactions.length), sub: 'registros', color: 'text-primary' },
+    { id: 'dre' as Section, title: 'DRE', icon: BarChart3, value: formatBRL(dreData.profit), sub: 'resultado do período', color: dreData.profit >= 0 ? 'text-success' : 'text-destructive' },
+    { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(periodTransactions.filter(t => t.status === 'pending' || t.status === 'overdue').length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
     { id: 'recebidos' as Section, title: 'Recebidos', icon: CheckCircle2, value: formatBRL(paidIncome), sub: 'total recebido', color: 'text-success' },
     { id: 'relatorio' as Section, title: 'Relatório', icon: FileBarChart, value: String(clientProfitData.length), sub: 'clientes', color: 'text-info' },
     { id: 'contas' as Section, title: 'Contas', icon: Building2, value: formatBRL(totalBankBalance), sub: `${bankAccounts.length} conta(s)`, color: 'text-primary' },
@@ -407,12 +416,12 @@ export default function FinancePage() {
       <>
         {/* KPI Summary */}
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          {[
-            { title: 'Receita Total', value: formatBRL(totalIncome), icon: TrendingUp, positive: true },
-            { title: 'Despesas', value: formatBRL(totalExpense), icon: TrendingDown, positive: false },
-            { title: 'Lucro Líquido', value: formatBRL(profit), icon: DollarSign, positive: profit >= 0 },
-            { title: 'Saldo Bancário', value: formatBRL(totalBankBalance), icon: Building2, positive: totalBankBalance >= 0 },
-          ].map((kpi) => (
+            {[
+              { title: 'Faturamento', value: formatBRL(totalIncome), icon: TrendingUp, positive: true },
+              { title: 'Custos', value: formatBRL(totalExpense), icon: TrendingDown, positive: false },
+              { title: 'Lucro Líquido', value: formatBRL(profit), icon: DollarSign, positive: profit >= 0 },
+              { title: 'A Receber', value: formatBRL(pendingReceivable), icon: Wallet, positive: pendingReceivable >= 0 },
+            ].map((kpi) => (
             <motion.div key={kpi.title} variants={itemVariants}>
               <Card className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
