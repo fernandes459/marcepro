@@ -41,6 +41,30 @@ interface BankAccount {
   agency: string | null; account_number: string | null; initial_balance: number;
 }
 
+type PeriodFilterMode = 'month' | 'custom';
+
+function getMonthOptions() {
+  return Array.from({ length: 12 }, (_, index) => ({
+    value: String(index + 1).padStart(2, '0'),
+    label: new Date(2026, index, 1).toLocaleDateString('pt-BR', { month: 'long' }),
+  }));
+}
+
+function getYearOptions(currentYear: number) {
+  return Array.from({ length: 5 }, (_, index) => String(currentYear - 2 + index));
+}
+
+function getMonthRange(year: string, month: string) {
+  const start = `${year}-${month}-01`;
+  const end = new Date(Number(year), Number(month), 0).toISOString().slice(0, 10);
+  return { start, end };
+}
+
+function isDateWithinRange(value: string | null | undefined, start: string, end: string) {
+  if (!value) return false;
+  return value >= start && value <= end;
+}
+
 const expenseCategories = [
   { value: 'material', label: 'Material / Insumos' },
   { value: 'labor', label: 'Mão de Obra' },
@@ -82,6 +106,7 @@ type Section = 'home' | 'lancamentos' | 'dre' | 'vencer' | 'recebidos' | 'relato
 export default function FinancePage() {
   const { user } = useAuth();
   const pageRef = useRef<HTMLDivElement>(null);
+  const today = new Date().toISOString().slice(0, 10);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -93,6 +118,11 @@ export default function FinancePage() {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterClient, setFilterClient] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [periodMode, setPeriodMode] = useState<PeriodFilterMode>('month');
+  const [selectedMonth, setSelectedMonth] = useState(today.slice(5, 7));
+  const [selectedYear, setSelectedYear] = useState(today.slice(0, 4));
+  const [customStart, setCustomStart] = useState(`${today.slice(0, 7)}-01`);
+  const [customEnd, setCustomEnd] = useState(today);
   const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
   
@@ -250,16 +280,35 @@ export default function FinancePage() {
     setDialogOpen(true);
   }
 
+  const monthOptions = useMemo(() => getMonthOptions(), []);
+  const yearOptions = useMemo(() => getYearOptions(new Date().getFullYear()), []);
+  const period = useMemo(() => {
+    if (periodMode === 'custom') {
+      const start = customStart || `${selectedYear}-${selectedMonth}-01`;
+      const end = customEnd || today;
+      return {
+        start: start <= end ? start : end,
+        end: end >= start ? end : start,
+      };
+    }
+
+    return getMonthRange(selectedYear, selectedMonth);
+  }, [customEnd, customStart, periodMode, selectedMonth, selectedYear, today]);
+
+  const periodTransactions = useMemo(
+    () => transactions.filter((transaction) => isDateWithinRange(transaction.date, period.start, period.end)),
+    [period.end, period.start, transactions]
+  );
+
   // Computed
-  const today = new Date().toISOString().slice(0, 10);
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
-  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
+  const totalIncome = periodTransactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
+  const totalExpense = periodTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
   const profit = totalIncome - totalExpense;
   const totalBankBalance = bankAccounts.reduce((s, a) => s + Number(a.current_balance), 0);
-  const pendingReceivable = transactions.filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
-  const pendingPayable = transactions.filter(t => t.type === 'expense' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
-  const overdueItems = transactions.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
-  const paidIncome = transactions.filter(t => t.type === 'income' && t.status === 'paid').reduce((s, t) => s + Number(t.amount), 0);
+  const pendingReceivable = periodTransactions.filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
+  const pendingPayable = periodTransactions.filter(t => t.type === 'expense' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
+  const overdueItems = periodTransactions.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
+  const paidIncome = periodTransactions.filter(t => t.type === 'income' && t.status === 'paid').reduce((s, t) => s + Number(t.amount), 0);
 
   const filtered = useMemo(() => {
     return transactions.filter(t => {
