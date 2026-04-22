@@ -139,7 +139,6 @@ export default function DashboardPage() {
     () => tasks.filter((task) => isDateWithinRange(task.due_date, period.start, period.end)),
     [period.end, period.start, tasks]
   );
-  const filteredBudgets = useMemo(() => budgets, [budgets]);
   const periodLabel = useMemo(() => {
     if (filterMode === 'custom') {
       return `${new Date(`${period.start}T12:00:00`).toLocaleDateString('pt-BR')} → ${new Date(`${period.end}T12:00:00`).toLocaleDateString('pt-BR')}`;
@@ -212,11 +211,78 @@ export default function DashboardPage() {
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold font-display tracking-tight">Bom dia, mestre 👋</h1>
-        <p className="text-muted-foreground text-sm">
-          {today.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold font-display tracking-tight">Bom dia, mestre 👋</h1>
+          <p className="text-muted-foreground text-sm">
+            {today.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
+          <p className="text-xs text-muted-foreground">Período analisado: {periodLabel}</p>
+        </div>
+
+        <Card className="w-full lg:w-auto">
+          <CardContent className="grid gap-3 p-4 sm:grid-cols-4">
+            <div className="space-y-2 sm:col-span-1">
+              <Label htmlFor="dashboard-filter-mode">Filtro</Label>
+              <Select value={filterMode} onValueChange={(value: FilterMode) => setFilterMode(value)}>
+                <SelectTrigger id="dashboard-filter-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="month">Mês/Ano</SelectItem>
+                  <SelectItem value="custom">Período</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {filterMode === 'month' ? (
+              <>
+                <div className="space-y-2 sm:col-span-1">
+                  <Label htmlFor="dashboard-month">Mês</Label>
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger id="dashboard-month">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map((month) => (
+                        <SelectItem key={month.value} value={month.value}>
+                          {month.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 sm:col-span-1">
+                  <Label htmlFor="dashboard-year">Ano</Label>
+                  <Select value={selectedYear} onValueChange={setSelectedYear}>
+                    <SelectTrigger id="dashboard-year">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((year) => (
+                        <SelectItem key={year} value={year}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2 sm:col-span-1">
+                  <Label htmlFor="dashboard-start">Início</Label>
+                  <Input id="dashboard-start" type="date" value={customStart} max={customEnd || undefined} onChange={(event) => setCustomStart(event.target.value)} />
+                </div>
+                <div className="space-y-2 sm:col-span-1">
+                  <Label htmlFor="dashboard-end">Fim</Label>
+                  <Input id="dashboard-end" type="date" value={customEnd} min={customStart || undefined} onChange={(event) => setCustomEnd(event.target.value)} />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* ============ ALERTAS CRÍTICOS (TOPO) ============ */}
@@ -288,7 +354,7 @@ export default function DashboardPage() {
               <p className="text-2xl sm:text-3xl font-bold font-display text-foreground tabular-nums">
                 {formatBRL(monthIncome)}
               </p>
-              <p className="text-[11px] text-muted-foreground mt-1">Recebido neste mês</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Recebido no período</p>
               {monthlyGoal > 0 && (
                 <div className="mt-3 space-y-1">
                   <Progress value={goalProgress} className="h-1.5" />
@@ -306,7 +372,7 @@ export default function DashboardPage() {
           <Card className="overflow-hidden hover:shadow-soft transition-all">
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Lucro do Mês</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Lucro Líquido</p>
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent">
                   <Target className="h-4 w-4 text-accent-foreground" />
                 </div>
