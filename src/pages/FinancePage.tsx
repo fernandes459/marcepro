@@ -591,7 +591,7 @@ export default function FinancePage() {
     return (
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base font-display">DRE — {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base font-display">DRE — {periodLabel}</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between py-2 border-b border-border">
@@ -657,7 +657,7 @@ export default function FinancePage() {
                 </div>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground py-12">Nenhuma despesa neste mês.</p>
+              <p className="text-sm text-muted-foreground py-12">Nenhuma despesa no período.</p>
             )}
           </CardContent>
         </Card>
@@ -666,7 +666,7 @@ export default function FinancePage() {
   }
 
   function renderAVencer() {
-    const upcoming = transactions.filter(t => t.status === 'pending' || t.status === 'overdue').sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
+    const upcoming = periodTransactions.filter(t => t.status === 'pending' || t.status === 'overdue').sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
     return (
       <Card>
         <CardHeader>
@@ -876,9 +876,61 @@ export default function FinancePage() {
               {activeSection === 'home' ? 'Controle completo de receitas, despesas e contas' :
                 miniCards.find(c => c.id === activeSection)?.title || 'Financeiro'}
             </p>
+            <p className="text-xs text-muted-foreground mt-1">Período analisado: {periodLabel}</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-end justify-end">
+          <div className="grid gap-2 sm:grid-cols-4">
+            <div className="space-y-2">
+              <Label htmlFor="finance-filter-mode">Filtro</Label>
+              <Select value={periodMode} onValueChange={(value: PeriodFilterMode) => setPeriodMode(value)}>
+                <SelectTrigger id="finance-filter-mode" className="w-full sm:w-[120px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="month">Mês/Ano</SelectItem>
+                  <SelectItem value="custom">Período</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {periodMode === 'month' ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="finance-month">Mês</Label>
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger id="finance-month" className="w-full sm:w-[140px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map((month) => (
+                        <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="finance-year">Ano</Label>
+                  <Select value={selectedYear} onValueChange={setSelectedYear}>
+                    <SelectTrigger id="finance-year" className="w-full sm:w-[110px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((year) => (
+                        <SelectItem key={year} value={year}>{year}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="finance-start">Início</Label>
+                  <Input id="finance-start" type="date" value={customStart} max={customEnd || undefined} onChange={e => setCustomStart(e.target.value)} className="w-full sm:w-[150px]" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="finance-end">Fim</Label>
+                  <Input id="finance-end" type="date" value={customEnd} min={customStart || undefined} onChange={e => setCustomEnd(e.target.value)} className="w-full sm:w-[150px]" />
+                </div>
+              </>
+            )}
+          </div>
+
           <Button className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Novo Lançamento
           </Button>
