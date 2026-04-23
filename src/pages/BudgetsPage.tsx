@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Send, FileText, Loader2, Trash2, Edit, CheckCircle, XCircle,
@@ -37,6 +37,13 @@ interface Client {
   state: string | null; cep: string | null; address_number: string | null; complement: string | null;
 }
 interface Employee { id: string; name: string; }
+interface MaterialCatalogItem {
+  id: string;
+  name: string;
+  unit_cost: number;
+  unit: string | null;
+  supplier: string | null;
+}
 interface Budget {
   id: string; code: string; client_id: string | null; project_name: string | null;
   status: string; total_cost: number; profit_margin: number; final_price: number;
@@ -105,6 +112,7 @@ export default function BudgetsPage() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [materialCatalog, setMaterialCatalog] = useState<MaterialCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -148,16 +156,18 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const [salespersonId, setSalespersonId] = useState<string>('');
 
   const fetchData = async () => {
-    const [budgetsRes, clientsRes, settingsRes, employeesRes] = await Promise.all([
+    const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes] = await Promise.all([
       supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
       supabase.from('company_settings').select('*').limit(1).maybeSingle(),
       supabase.from('employees').select('id, name').eq('status', 'active').order('name'),
+      supabase.from('material_catalog' as any).select('id, name, unit_cost, unit, supplier').order('name'),
     ]);
     if (budgetsRes.data) setBudgets(budgetsRes.data as any);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
     if (settingsRes.data) setCompanySettings(settingsRes.data);
     if (employeesRes.data) setEmployees(employeesRes.data as Employee[]);
+    if (materialsRes.data) setMaterialCatalog(materialsRes.data as unknown as MaterialCatalogItem[]);
     setLoading(false);
   };
 
@@ -181,9 +191,19 @@ const [selectedClientId, setSelectedClientId] = useState('');
       .channel(`budgets-live-${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'material_catalog' }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
+
+  const materialSuggestions = useMemo(
+    () => materialCatalog.map((material) => ({
+      key: material.id,
+      label: `${material.name}${material.supplier ? ` · ${material.supplier}` : ''}`,
+      value: material.name,
+    })),
+    [materialCatalog]
+  );
 
   const filtered = budgets.filter(b => {
     const clientName = (b.clients as any)?.name || '';
@@ -230,6 +250,19 @@ const [selectedClientId, setSelectedClientId] = useState('');
 
   const addItem = () => setItems([...items, { name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
+  const resolveCatalogMaterial = (value: string) => materialCatalog.find((material) => material.name.trim().toLowerCase() === value.trim().toLowerCase());
+  const applyCatalogMaterial = (idx: number, materialName: string) => {
+    const material = resolveCatalogMaterial(materialName);
+    if (!material) return;
+    const updated = [...items];
+    updated[idx] = {
+      ...updated[idx],
+      name: material.name,
+      materialCost: Number(material.unit_cost || 0),
+      unitPrice: Number(material.unit_cost || 0) + Number(updated[idx].laborCost || 0),
+    };
+    setItems(updated);
+  };
   const updateItem = (idx: number, field: keyof BudgetItem, value: string | number) => {
     const updated = [...items];
     (updated[idx] as any)[field] = value;
