@@ -63,6 +63,20 @@ interface MaterialCatalogItem {
   source: string;
 }
 
+function parseSpreadsheetCurrency(value: unknown) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+
+  const normalized = String(value ?? '')
+    .trim()
+    .replace(/R\$/gi, '')
+    .replace(/\s+/g, '')
+    .replace(/\.(?=\d{3}(\D|$))/g, '')
+    .replace(',', '.');
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
 const roleLabels: Record<string, string> = {
   admin: 'Administrador',
   manager: 'Gerente',
@@ -201,10 +215,10 @@ export default function SettingsPage() {
         .map((row) => {
           const entries = Object.fromEntries(Object.entries(row).map(([key, value]) => [key.trim().toLowerCase(), value]));
           const name = String(entries.nome || entries.material || entries.item || entries.descricao || '').trim();
-          const rawCost = entries.custo ?? entries.valor ?? entries.preco ?? entries['custo unitario'] ?? entries['custo_unitario'] ?? '';
+          const rawCost = entries.custo ?? entries.valor ?? entries.preco ?? entries['custo unitario'] ?? entries['custo unitário'] ?? entries['custo_unitario'] ?? '';
           const supplier = String(entries.fornecedor || entries.marca || '').trim();
           const unit = String(entries.unidade || entries.unit || 'un').trim() || 'un';
-          const numericCost = Number(String(rawCost).replace(/\./g, '').replace(',', '.'));
+          const numericCost = parseSpreadsheetCurrency(rawCost);
           if (!name || !Number.isFinite(numericCost)) return null;
           return {
             user_id: user!.id,
