@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { ChangeEvent, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard } from 'lucide-react';
+import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard, Package2, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 interface Employee {
   id: string;
@@ -51,6 +52,15 @@ interface TeamMember {
   user_id: string;
   role: string;
   email?: string;
+}
+
+interface MaterialCatalogItem {
+  id: string;
+  name: string;
+  unit_cost: number;
+  unit: string | null;
+  supplier: string | null;
+  source: string;
 }
 
 const roleLabels: Record<string, string> = {
@@ -102,13 +112,16 @@ export default function SettingsPage() {
   const [teamEmail, setTeamEmail] = useState('');
   const [teamRole, setTeamRole] = useState('partner');
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [materials, setMaterials] = useState<MaterialCatalogItem[]>([]);
+  const [materialName, setMaterialName] = useState('');
+  const [materialCost, setMaterialCost] = useState('');
 
   const emptyEmpForm = {
     name: '', role: 'production', email: '', phone: '', cpf: '', salary: '', hire_date: '', notes: '',
   };
   const [empForm, setEmpForm] = useState(emptyEmpForm);
 
-  useEffect(() => { if (user) { fetchEmployees(); fetchCompany(); fetchTeamMembers(); } }, [user]);
+  useEffect(() => { if (user) { fetchEmployees(); fetchCompany(); fetchTeamMembers(); fetchMaterials(); } }, [user]);
 
   async function fetchEmployees() {
     const { data } = await supabase.from('employees').select('*').order('name');
@@ -139,6 +152,88 @@ export default function SettingsPage() {
   async function fetchTeamMembers() {
     const { data } = await supabase.from('user_roles').select('*');
     if (data) setTeamMembers(data as TeamMember[]);
+  }
+
+  async function fetchMaterials() {
+    const { data } = await supabase.from('material_catalog' as any).select('*').order('name');
+    if (data) setMaterials(data as unknown as MaterialCatalogItem[]);
+  }
+
+  async function saveMaterial() {
+    if (!materialName.trim()) { toast.error('Informe o nome do material'); return; }
+    const cost = Number(materialCost.replace(',', '.'));
+    if (!Number.isFinite(cost) || cost < 0) { toast.error('Informe um custo válido'); return; }
+    const payload = {
+      user_id: user!.id,
+      name: materialName.trim(),
+      unit_cost: cost,
+      source: 'manual',
+    };
+    const existing = materials.find((item) => item.name.trim().toLowerCase() === materialName.trim().toLowerCase());
+    const response = existing
+      ? await supabase.from('material_catalog' as any).update(payload).eq('id', existing.id)
+      : await supabase.from('material_catalog' as any).insert(payload);
+    if (response.error) { toast.error('Não foi possível salvar o material'); return; }
+    setMaterialName('');
+    setMaterialCost('');
+    toast.success(existing ? 'Material atualizado!' : 'Material cadastrado!');
+    fetchMaterials();
+  }
+
+  async function deleteMaterial(id: string) {
+    const { error } = await supabase.from('material_catalog' as any).delete().eq('id', id);
+    if (error) { toast.error('Não foi possível remover o material'); return; }
+    setMaterials((current) => current.filter((item) => item.id !== id));
+    toast.success('Material removido');
+  }
+
+  async function importMaterialsFromFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
+
+      const normalized = rows
+        .map((row) => {
+          const entries = Object.fromEntries(Object.entries(row).map(([key, value]) => [key.trim().toLowerCase(), value]));
+          const name = String(entries.nome || entries.material || entries.item || entries.descricao || '').trim();
+          const rawCost = entries.custo ?? entries.valor ?? entries.preco ?? entries['custo unitario'] ?? entries['custo_unitario'] ?? '';
+          const supplier = String(entries.fornecedor || entries.marca || '').trim();
+          const unit = String(entries.unidade || entries.unit || 'un').trim() || 'un';
+          const numericCost = Number(String(rawCost).replace(/\./g, '').replace(',', '.'));
+          if (!name || !Number.isFinite(numericCost)) return null;
+          return {
+            user_id: user!.id,
+            name,
+            unit_cost: numericCost,
+            unit,
+            supplier: supplier || null,
+            source: 'excel',
+            import_batch: `${file.name}-${Date.now()}`,
+            last_imported_at: new Date().toISOString(),
+          };
+        })
+        .filter(Boolean);
+
+      if (normalized.length === 0) {
+        toast.error('A planilha precisa ter colunas como Nome/Material e Custo/Valor');
+        return;
+      }
+
+      const { error } = await supabase.from('material_catalog' as any).upsert(normalized as any, { onConflict: 'user_id,name' });
+      if (error) { toast.error('Falha ao importar materiais'); return; }
+      toast.success(`${normalized.length} material(is) importado(s)`);
+      fetchMaterials();
+    } catch (importError) {
+      console.error(importError);
+      toast.error('Não foi possível ler a planilha');
+    } finally {
+      event.target.value = '';
+    }
   }
 
   async function saveCompany() {
