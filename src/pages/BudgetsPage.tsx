@@ -659,9 +659,9 @@ const openEditBudget = async (budget: Budget) => {
           <DialogTrigger asChild>
             <Button className="gradient-primary shadow-primary border-0"><Plus className="h-4 w-4 mr-2" /> Novo Orçamento</Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="h-[100dvh] w-[100dvw] max-w-none rounded-none border-0 p-0 sm:h-[100dvh] sm:w-[100dvw] sm:max-w-none">
             <DialogHeader><DialogTitle className="font-display">{editingBudgetId ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle></DialogHeader>
-<form onSubmit={handleCreate} className="space-y-6">
+<form onSubmit={handleCreate} className="flex h-full flex-col overflow-hidden">
               {/* Seção 1: Informações Básicas */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2">Informações Básicas</h3>
