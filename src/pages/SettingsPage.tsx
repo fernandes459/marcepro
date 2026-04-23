@@ -364,6 +364,7 @@ export default function SettingsPage() {
         <TabsList className="flex-wrap">
           <TabsTrigger value="company"><Building className="h-4 w-4 mr-1" /> Empresa</TabsTrigger>
           <TabsTrigger value="fees"><CreditCard className="h-4 w-4 mr-1" /> Taxas</TabsTrigger>
+          <TabsTrigger value="materials"><Package2 className="h-4 w-4 mr-1" /> Materiais</TabsTrigger>
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-1" /> Equipe</TabsTrigger>
           <TabsTrigger value="access"><Shield className="h-4 w-4 mr-1" /> Acessos</TabsTrigger>
           <TabsTrigger value="profile"><User className="h-4 w-4 mr-1" /> Perfil</TabsTrigger>
@@ -459,6 +460,88 @@ export default function SettingsPage() {
                 ))}
               </div>
               <Button className="gradient-primary shadow-primary border-0" onClick={saveCompany}>Salvar Taxas</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="materials">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-display flex items-center gap-2">
+                <Package2 className="h-4 w-4" /> Base de Materiais
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Cadastro manual</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Esses materiais ficam disponíveis no autocomplete do orçamento.</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Nome do material</Label>
+                      <Input value={materialName} onChange={(e) => setMaterialName(e.target.value)} placeholder="Ex: MDF Carvalho 18mm" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Custo unitário</Label>
+                      <Input type="number" step="0.01" value={materialCost} onChange={(e) => setMaterialCost(e.target.value)} placeholder="0,00" />
+                    </div>
+                  </div>
+                  <Button className="gradient-primary shadow-primary border-0" onClick={saveMaterial}>
+                    <Plus className="h-4 w-4 mr-2" /> Salvar material
+                  </Button>
+                </div>
+
+                <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Importar planilha Excel</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Use colunas como Nome/Material e Custo/Valor. A primeira aba da planilha é lida automaticamente.</p>
+                  </div>
+                  <Label htmlFor="materials-import" className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-background px-4 py-6 text-sm font-medium hover:bg-muted/40">
+                    <Upload className="h-4 w-4" /> Selecionar arquivo .xlsx
+                  </Label>
+                  <Input id="materials-import" type="file" accept=".xlsx,.xls" className="hidden" onChange={importMaterialsFromFile} />
+                  <p className="text-[10px] text-muted-foreground">Se um material já existir com o mesmo nome, o custo será atualizado.</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border overflow-hidden">
+                <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">Materiais cadastrados</h3>
+                    <p className="text-xs text-muted-foreground">{materials.length} item(ns) prontos para uso no orçamento</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/20">
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">Material</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground hidden sm:table-cell">Origem</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Custo</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-muted-foreground">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {materials.length === 0 ? (
+                        <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhum material cadastrado ainda.</td></tr>
+                      ) : materials.map((material) => (
+                        <tr key={material.id} className="border-b last:border-0 hover:bg-muted/20">
+                          <td className="px-4 py-3 text-sm font-medium">{material.name}</td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell">{material.source === 'excel' ? 'Planilha' : 'Manual'}</td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold">R$ {Number(material.unit_cost).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-4 py-3 text-center">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => deleteMaterial(material.id)}>
+                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
