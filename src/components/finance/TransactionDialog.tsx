@@ -15,6 +15,7 @@ import { CurrencyInput } from '@/components/CurrencyInput';
 import { formatBRL } from '@/lib/format';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { FinancialCategoryOption, mergeFinancialCategories } from '@/lib/financial';
 
 interface Client { id: string; name: string; }
 interface BankAccount { id: string; name: string; bank_name: string | null; current_balance: number; }
@@ -35,29 +36,6 @@ const paymentMethods = [
   { value: 'transfer', label: 'Transferência', icon: Landmark },
   { value: 'boleto', label: 'Boleto', icon: Receipt },
   { value: 'cheque', label: 'Cheque', icon: Receipt },
-];
-
-const expenseCategories = [
-  { value: 'material', label: 'Material / Insumos' },
-  { value: 'labor', label: 'Mão de Obra' },
-  { value: 'rent', label: 'Aluguel' },
-  { value: 'salary', label: 'Salários / Funcionários' },
-  { value: 'fuel', label: 'Combustível' },
-  { value: 'food', label: 'Alimentação' },
-  { value: 'tools', label: 'Ferramentas / Equipamentos' },
-  { value: 'maintenance', label: 'Manutenção' },
-  { value: 'taxes', label: 'Impostos / Taxas' },
-  { value: 'utilities', label: 'Água / Luz / Internet' },
-  { value: 'transport', label: 'Transporte / Frete' },
-  { value: 'marketing', label: 'Marketing' },
-  { value: 'other_expense', label: 'Outras Despesas' },
-];
-
-const incomeCategories = [
-  { value: 'project', label: 'Projeto / Orçamento' },
-  { value: 'installment', label: 'Parcela de Projeto' },
-  { value: 'service', label: 'Serviço Avulso' },
-  { value: 'other_income', label: 'Outras Receitas' },
 ];
 
 interface TransactionDialogProps {
@@ -96,8 +74,28 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
   const [payments, setPayments] = useState<PaymentSplit[]>([
     { id: '1', method: 'pix', amount: 0, installments: 1, machineDiscount: 0 },
   ]);
+  const [customCategories, setCustomCategories] = useState<FinancialCategoryOption[]>([]);
 
-  const categories = type === 'income' ? incomeCategories : expenseCategories;
+  useEffect(() => {
+    supabase
+      .from('financial_categories' as any)
+      .select('slug, name, type, color, is_system, sort_order')
+      .order('sort_order')
+      .then(({ data }) => {
+        if (data) {
+          setCustomCategories((data as any[]).map((item) => ({
+            value: item.slug,
+            label: item.name,
+            type: item.type,
+            color: item.color,
+            isSystem: item.is_system,
+            sortOrder: item.sort_order,
+          })));
+        }
+      });
+  }, []);
+
+  const categories = mergeFinancialCategories(customCategories).filter((item) => item.type === type);
 
   // Load edit data when editTransaction changes
   useEffect(() => {
