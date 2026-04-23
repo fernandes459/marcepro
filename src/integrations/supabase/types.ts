@@ -384,6 +384,45 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_categories: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          is_system: boolean
+          name: string
+          slug: string
+          sort_order: number
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_system?: boolean
+          name: string
+          slug: string
+          sort_order?: number
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_system?: boolean
+          name?: string
+          slug?: string
+          sort_order?: number
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       financial_transactions: {
         Row: {
           amount: number
@@ -477,6 +516,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      material_catalog: {
+        Row: {
+          created_at: string
+          id: string
+          import_batch: string | null
+          last_imported_at: string | null
+          name: string
+          notes: string | null
+          source: string
+          supplier: string | null
+          unit: string
+          unit_cost: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          import_batch?: string | null
+          last_imported_at?: string | null
+          name: string
+          notes?: string | null
+          source?: string
+          supplier?: string | null
+          unit?: string
+          unit_cost?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          import_batch?: string | null
+          last_imported_at?: string | null
+          name?: string
+          notes?: string | null
+          source?: string
+          supplier?: string | null
+          unit?: string
+          unit_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       payment_milestones: {
         Row: {

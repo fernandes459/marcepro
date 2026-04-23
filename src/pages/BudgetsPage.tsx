@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Send, FileText, Loader2, Trash2, Edit, CheckCircle, XCircle,
@@ -37,6 +37,13 @@ interface Client {
   state: string | null; cep: string | null; address_number: string | null; complement: string | null;
 }
 interface Employee { id: string; name: string; }
+interface MaterialCatalogItem {
+  id: string;
+  name: string;
+  unit_cost: number;
+  unit: string | null;
+  supplier: string | null;
+}
 interface Budget {
   id: string; code: string; client_id: string | null; project_name: string | null;
   status: string; total_cost: number; profit_margin: number; final_price: number;
@@ -105,6 +112,7 @@ export default function BudgetsPage() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [materialCatalog, setMaterialCatalog] = useState<MaterialCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -148,16 +156,18 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const [salespersonId, setSalespersonId] = useState<string>('');
 
   const fetchData = async () => {
-    const [budgetsRes, clientsRes, settingsRes, employeesRes] = await Promise.all([
+    const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes] = await Promise.all([
       supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
       supabase.from('company_settings').select('*').limit(1).maybeSingle(),
       supabase.from('employees').select('id, name').eq('status', 'active').order('name'),
+      supabase.from('material_catalog' as any).select('id, name, unit_cost, unit, supplier').order('name'),
     ]);
     if (budgetsRes.data) setBudgets(budgetsRes.data as any);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
     if (settingsRes.data) setCompanySettings(settingsRes.data);
     if (employeesRes.data) setEmployees(employeesRes.data as Employee[]);
+    if (materialsRes.data) setMaterialCatalog(materialsRes.data as unknown as MaterialCatalogItem[]);
     setLoading(false);
   };
 
@@ -181,9 +191,19 @@ const [selectedClientId, setSelectedClientId] = useState('');
       .channel(`budgets-live-${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'material_catalog' }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
+
+  const materialSuggestions = useMemo(
+    () => materialCatalog.map((material) => ({
+      key: material.id,
+      label: `${material.name}${material.supplier ? ` · ${material.supplier}` : ''}`,
+      value: material.name,
+    })),
+    [materialCatalog]
+  );
 
   const filtered = budgets.filter(b => {
     const clientName = (b.clients as any)?.name || '';
@@ -230,6 +250,19 @@ const [selectedClientId, setSelectedClientId] = useState('');
 
   const addItem = () => setItems([...items, { name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
+  const resolveCatalogMaterial = (value: string) => materialCatalog.find((material) => material.name.trim().toLowerCase() === value.trim().toLowerCase());
+  const applyCatalogMaterial = (idx: number, materialName: string) => {
+    const material = resolveCatalogMaterial(materialName);
+    if (!material) return;
+    const updated = [...items];
+    updated[idx] = {
+      ...updated[idx],
+      name: material.name,
+      materialCost: Number(material.unit_cost || 0),
+      unitPrice: Number(material.unit_cost || 0) + Number(updated[idx].laborCost || 0),
+    };
+    setItems(updated);
+  };
   const updateItem = (idx: number, field: keyof BudgetItem, value: string | number) => {
     const updated = [...items];
     (updated[idx] as any)[field] = value;
@@ -401,6 +434,19 @@ const openEditBudget = async (budget: Budget) => {
         .select('*')
         .eq('budget_id', budget.id)
         .order('sort_order');
+
+      const { data: existingReceivables } = await supabase
+        .from('financial_transactions')
+        .select('id')
+        .eq('budget_id', budget.id)
+        .in('category', ['project', 'installment']);
+
+      if (existingReceivables && existingReceivables.length > 0) {
+        await supabase
+          .from('financial_transactions')
+          .delete()
+          .in('id', existingReceivables.map((transaction) => transaction.id));
+      }
 
       if (milestones && milestones.length > 0) {
         // Generate receivables from milestones
@@ -613,9 +659,21 @@ const openEditBudget = async (budget: Budget) => {
           <DialogTrigger asChild>
             <Button className="gradient-primary shadow-primary border-0"><Plus className="h-4 w-4 mr-2" /> Novo Orçamento</Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="font-display">{editingBudgetId ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle></DialogHeader>
-<form onSubmit={handleCreate} className="space-y-6">
+          <DialogContent className="h-[100dvh] w-[100dvw] max-w-none rounded-none border-0 p-0 sm:h-[100dvh] sm:w-[100dvw] sm:max-w-none">
+            <form onSubmit={handleCreate} className="flex h-full flex-col overflow-hidden bg-background">
+              <DialogHeader className="border-b border-border px-4 py-3 sm:px-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <DialogTitle className="font-display text-lg sm:text-xl">{editingBudgetId ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle>
+                    <p className="mt-1 text-xs text-muted-foreground">Tela cheia para orçamento técnico, negociação e recebíveis.</p>
+                  </div>
+                  <div className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-right">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Preço final</p>
+                    <p className="font-display text-sm font-semibold">{formatBRL(finalPrice)}</p>
+                  </div>
+                </div>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
               {/* Seção 1: Informações Básicas */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2">Informações Básicas</h3>
@@ -746,10 +804,29 @@ const openEditBudget = async (budget: Budget) => {
                     <div className="space-y-2">
                       {items.map((item, idx) => {
                         const itemSubtotal = (item.materialCost + item.laborCost) * item.quantity;
+                        const matchedMaterial = resolveCatalogMaterial(item.name);
                         return (
                           <div key={idx} className="rounded-lg bg-background p-3 space-y-2 border">
                             <div className="flex items-center gap-2">
-                              <Input placeholder="Nome do material/serviço" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} className="flex-1 text-sm" />
+                              <div className="flex-1 space-y-1">
+                                <Input list={`budget-material-suggestions-${idx}`} placeholder="Nome do material/serviço" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} onBlur={(e) => applyCatalogMaterial(idx, e.target.value)} className="flex-1 text-sm" />
+                                <datalist id={`budget-material-suggestions-${idx}`}>
+                                  {materialSuggestions.map((suggestion) => (
+                                    <option key={`${idx}-${suggestion.key}`} value={suggestion.value} label={suggestion.label} />
+                                  ))}
+                                </datalist>
+                                {matchedMaterial ? (
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Custo sugerido: <span className="font-medium text-foreground">{formatBRL(Number(matchedMaterial.unit_cost))}</span>
+                                    {matchedMaterial.unit ? ` / ${matchedMaterial.unit}` : ''}
+                                    {matchedMaterial.supplier ? ` · ${matchedMaterial.supplier}` : ''}
+                                  </p>
+                                ) : materialCatalog.length > 0 ? (
+                                  <p className="text-[10px] text-muted-foreground">Digite para auto completar e preencher o custo automaticamente.</p>
+                                ) : (
+                                  <p className="text-[10px] text-muted-foreground">Cadastre materiais em Configurações para agilizar os orçamentos.</p>
+                                )}
+                              </div>
                               <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="text-destructive shrink-0 h-8 w-8 p-0"><Trash2 className="h-3.5 w-3.5" /></Button>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
@@ -949,19 +1026,22 @@ const openEditBudget = async (budget: Budget) => {
                 <p className="text-xs text-muted-foreground">Estas notas são apenas para uso interno e não aparecem nos PDFs ou WhatsApp.</p>
               </div>
               
-              <Button
-                type="submit"
-                className={`w-full border-0 ${isBelowMin ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : 'gradient-primary shadow-primary'}`}
-                disabled={saving || isBelowMin}
-              >
-                {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {isBelowMin ? <Lock className="h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
-                {isBelowMin
-                  ? `Bloqueado — margem abaixo de ${minMargin}%`
-                  : editingBudgetId
-                    ? 'Salvar Alterações'
-                    : 'Salvar Orçamento'}
-              </Button>
+              </div>
+              <div className="border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6">
+                <Button
+                  type="submit"
+                  className={`w-full border-0 ${isBelowMin ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : 'gradient-primary shadow-primary'}`}
+                  disabled={saving || isBelowMin}
+                >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {isBelowMin ? <Lock className="h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
+                  {isBelowMin
+                    ? `Bloqueado — margem abaixo de ${minMargin}%`
+                    : editingBudgetId
+                      ? 'Salvar Alterações'
+                      : 'Salvar Orçamento'}
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>

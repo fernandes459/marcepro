@@ -24,6 +24,7 @@ import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { TransactionDialog } from '@/components/finance/TransactionDialog';
 import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
+import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories } from '@/lib/financial';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
@@ -65,30 +66,6 @@ function isDateWithinRange(value: string | null | undefined, start: string, end:
   return value >= start && value <= end;
 }
 
-const expenseCategories = [
-  { value: 'material', label: 'Material / Insumos' },
-  { value: 'labor', label: 'Mão de Obra' },
-  { value: 'rent', label: 'Aluguel' },
-  { value: 'salary', label: 'Salários / Funcionários' },
-  { value: 'fuel', label: 'Combustível' },
-  { value: 'food', label: 'Alimentação' },
-  { value: 'tools', label: 'Ferramentas / Equipamentos' },
-  { value: 'maintenance', label: 'Manutenção' },
-  { value: 'taxes', label: 'Impostos / Taxas' },
-  { value: 'utilities', label: 'Água / Luz / Internet' },
-  { value: 'transport', label: 'Transporte / Frete' },
-  { value: 'marketing', label: 'Marketing' },
-  { value: 'other_expense', label: 'Outras Despesas' },
-];
-const incomeCategories = [
-  { value: 'project', label: 'Projeto / Orçamento' },
-  { value: 'installment', label: 'Parcela de Projeto' },
-  { value: 'service', label: 'Serviço Avulso' },
-  { value: 'other_income', label: 'Outras Receitas' },
-];
-const categoryLabels: Record<string, string> = {};
-[...expenseCategories, ...incomeCategories].forEach(c => { categoryLabels[c.value] = c.label; });
-
 const statusConfig: Record<string, { label: string; className: string }> = {
   pending: { label: 'Pendente', className: 'bg-warning/10 text-warning' },
   paid: { label: 'Pago', className: 'bg-success/10 text-success' },
@@ -110,6 +87,7 @@ export default function FinancePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [customCategories, setCustomCategories] = useState<FinancialCategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
@@ -147,6 +125,27 @@ export default function FinancePage() {
   useEffect(() => {
     void fetchAll();
   }, [fetchAll]);
+
+  useEffect(() => {
+    supabase
+      .from('financial_categories' as any)
+      .select('slug, name, type, color, is_system, sort_order')
+      .order('sort_order')
+      .then(({ data }) => {
+        if (data) {
+          setCustomCategories((data as any[]).map((item) => ({
+            value: item.slug,
+            label: item.name,
+            type: item.type,
+            color: item.color,
+            isSystem: item.is_system,
+            sortOrder: item.sort_order,
+          })));
+        }
+      });
+  }, []);
+
+  const mergedCategories = useMemo(() => mergeFinancialCategories(customCategories), [customCategories]);
 
   useEffect(() => {
     if (!user) return;
@@ -371,11 +370,11 @@ export default function FinancePage() {
   const expenseByCat = useMemo(() => {
     const counts: Record<string, number> = {};
     periodTransactions.filter(t => t.type === 'expense').forEach(t => {
-      const cat = categoryLabels[t.category] || t.category;
+      const cat = getCategoryLabel(mergedCategories, t.category);
       counts[cat] = (counts[cat] || 0) + Number(t.amount);
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [periodTransactions]);
+  }, [mergedCategories, periodTransactions]);
 
   const periodLabel = useMemo(() => {
     if (periodMode === 'custom') {
@@ -553,7 +552,7 @@ export default function FinancePage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">{clientName || '—'}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground hidden md:table-cell">{categoryLabels[tx.category] || tx.category}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground hidden md:table-cell">{getCategoryLabel(mergedCategories, tx.category)}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(tx.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
                       <td className={`px-4 py-3 text-sm text-right font-semibold ${tx.type === 'income' ? 'text-success' : 'text-destructive'}`}>
                         {tx.type === 'income' ? '+' : '-'} {formatBRL(Number(tx.amount))}
@@ -610,7 +609,7 @@ export default function FinancePage() {
                 <div className="pl-8 space-y-1 border-l-2 border-muted ml-4">
                   {Object.entries(dreData.byCategory).map(([cat, val]) => (
                     <div key={cat} className="flex justify-between py-1">
-                      <span className="text-xs text-muted-foreground">{categoryLabels[cat] || cat}</span>
+                      <span className="text-xs text-muted-foreground">{getCategoryLabel(mergedCategories, cat)}</span>
                       <span className="text-xs text-destructive">{formatBRL(val)}</span>
                     </div>
                   ))}

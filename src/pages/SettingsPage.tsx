@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { ChangeEvent, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard } from 'lucide-react';
+import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard, Package2, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 interface Employee {
   id: string;
@@ -51,6 +52,15 @@ interface TeamMember {
   user_id: string;
   role: string;
   email?: string;
+}
+
+interface MaterialCatalogItem {
+  id: string;
+  name: string;
+  unit_cost: number;
+  unit: string | null;
+  supplier: string | null;
+  source: string;
 }
 
 const roleLabels: Record<string, string> = {
@@ -102,13 +112,16 @@ export default function SettingsPage() {
   const [teamEmail, setTeamEmail] = useState('');
   const [teamRole, setTeamRole] = useState('partner');
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [materials, setMaterials] = useState<MaterialCatalogItem[]>([]);
+  const [materialName, setMaterialName] = useState('');
+  const [materialCost, setMaterialCost] = useState('');
 
   const emptyEmpForm = {
     name: '', role: 'production', email: '', phone: '', cpf: '', salary: '', hire_date: '', notes: '',
   };
   const [empForm, setEmpForm] = useState(emptyEmpForm);
 
-  useEffect(() => { if (user) { fetchEmployees(); fetchCompany(); fetchTeamMembers(); } }, [user]);
+  useEffect(() => { if (user) { fetchEmployees(); fetchCompany(); fetchTeamMembers(); fetchMaterials(); } }, [user]);
 
   async function fetchEmployees() {
     const { data } = await supabase.from('employees').select('*').order('name');
@@ -139,6 +152,88 @@ export default function SettingsPage() {
   async function fetchTeamMembers() {
     const { data } = await supabase.from('user_roles').select('*');
     if (data) setTeamMembers(data as TeamMember[]);
+  }
+
+  async function fetchMaterials() {
+    const { data } = await supabase.from('material_catalog' as any).select('*').order('name');
+    if (data) setMaterials(data as unknown as MaterialCatalogItem[]);
+  }
+
+  async function saveMaterial() {
+    if (!materialName.trim()) { toast.error('Informe o nome do material'); return; }
+    const cost = Number(materialCost.replace(',', '.'));
+    if (!Number.isFinite(cost) || cost < 0) { toast.error('Informe um custo válido'); return; }
+    const payload = {
+      user_id: user!.id,
+      name: materialName.trim(),
+      unit_cost: cost,
+      source: 'manual',
+    };
+    const existing = materials.find((item) => item.name.trim().toLowerCase() === materialName.trim().toLowerCase());
+    const response = existing
+      ? await supabase.from('material_catalog' as any).update(payload).eq('id', existing.id)
+      : await supabase.from('material_catalog' as any).insert(payload);
+    if (response.error) { toast.error('Não foi possível salvar o material'); return; }
+    setMaterialName('');
+    setMaterialCost('');
+    toast.success(existing ? 'Material atualizado!' : 'Material cadastrado!');
+    fetchMaterials();
+  }
+
+  async function deleteMaterial(id: string) {
+    const { error } = await supabase.from('material_catalog' as any).delete().eq('id', id);
+    if (error) { toast.error('Não foi possível remover o material'); return; }
+    setMaterials((current) => current.filter((item) => item.id !== id));
+    toast.success('Material removido');
+  }
+
+  async function importMaterialsFromFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '' });
+
+      const normalized = rows
+        .map((row) => {
+          const entries = Object.fromEntries(Object.entries(row).map(([key, value]) => [key.trim().toLowerCase(), value]));
+          const name = String(entries.nome || entries.material || entries.item || entries.descricao || '').trim();
+          const rawCost = entries.custo ?? entries.valor ?? entries.preco ?? entries['custo unitario'] ?? entries['custo_unitario'] ?? '';
+          const supplier = String(entries.fornecedor || entries.marca || '').trim();
+          const unit = String(entries.unidade || entries.unit || 'un').trim() || 'un';
+          const numericCost = Number(String(rawCost).replace(/\./g, '').replace(',', '.'));
+          if (!name || !Number.isFinite(numericCost)) return null;
+          return {
+            user_id: user!.id,
+            name,
+            unit_cost: numericCost,
+            unit,
+            supplier: supplier || null,
+            source: 'excel',
+            import_batch: `${file.name}-${Date.now()}`,
+            last_imported_at: new Date().toISOString(),
+          };
+        })
+        .filter(Boolean);
+
+      if (normalized.length === 0) {
+        toast.error('A planilha precisa ter colunas como Nome/Material e Custo/Valor');
+        return;
+      }
+
+      const { error } = await supabase.from('material_catalog' as any).upsert(normalized as any, { onConflict: 'user_id,name' });
+      if (error) { toast.error('Falha ao importar materiais'); return; }
+      toast.success(`${normalized.length} material(is) importado(s)`);
+      fetchMaterials();
+    } catch (importError) {
+      console.error(importError);
+      toast.error('Não foi possível ler a planilha');
+    } finally {
+      event.target.value = '';
+    }
   }
 
   async function saveCompany() {
@@ -269,6 +364,7 @@ export default function SettingsPage() {
         <TabsList className="flex-wrap">
           <TabsTrigger value="company"><Building className="h-4 w-4 mr-1" /> Empresa</TabsTrigger>
           <TabsTrigger value="fees"><CreditCard className="h-4 w-4 mr-1" /> Taxas</TabsTrigger>
+          <TabsTrigger value="materials"><Package2 className="h-4 w-4 mr-1" /> Materiais</TabsTrigger>
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-1" /> Equipe</TabsTrigger>
           <TabsTrigger value="access"><Shield className="h-4 w-4 mr-1" /> Acessos</TabsTrigger>
           <TabsTrigger value="profile"><User className="h-4 w-4 mr-1" /> Perfil</TabsTrigger>
@@ -364,6 +460,88 @@ export default function SettingsPage() {
                 ))}
               </div>
               <Button className="gradient-primary shadow-primary border-0" onClick={saveCompany}>Salvar Taxas</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="materials">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-display flex items-center gap-2">
+                <Package2 className="h-4 w-4" /> Base de Materiais
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Cadastro manual</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Esses materiais ficam disponíveis no autocomplete do orçamento.</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Nome do material</Label>
+                      <Input value={materialName} onChange={(e) => setMaterialName(e.target.value)} placeholder="Ex: MDF Carvalho 18mm" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Custo unitário</Label>
+                      <Input type="number" step="0.01" value={materialCost} onChange={(e) => setMaterialCost(e.target.value)} placeholder="0,00" />
+                    </div>
+                  </div>
+                  <Button className="gradient-primary shadow-primary border-0" onClick={saveMaterial}>
+                    <Plus className="h-4 w-4 mr-2" /> Salvar material
+                  </Button>
+                </div>
+
+                <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Importar planilha Excel</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Use colunas como Nome/Material e Custo/Valor. A primeira aba da planilha é lida automaticamente.</p>
+                  </div>
+                  <Label htmlFor="materials-import" className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-background px-4 py-6 text-sm font-medium hover:bg-muted/40">
+                    <Upload className="h-4 w-4" /> Selecionar arquivo .xlsx
+                  </Label>
+                  <Input id="materials-import" type="file" accept=".xlsx,.xls" className="hidden" onChange={importMaterialsFromFile} />
+                  <p className="text-[10px] text-muted-foreground">Se um material já existir com o mesmo nome, o custo será atualizado.</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border overflow-hidden">
+                <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">Materiais cadastrados</h3>
+                    <p className="text-xs text-muted-foreground">{materials.length} item(ns) prontos para uso no orçamento</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/20">
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">Material</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground hidden sm:table-cell">Origem</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Custo</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-muted-foreground">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {materials.length === 0 ? (
+                        <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhum material cadastrado ainda.</td></tr>
+                      ) : materials.map((material) => (
+                        <tr key={material.id} className="border-b last:border-0 hover:bg-muted/20">
+                          <td className="px-4 py-3 text-sm font-medium">{material.name}</td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground hidden sm:table-cell">{material.source === 'excel' ? 'Planilha' : 'Manual'}</td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold">R$ {Number(material.unit_cost).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-4 py-3 text-center">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => deleteMaterial(material.id)}>
+                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
