@@ -127,6 +127,27 @@ export default function FinancePage() {
   }, [fetchAll]);
 
   useEffect(() => {
+    supabase
+      .from('financial_categories' as any)
+      .select('slug, name, type, color, is_system, sort_order')
+      .order('sort_order')
+      .then(({ data }) => {
+        if (data) {
+          setCustomCategories((data as any[]).map((item) => ({
+            value: item.slug,
+            label: item.name,
+            type: item.type,
+            color: item.color,
+            isSystem: item.is_system,
+            sortOrder: item.sort_order,
+          })));
+        }
+      });
+  }, []);
+
+  const mergedCategories = useMemo(() => mergeFinancialCategories(customCategories), [customCategories]);
+
+  useEffect(() => {
     if (!user) return;
 
     const channel = supabase
@@ -349,11 +370,11 @@ export default function FinancePage() {
   const expenseByCat = useMemo(() => {
     const counts: Record<string, number> = {};
     periodTransactions.filter(t => t.type === 'expense').forEach(t => {
-      const cat = categoryLabels[t.category] || t.category;
+      const cat = getCategoryLabel(mergedCategories, t.category);
       counts[cat] = (counts[cat] || 0) + Number(t.amount);
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [periodTransactions]);
+  }, [mergedCategories, periodTransactions]);
 
   const periodLabel = useMemo(() => {
     if (periodMode === 'custom') {
