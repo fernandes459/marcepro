@@ -24,6 +24,7 @@ import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { TransactionDialog } from '@/components/finance/TransactionDialog';
 import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
+import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories } from '@/lib/financial';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
@@ -65,30 +66,6 @@ function isDateWithinRange(value: string | null | undefined, start: string, end:
   return value >= start && value <= end;
 }
 
-const expenseCategories = [
-  { value: 'material', label: 'Material / Insumos' },
-  { value: 'labor', label: 'Mão de Obra' },
-  { value: 'rent', label: 'Aluguel' },
-  { value: 'salary', label: 'Salários / Funcionários' },
-  { value: 'fuel', label: 'Combustível' },
-  { value: 'food', label: 'Alimentação' },
-  { value: 'tools', label: 'Ferramentas / Equipamentos' },
-  { value: 'maintenance', label: 'Manutenção' },
-  { value: 'taxes', label: 'Impostos / Taxas' },
-  { value: 'utilities', label: 'Água / Luz / Internet' },
-  { value: 'transport', label: 'Transporte / Frete' },
-  { value: 'marketing', label: 'Marketing' },
-  { value: 'other_expense', label: 'Outras Despesas' },
-];
-const incomeCategories = [
-  { value: 'project', label: 'Projeto / Orçamento' },
-  { value: 'installment', label: 'Parcela de Projeto' },
-  { value: 'service', label: 'Serviço Avulso' },
-  { value: 'other_income', label: 'Outras Receitas' },
-];
-const categoryLabels: Record<string, string> = {};
-[...expenseCategories, ...incomeCategories].forEach(c => { categoryLabels[c.value] = c.label; });
-
 const statusConfig: Record<string, { label: string; className: string }> = {
   pending: { label: 'Pendente', className: 'bg-warning/10 text-warning' },
   paid: { label: 'Pago', className: 'bg-success/10 text-success' },
@@ -110,6 +87,7 @@ export default function FinancePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [customCategories, setCustomCategories] = useState<FinancialCategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
