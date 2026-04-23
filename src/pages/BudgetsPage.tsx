@@ -660,8 +660,20 @@ const openEditBudget = async (budget: Budget) => {
             <Button className="gradient-primary shadow-primary border-0"><Plus className="h-4 w-4 mr-2" /> Novo Orçamento</Button>
           </DialogTrigger>
           <DialogContent className="h-[100dvh] w-[100dvw] max-w-none rounded-none border-0 p-0 sm:h-[100dvh] sm:w-[100dvw] sm:max-w-none">
-            <DialogHeader><DialogTitle className="font-display">{editingBudgetId ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle></DialogHeader>
-<form onSubmit={handleCreate} className="flex h-full flex-col overflow-hidden">
+            <form onSubmit={handleCreate} className="flex h-full flex-col overflow-hidden bg-background">
+              <DialogHeader className="border-b border-border px-4 py-3 sm:px-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <DialogTitle className="font-display text-lg sm:text-xl">{editingBudgetId ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle>
+                    <p className="mt-1 text-xs text-muted-foreground">Tela cheia para orçamento técnico, negociação e recebíveis.</p>
+                  </div>
+                  <div className="rounded-md border border-border bg-muted/40 px-3 py-1.5 text-right">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Preço final</p>
+                    <p className="font-display text-sm font-semibold">{formatBRL(finalPrice)}</p>
+                  </div>
+                </div>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
               {/* Seção 1: Informações Básicas */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2">Informações Básicas</h3>
@@ -1014,19 +1026,22 @@ const openEditBudget = async (budget: Budget) => {
                 <p className="text-xs text-muted-foreground">Estas notas são apenas para uso interno e não aparecem nos PDFs ou WhatsApp.</p>
               </div>
               
-              <Button
-                type="submit"
-                className={`w-full border-0 ${isBelowMin ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : 'gradient-primary shadow-primary'}`}
-                disabled={saving || isBelowMin}
-              >
-                {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {isBelowMin ? <Lock className="h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
-                {isBelowMin
-                  ? `Bloqueado — margem abaixo de ${minMargin}%`
-                  : editingBudgetId
-                    ? 'Salvar Alterações'
-                    : 'Salvar Orçamento'}
-              </Button>
+              </div>
+              <div className="border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6">
+                <Button
+                  type="submit"
+                  className={`w-full border-0 ${isBelowMin ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : 'gradient-primary shadow-primary'}`}
+                  disabled={saving || isBelowMin}
+                >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {isBelowMin ? <Lock className="h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
+                  {isBelowMin
+                    ? `Bloqueado — margem abaixo de ${minMargin}%`
+                    : editingBudgetId
+                      ? 'Salvar Alterações'
+                      : 'Salvar Orçamento'}
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
