@@ -435,6 +435,19 @@ const openEditBudget = async (budget: Budget) => {
         .eq('budget_id', budget.id)
         .order('sort_order');
 
+      const { data: existingReceivables } = await supabase
+        .from('financial_transactions')
+        .select('id')
+        .eq('budget_id', budget.id)
+        .in('category', ['project', 'installment']);
+
+      if (existingReceivables && existingReceivables.length > 0) {
+        await supabase
+          .from('financial_transactions')
+          .delete()
+          .in('id', existingReceivables.map((transaction) => transaction.id));
+      }
+
       if (milestones && milestones.length > 0) {
         // Generate receivables from milestones
         const inserts = milestones.map((ms: any, idx: number) => {
