@@ -552,7 +552,7 @@ export default function FinancePage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">{clientName || '—'}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground hidden md:table-cell">{categoryLabels[tx.category] || tx.category}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground hidden md:table-cell">{getCategoryLabel(mergedCategories, tx.category)}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(tx.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
                       <td className={`px-4 py-3 text-sm text-right font-semibold ${tx.type === 'income' ? 'text-success' : 'text-destructive'}`}>
                         {tx.type === 'income' ? '+' : '-'} {formatBRL(Number(tx.amount))}
@@ -609,7 +609,7 @@ export default function FinancePage() {
                 <div className="pl-8 space-y-1 border-l-2 border-muted ml-4">
                   {Object.entries(dreData.byCategory).map(([cat, val]) => (
                     <div key={cat} className="flex justify-between py-1">
-                      <span className="text-xs text-muted-foreground">{categoryLabels[cat] || cat}</span>
+                      <span className="text-xs text-muted-foreground">{getCategoryLabel(mergedCategories, cat)}</span>
                       <span className="text-xs text-destructive">{formatBRL(val)}</span>
                     </div>
                   ))}
