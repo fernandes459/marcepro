@@ -950,13 +950,41 @@ const openEditBudget = async (budget: Budget) => {
               </div>
 
               {/* PAINEL DE PRECIFICAÇÃO PREMIUM (sticky) */}
-              <div className="sticky bottom-0 z-10 -mx-1 pt-1">
+              <datalist id="room-label-suggestions">
+                {Array.from(new Set(items.map(i => i.roomLabel).filter(Boolean) as string[])).map(r => <option key={r} value={r} />)}
+                <option value="Cozinha" />
+                <option value="Sala" />
+                <option value="Quarto" />
+                <option value="Banheiro" />
+                <option value="Closet" />
+                <option value="Home Office" />
+                <option value="Área de Serviço" />
+              </datalist>
+              <div className="sticky bottom-0 z-10 -mx-1 pt-1 space-y-2">
                 <PricingPanel
                   totalCost={totalCost}
                   finalPrice={finalPrice}
                   margin={margin}
                   minMargin={minMargin}
                 />
+                <div className="flex justify-end">
+                  <AISuggestPricing
+                    totalCost={totalCost}
+                    defaultMargin={Number(companySettings?.default_margin ?? 40)}
+                    minMargin={minMargin}
+                    projectName={projectName}
+                    finishType={finishType}
+                    complexity={complexityFactor}
+                    rooms={Array.from(new Set(items.map(i => i.roomLabel).filter(Boolean) as string[]))}
+                    onApply={(price) => {
+                      // Adjust margin so finalPrice ~= price (com desconto atual)
+                      if (totalCost <= 0) return;
+                      const targetPriceBeforeDiscount = price / (1 - discountPct / 100);
+                      const newMargin = Math.max(0, ((targetPriceBeforeDiscount - totalCost) / totalCost) * 100);
+                      setMargin(Number(newMargin.toFixed(1)));
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Seção 6: Condições de Pagamento */}
