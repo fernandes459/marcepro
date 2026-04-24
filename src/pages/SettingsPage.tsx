@@ -136,7 +136,8 @@ export default function SettingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [company, setCompany] = useState<CompanySettings>({
     company_name: '', cnpj: '', phone: '', email: '', address: '', city: '', state: '', cep: '',
-    default_margin: '40', min_margin: '20', default_commission: '0', monthly_goal: '0', card_fees: {},
+    default_margin: '40', min_margin: '20', default_commission: '0', monthly_goal: '0',
+    avg_projects_per_month: '4', card_fees: {},
   });
 
   // Team access
