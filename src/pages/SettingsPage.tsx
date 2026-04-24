@@ -506,6 +506,110 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        {/* Operational Costs */}
+        <TabsContent value="opcosts">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-display flex items-center gap-2">
+                <Receipt className="h-4 w-4" /> Custo Operacional Mensal
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {(() => {
+                const totalMonthly = opCosts.filter(c => c.active).reduce((s, c) => s + Number(c.monthly_amount || 0), 0);
+                const avgProjects = Math.max(1, parseInt(company.avg_projects_per_month) || 4);
+                const overheadPerProject = totalMonthly / avgProjects;
+                return (
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border bg-muted/30 p-4">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total mensal</p>
+                      <p className="font-display text-2xl font-bold mt-1">R$ {totalMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">{opCosts.filter(c => c.active).length} custo(s) ativo(s)</p>
+                    </div>
+                    <div className="rounded-xl border bg-muted/30 p-4">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1"><Calculator className="h-3 w-3" /> Projetos/mês (média)</p>
+                      <Input type="number" min="1" className="mt-1 font-display text-xl font-bold h-10 bg-background" value={company.avg_projects_per_month} onChange={e => setCompany({ ...company, avg_projects_per_month: e.target.value })} onBlur={saveCompany} />
+                      <p className="text-[10px] text-muted-foreground mt-1">Usado para diluir overhead</p>
+                    </div>
+                    <div className="rounded-xl border-2 border-primary/40 bg-primary/5 p-4">
+                      <p className="text-[11px] uppercase tracking-wide text-primary font-semibold">Overhead por projeto</p>
+                      <p className="font-display text-2xl font-bold mt-1 text-primary">R$ {overheadPerProject.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Soma diluída no custo de cada orçamento</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
+                <h3 className="text-sm font-semibold">{editingOpId ? 'Editar custo' : 'Adicionar custo'}</h3>
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Nome</Label>
+                    <Input value={opForm.name} onChange={e => setOpForm({ ...opForm, name: e.target.value })} placeholder="Ex: Aluguel galpão" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Categoria</Label>
+                    <Select value={opForm.category} onValueChange={v => setOpForm({ ...opForm, category: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {OPERATIONAL_CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Valor mensal (R$)</Label>
+                    <Input type="number" step="0.01" value={opForm.monthly_amount} onChange={e => setOpForm({ ...opForm, monthly_amount: e.target.value })} placeholder="0,00" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Observação</Label>
+                    <Input value={opForm.notes} onChange={e => setOpForm({ ...opForm, notes: e.target.value })} placeholder="Opcional" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button className="gradient-primary shadow-primary border-0" onClick={saveOpCost}>
+                    <Plus className="h-4 w-4 mr-1" /> {editingOpId ? 'Salvar alterações' : 'Adicionar'}
+                  </Button>
+                  {editingOpId && (
+                    <Button variant="outline" onClick={() => { setEditingOpId(null); setOpForm({ name: '', category: 'rent', monthly_amount: '', notes: '' }); }}>Cancelar</Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Custo</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Categoria</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">Mensal</th>
+                      <th className="px-3 py-2 text-center text-xs font-semibold uppercase text-muted-foreground">Ativo</th>
+                      <th className="px-3 py-2 text-center text-xs font-semibold uppercase text-muted-foreground">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {opCosts.length === 0 ? (
+                      <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground text-xs">Nenhum custo cadastrado.</td></tr>
+                    ) : opCosts.map(c => (
+                      <tr key={c.id} className="border-b last:border-0 hover:bg-muted/20">
+                        <td className="px-3 py-2 font-medium">{c.name}{c.notes && <span className="block text-[10px] text-muted-foreground">{c.notes}</span>}</td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">{OPERATIONAL_CATEGORIES.find(o => o.value === c.category)?.label || c.category}</td>
+                        <td className="px-3 py-2 text-right font-semibold">R$ {Number(c.monthly_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td className="px-3 py-2 text-center"><Switch checked={c.active} onCheckedChange={() => toggleOpCost(c)} /></td>
+                        <td className="px-3 py-2 text-center">
+                          <div className="inline-flex gap-1">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditingOpId(c.id); setOpForm({ name: c.name, category: c.category, monthly_amount: String(c.monthly_amount), notes: c.notes || '' }); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteOpCost(c.id)}><Trash2 className="h-3.5 w-3.5 text-muted-foreground" /></Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Card Fees */}
         <TabsContent value="fees">
           <Card>
