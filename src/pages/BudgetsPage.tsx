@@ -227,7 +227,7 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const complexityMultiplier = COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.multiplier || 1.0;
   const finishMultiplier = FINISH_OPTIONS.find(f => f.value === finishType)?.multiplier || 1.0;
   const baseCost = totalItemsCost + parametricCost + extraTaxes + extraFreight + extraOther;
-  const totalCost = baseCost * complexityMultiplier * finishMultiplier;
+  const totalCost = baseCost * complexityMultiplier * finishMultiplier + overheadPerProject;
   const profit = totalCost * (margin / 100);
   const priceBeforeDiscount = totalCost + profit;
   const minMargin = Number(companySettings?.min_margin ?? 20);
