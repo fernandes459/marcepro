@@ -177,6 +177,7 @@ export default function SettingsPage() {
         min_margin: String((data as any).min_margin ?? 20),
         default_commission: String((data as any).default_commission ?? 0),
         monthly_goal: String((data as any).monthly_goal ?? 0),
+        avg_projects_per_month: String((data as any).avg_projects_per_month ?? 4),
         card_fees: (data as any).card_fees || {},
       });
     }
