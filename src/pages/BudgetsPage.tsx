@@ -256,7 +256,7 @@ const [selectedClientId, setSelectedClientId] = useState('');
     return parts.join(' + ') || 'A combinar';
   };
 
-  const addItem = () => setItems([...items, { name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
+  const addItem = () => setItems([...items, { name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '' }]);
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
   const resolveCatalogMaterial = (value: string) => materialCatalog.find((material) => material.name.trim().toLowerCase() === value.trim().toLowerCase());
   const applyCatalogMaterial = (idx: number, materialName: string) => {
