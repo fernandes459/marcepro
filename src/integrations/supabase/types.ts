@@ -118,6 +118,7 @@ export type Database = {
           material_cost: number
           name: string
           quantity: number
+          room_label: string | null
           unit_price: number
         }
         Insert: {
@@ -127,6 +128,7 @@ export type Database = {
           material_cost?: number
           name: string
           quantity?: number
+          room_label?: string | null
           unit_price?: number
         }
         Update: {
@@ -136,6 +138,7 @@ export type Database = {
           material_cost?: number
           name?: string
           quantity?: number
+          room_label?: string | null
           unit_price?: number
         }
         Relationships: [
@@ -276,6 +279,7 @@ export type Database = {
       company_settings: {
         Row: {
           address: string | null
+          avg_projects_per_month: number
           card_fees: Json
           cep: string | null
           city: string | null
@@ -296,6 +300,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          avg_projects_per_month?: number
           card_fees?: Json
           cep?: string | null
           city?: string | null
@@ -316,6 +321,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          avg_projects_per_month?: number
           card_fees?: Json
           cep?: string | null
           city?: string | null
@@ -557,6 +563,42 @@ export type Database = {
           supplier?: string | null
           unit?: string
           unit_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      operational_costs: {
+        Row: {
+          active: boolean
+          category: string
+          created_at: string
+          id: string
+          monthly_amount: number
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string
+          created_at?: string
+          id?: string
+          monthly_amount?: number
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          created_at?: string
+          id?: string
+          monthly_amount?: number
+          name?: string
+          notes?: string | null
           updated_at?: string
           user_id?: string
         }
