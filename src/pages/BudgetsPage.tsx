@@ -818,25 +818,34 @@ const openEditBudget = async (budget: Budget) => {
                         const matchedMaterial = resolveCatalogMaterial(item.name);
                         return (
                           <div key={idx} className="rounded-lg bg-background p-3 space-y-2 border">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 space-y-1">
-                                <Input list={`budget-material-suggestions-${idx}`} placeholder="Nome do material/serviço" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} onBlur={(e) => applyCatalogMaterial(idx, e.target.value)} className="flex-1 text-sm" />
-                                <datalist id={`budget-material-suggestions-${idx}`}>
-                                  {materialSuggestions.map((suggestion) => (
-                                    <option key={`${idx}-${suggestion.key}`} value={suggestion.value} label={suggestion.label} />
-                                  ))}
-                                </datalist>
-                                {matchedMaterial ? (
-                                  <p className="text-[10px] text-muted-foreground">
-                                    Custo sugerido: <span className="font-medium text-foreground">{formatBRL(Number(matchedMaterial.unit_cost))}</span>
-                                    {matchedMaterial.unit ? ` / ${matchedMaterial.unit}` : ''}
-                                    {matchedMaterial.supplier ? ` · ${matchedMaterial.supplier}` : ''}
-                                  </p>
-                                ) : materialCatalog.length > 0 ? (
-                                  <p className="text-[10px] text-muted-foreground">Digite para auto completar e preencher o custo automaticamente.</p>
-                                ) : (
-                                  <p className="text-[10px] text-muted-foreground">Cadastre materiais em Configurações para agilizar os orçamentos.</p>
-                                )}
+                            <div className="flex items-start gap-2">
+                              <div className="flex-1 grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-2">
+                                <div className="space-y-1">
+                                  <Input list={`budget-material-suggestions-${idx}`} placeholder="Nome do material/serviço" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} onBlur={(e) => applyCatalogMaterial(idx, e.target.value)} className="text-sm" />
+                                  <datalist id={`budget-material-suggestions-${idx}`}>
+                                    {materialSuggestions.map((suggestion) => (
+                                      <option key={`${idx}-${suggestion.key}`} value={suggestion.value} label={suggestion.label} />
+                                    ))}
+                                  </datalist>
+                                  {matchedMaterial ? (
+                                    <p className="text-[10px] text-muted-foreground">
+                                      Custo sugerido: <span className="font-medium text-foreground">{formatBRL(Number(matchedMaterial.unit_cost))}</span>
+                                      {matchedMaterial.unit ? ` / ${matchedMaterial.unit}` : ''}
+                                      {matchedMaterial.supplier ? ` · ${matchedMaterial.supplier}` : ''}
+                                    </p>
+                                  ) : materialCatalog.length > 0 ? (
+                                    <p className="text-[10px] text-muted-foreground">Digite para auto completar e preencher o custo automaticamente.</p>
+                                  ) : (
+                                    <p className="text-[10px] text-muted-foreground">Cadastre materiais em Configurações para agilizar os orçamentos.</p>
+                                  )}
+                                </div>
+                                <Input
+                                  list="room-label-suggestions"
+                                  placeholder="Ambiente (ex: Cozinha)"
+                                  value={item.roomLabel || ''}
+                                  onChange={(e) => updateItem(idx, 'roomLabel', e.target.value)}
+                                  className="text-sm"
+                                />
                               </div>
                               <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="text-destructive shrink-0 h-8 w-8 p-0"><Trash2 className="h-3.5 w-3.5" /></Button>
                             </div>
