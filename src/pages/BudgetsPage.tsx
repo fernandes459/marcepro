@@ -8,6 +8,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Slider } from '@/components/ui/slider';
 import { PricingPanel } from '@/components/budget/PricingPanel';
+import { AISuggestPricing } from '@/components/budget/AISuggestPricing';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -29,7 +30,7 @@ import ModuleConfigurator, { ModuleConfig, ModuleResult } from '@/components/bud
 import ContractDRE from '@/components/finance/ContractDRE';
 import PaymentMilestones from '@/components/finance/PaymentMilestones';
 
-interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; }
+interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; roomLabel: string; }
 const DEFAULT_PAYMENT_TEXT = '50% de entrada e o restante na entrega da obra';
 interface Client {
   id: string; name: string; phone: string; email: string | null; city: string | null;
