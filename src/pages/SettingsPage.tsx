@@ -44,6 +44,7 @@ interface CompanySettings {
   min_margin: string;
   default_commission: string;
   monthly_goal: string;
+  avg_projects_per_month: string;
   card_fees: CardFees;
 }
 
