@@ -446,6 +446,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="company">
         <TabsList className="flex-wrap">
           <TabsTrigger value="company"><Building className="h-4 w-4 mr-1" /> Empresa</TabsTrigger>
+          <TabsTrigger value="opcosts"><Receipt className="h-4 w-4 mr-1" /> Custo Operacional</TabsTrigger>
           <TabsTrigger value="fees"><CreditCard className="h-4 w-4 mr-1" /> Taxas</TabsTrigger>
           <TabsTrigger value="materials"><Package2 className="h-4 w-4 mr-1" /> Materiais</TabsTrigger>
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-1" /> Equipe</TabsTrigger>
