@@ -150,12 +150,59 @@ export default function SettingsPage() {
   const [materialName, setMaterialName] = useState('');
   const [materialCost, setMaterialCost] = useState('');
 
+  // Operational costs
+  const [opCosts, setOpCosts] = useState<OperationalCost[]>([]);
+  const [opForm, setOpForm] = useState({ name: '', category: 'rent', monthly_amount: '', notes: '' });
+  const [editingOpId, setEditingOpId] = useState<string | null>(null);
+
   const emptyEmpForm = {
     name: '', role: 'production', email: '', phone: '', cpf: '', salary: '', hire_date: '', notes: '',
   };
   const [empForm, setEmpForm] = useState(emptyEmpForm);
 
-  useEffect(() => { if (user) { fetchEmployees(); fetchCompany(); fetchTeamMembers(); fetchMaterials(); } }, [user]);
+  useEffect(() => { if (user) { fetchEmployees(); fetchCompany(); fetchTeamMembers(); fetchMaterials(); fetchOpCosts(); } }, [user]);
+
+  async function fetchOpCosts() {
+    const { data } = await supabase.from('operational_costs').select('*').order('category').order('name');
+    if (data) setOpCosts(data as OperationalCost[]);
+  }
+
+  async function saveOpCost() {
+    if (!opForm.name.trim()) { toast.error('Informe o nome do custo'); return; }
+    const amount = Number(opForm.monthly_amount.replace(',', '.'));
+    if (!Number.isFinite(amount) || amount < 0) { toast.error('Valor mensal inválido'); return; }
+    const payload = {
+      user_id: user!.id,
+      name: opForm.name.trim(),
+      category: opForm.category,
+      monthly_amount: amount,
+      notes: opForm.notes || null,
+    };
+    if (editingOpId) {
+      const { error } = await supabase.from('operational_costs').update(payload).eq('id', editingOpId);
+      if (error) { toast.error('Erro ao atualizar'); return; }
+      toast.success('Custo atualizado');
+    } else {
+      const { error } = await supabase.from('operational_costs').insert(payload);
+      if (error) { toast.error('Erro ao salvar'); return; }
+      toast.success('Custo adicionado');
+    }
+    setOpForm({ name: '', category: 'rent', monthly_amount: '', notes: '' });
+    setEditingOpId(null);
+    fetchOpCosts();
+  }
+
+  async function deleteOpCost(id: string) {
+    const { error } = await supabase.from('operational_costs').delete().eq('id', id);
+    if (error) { toast.error('Erro ao excluir'); return; }
+    setOpCosts(prev => prev.filter(c => c.id !== id));
+    toast.success('Removido');
+  }
+
+  async function toggleOpCost(cost: OperationalCost) {
+    await supabase.from('operational_costs').update({ active: !cost.active }).eq('id', cost.id);
+    fetchOpCosts();
+  }
 
   async function fetchEmployees() {
     const { data } = await supabase.from('employees').select('*').order('name');
