@@ -158,18 +158,24 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const [salespersonId, setSalespersonId] = useState<string>('');
 
   const fetchData = async () => {
-    const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes] = await Promise.all([
+    const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes, opCostsRes] = await Promise.all([
       supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
       supabase.from('company_settings').select('*').limit(1).maybeSingle(),
       supabase.from('employees').select('id, name').eq('status', 'active').order('name'),
       supabase.from('material_catalog' as any).select('id, name, unit_cost, unit, supplier').order('name'),
+      supabase.from('operational_costs').select('monthly_amount, active'),
     ]);
     if (budgetsRes.data) setBudgets(budgetsRes.data as any);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
     if (settingsRes.data) setCompanySettings(settingsRes.data);
     if (employeesRes.data) setEmployees(employeesRes.data as Employee[]);
     if (materialsRes.data) setMaterialCatalog(materialsRes.data as unknown as MaterialCatalogItem[]);
+    if (opCostsRes.data && settingsRes.data) {
+      const total = (opCostsRes.data as any[]).filter(c => c.active).reduce((s, c) => s + Number(c.monthly_amount || 0), 0);
+      const avg = Math.max(1, Number((settingsRes.data as any).avg_projects_per_month) || 4);
+      setOverheadPerProject(total / avg);
+    }
     setLoading(false);
   };
 
