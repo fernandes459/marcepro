@@ -128,6 +128,7 @@ export default function BudgetsPage() {
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const [pdfSimplified, setPdfSimplified] = useState(false);
   const [expandedBudgetId, setExpandedBudgetId] = useState<string | null>(null);
+  const [overheadPerProject, setOverheadPerProject] = useState(0);
 
 const [selectedClientId, setSelectedClientId] = useState('');
   const [projectName, setProjectName] = useState('');
