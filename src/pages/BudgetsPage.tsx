@@ -317,6 +317,7 @@ const handleCreate = async (e: React.FormEvent) => {
       const budgetItems = items.filter(i => i.name.trim()).map(i => ({
         budget_id: editingBudgetId, name: i.name, quantity: i.quantity,
         material_cost: i.materialCost, labor_cost: i.laborCost, unit_price: i.unitPrice,
+        room_label: i.roomLabel?.trim() || null,
       }));
       if (budgetItems.length > 0) await supabase.from('budget_items').insert(budgetItems as any);
       toast.success('Orçamento atualizado!');
@@ -333,6 +334,7 @@ const handleCreate = async (e: React.FormEvent) => {
       const budgetItems = items.filter(i => i.name.trim()).map(i => ({
         budget_id: (budgetData as any).id, name: i.name, quantity: i.quantity,
         material_cost: i.materialCost, labor_cost: i.laborCost, unit_price: i.unitPrice,
+        room_label: i.roomLabel?.trim() || null,
       }));
       if (budgetItems.length > 0) await supabase.from('budget_items').insert(budgetItems as any);
       toast.success('Orçamento criado com sucesso!');
@@ -342,7 +344,7 @@ const handleCreate = async (e: React.FormEvent) => {
 
 const resetForm = () => {
     setSelectedClientId(''); setProjectName(''); setClientDescription(''); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT); setNotes('');
-    setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
+    setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '' }]);
     setExtraTaxes(0); setExtraFreight(0); setExtraOther(0);
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
     setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
@@ -378,10 +380,11 @@ const openEditBudget = async (budget: Budget) => {
       setItems(budgetItems.map((i: any) => ({
         name: i.name, quantity: i.quantity, unitPrice: i.unit_price,
         materialCost: i.material_cost, laborCost: i.labor_cost,
+        roomLabel: i.room_label || '',
       })));
       setCalcOpen(true); // open the internal calc panel so user sees their items immediately
     } else {
-      setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
+      setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '' }]);
     }
 
     if (meta.useAdvancedPayment) {
