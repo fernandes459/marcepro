@@ -8,6 +8,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Slider } from '@/components/ui/slider';
 import { PricingPanel } from '@/components/budget/PricingPanel';
+import { AISuggestPricing } from '@/components/budget/AISuggestPricing';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -29,7 +30,7 @@ import ModuleConfigurator, { ModuleConfig, ModuleResult } from '@/components/bud
 import ContractDRE from '@/components/finance/ContractDRE';
 import PaymentMilestones from '@/components/finance/PaymentMilestones';
 
-interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; }
+interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; roomLabel?: string; }
 const DEFAULT_PAYMENT_TEXT = '50% de entrada e o restante na entrega da obra';
 interface Client {
   id: string; name: string; phone: string; email: string | null; city: string | null;
@@ -127,6 +128,7 @@ export default function BudgetsPage() {
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const [pdfSimplified, setPdfSimplified] = useState(false);
   const [expandedBudgetId, setExpandedBudgetId] = useState<string | null>(null);
+  const [overheadPerProject, setOverheadPerProject] = useState(0);
 
 const [selectedClientId, setSelectedClientId] = useState('');
   const [projectName, setProjectName] = useState('');
@@ -156,18 +158,24 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const [salespersonId, setSalespersonId] = useState<string>('');
 
   const fetchData = async () => {
-    const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes] = await Promise.all([
+    const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes, opCostsRes] = await Promise.all([
       supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
       supabase.from('company_settings').select('*').limit(1).maybeSingle(),
       supabase.from('employees').select('id, name').eq('status', 'active').order('name'),
       supabase.from('material_catalog' as any).select('id, name, unit_cost, unit, supplier').order('name'),
+      supabase.from('operational_costs').select('monthly_amount, active'),
     ]);
     if (budgetsRes.data) setBudgets(budgetsRes.data as any);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
     if (settingsRes.data) setCompanySettings(settingsRes.data);
     if (employeesRes.data) setEmployees(employeesRes.data as Employee[]);
     if (materialsRes.data) setMaterialCatalog(materialsRes.data as unknown as MaterialCatalogItem[]);
+    if (opCostsRes.data && settingsRes.data) {
+      const total = (opCostsRes.data as any[]).filter(c => c.active).reduce((s, c) => s + Number(c.monthly_amount || 0), 0);
+      const avg = Math.max(1, Number((settingsRes.data as any).avg_projects_per_month) || 4);
+      setOverheadPerProject(total / avg);
+    }
     setLoading(false);
   };
 
@@ -219,7 +227,7 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const complexityMultiplier = COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.multiplier || 1.0;
   const finishMultiplier = FINISH_OPTIONS.find(f => f.value === finishType)?.multiplier || 1.0;
   const baseCost = totalItemsCost + parametricCost + extraTaxes + extraFreight + extraOther;
-  const totalCost = baseCost * complexityMultiplier * finishMultiplier;
+  const totalCost = baseCost * complexityMultiplier * finishMultiplier + overheadPerProject;
   const profit = totalCost * (margin / 100);
   const priceBeforeDiscount = totalCost + profit;
   const minMargin = Number(companySettings?.min_margin ?? 20);
@@ -248,7 +256,7 @@ const [selectedClientId, setSelectedClientId] = useState('');
     return parts.join(' + ') || 'A combinar';
   };
 
-  const addItem = () => setItems([...items, { name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
+  const addItem = () => setItems([...items, { name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '' }]);
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
   const resolveCatalogMaterial = (value: string) => materialCatalog.find((material) => material.name.trim().toLowerCase() === value.trim().toLowerCase());
   const applyCatalogMaterial = (idx: number, materialName: string) => {
@@ -309,6 +317,7 @@ const handleCreate = async (e: React.FormEvent) => {
       const budgetItems = items.filter(i => i.name.trim()).map(i => ({
         budget_id: editingBudgetId, name: i.name, quantity: i.quantity,
         material_cost: i.materialCost, labor_cost: i.laborCost, unit_price: i.unitPrice,
+        room_label: i.roomLabel?.trim() || null,
       }));
       if (budgetItems.length > 0) await supabase.from('budget_items').insert(budgetItems as any);
       toast.success('Orçamento atualizado!');
@@ -325,6 +334,7 @@ const handleCreate = async (e: React.FormEvent) => {
       const budgetItems = items.filter(i => i.name.trim()).map(i => ({
         budget_id: (budgetData as any).id, name: i.name, quantity: i.quantity,
         material_cost: i.materialCost, labor_cost: i.laborCost, unit_price: i.unitPrice,
+        room_label: i.roomLabel?.trim() || null,
       }));
       if (budgetItems.length > 0) await supabase.from('budget_items').insert(budgetItems as any);
       toast.success('Orçamento criado com sucesso!');
@@ -334,7 +344,7 @@ const handleCreate = async (e: React.FormEvent) => {
 
 const resetForm = () => {
     setSelectedClientId(''); setProjectName(''); setClientDescription(''); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT); setNotes('');
-    setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
+    setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '' }]);
     setExtraTaxes(0); setExtraFreight(0); setExtraOther(0);
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
     setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
@@ -370,10 +380,11 @@ const openEditBudget = async (budget: Budget) => {
       setItems(budgetItems.map((i: any) => ({
         name: i.name, quantity: i.quantity, unitPrice: i.unit_price,
         materialCost: i.material_cost, laborCost: i.labor_cost,
+        roomLabel: i.room_label || '',
       })));
       setCalcOpen(true); // open the internal calc panel so user sees their items immediately
     } else {
-      setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
+      setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '' }]);
     }
 
     if (meta.useAdvancedPayment) {
@@ -807,25 +818,34 @@ const openEditBudget = async (budget: Budget) => {
                         const matchedMaterial = resolveCatalogMaterial(item.name);
                         return (
                           <div key={idx} className="rounded-lg bg-background p-3 space-y-2 border">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 space-y-1">
-                                <Input list={`budget-material-suggestions-${idx}`} placeholder="Nome do material/serviço" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} onBlur={(e) => applyCatalogMaterial(idx, e.target.value)} className="flex-1 text-sm" />
-                                <datalist id={`budget-material-suggestions-${idx}`}>
-                                  {materialSuggestions.map((suggestion) => (
-                                    <option key={`${idx}-${suggestion.key}`} value={suggestion.value} label={suggestion.label} />
-                                  ))}
-                                </datalist>
-                                {matchedMaterial ? (
-                                  <p className="text-[10px] text-muted-foreground">
-                                    Custo sugerido: <span className="font-medium text-foreground">{formatBRL(Number(matchedMaterial.unit_cost))}</span>
-                                    {matchedMaterial.unit ? ` / ${matchedMaterial.unit}` : ''}
-                                    {matchedMaterial.supplier ? ` · ${matchedMaterial.supplier}` : ''}
-                                  </p>
-                                ) : materialCatalog.length > 0 ? (
-                                  <p className="text-[10px] text-muted-foreground">Digite para auto completar e preencher o custo automaticamente.</p>
-                                ) : (
-                                  <p className="text-[10px] text-muted-foreground">Cadastre materiais em Configurações para agilizar os orçamentos.</p>
-                                )}
+                            <div className="flex items-start gap-2">
+                              <div className="flex-1 grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-2">
+                                <div className="space-y-1">
+                                  <Input list={`budget-material-suggestions-${idx}`} placeholder="Nome do material/serviço" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} onBlur={(e) => applyCatalogMaterial(idx, e.target.value)} className="text-sm" />
+                                  <datalist id={`budget-material-suggestions-${idx}`}>
+                                    {materialSuggestions.map((suggestion) => (
+                                      <option key={`${idx}-${suggestion.key}`} value={suggestion.value} label={suggestion.label} />
+                                    ))}
+                                  </datalist>
+                                  {matchedMaterial ? (
+                                    <p className="text-[10px] text-muted-foreground">
+                                      Custo sugerido: <span className="font-medium text-foreground">{formatBRL(Number(matchedMaterial.unit_cost))}</span>
+                                      {matchedMaterial.unit ? ` / ${matchedMaterial.unit}` : ''}
+                                      {matchedMaterial.supplier ? ` · ${matchedMaterial.supplier}` : ''}
+                                    </p>
+                                  ) : materialCatalog.length > 0 ? (
+                                    <p className="text-[10px] text-muted-foreground">Digite para auto completar e preencher o custo automaticamente.</p>
+                                  ) : (
+                                    <p className="text-[10px] text-muted-foreground">Cadastre materiais em Configurações para agilizar os orçamentos.</p>
+                                  )}
+                                </div>
+                                <Input
+                                  list="room-label-suggestions"
+                                  placeholder="Ambiente (ex: Cozinha)"
+                                  value={item.roomLabel || ''}
+                                  onChange={(e) => updateItem(idx, 'roomLabel', e.target.value)}
+                                  className="text-sm"
+                                />
                               </div>
                               <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="text-destructive shrink-0 h-8 w-8 p-0"><Trash2 className="h-3.5 w-3.5" /></Button>
                             </div>
@@ -930,13 +950,41 @@ const openEditBudget = async (budget: Budget) => {
               </div>
 
               {/* PAINEL DE PRECIFICAÇÃO PREMIUM (sticky) */}
-              <div className="sticky bottom-0 z-10 -mx-1 pt-1">
+              <datalist id="room-label-suggestions">
+                {Array.from(new Set(items.map(i => i.roomLabel).filter(Boolean) as string[])).map(r => <option key={r} value={r} />)}
+                <option value="Cozinha" />
+                <option value="Sala" />
+                <option value="Quarto" />
+                <option value="Banheiro" />
+                <option value="Closet" />
+                <option value="Home Office" />
+                <option value="Área de Serviço" />
+              </datalist>
+              <div className="sticky bottom-0 z-10 -mx-1 pt-1 space-y-2">
                 <PricingPanel
                   totalCost={totalCost}
                   finalPrice={finalPrice}
                   margin={margin}
                   minMargin={minMargin}
                 />
+                <div className="flex justify-end">
+                  <AISuggestPricing
+                    totalCost={totalCost}
+                    defaultMargin={Number(companySettings?.default_margin ?? 40)}
+                    minMargin={minMargin}
+                    projectName={projectName}
+                    finishType={finishType}
+                    complexity={complexityFactor}
+                    rooms={Array.from(new Set(items.map(i => i.roomLabel).filter(Boolean) as string[]))}
+                    onApply={(price) => {
+                      // Adjust margin so finalPrice ~= price (com desconto atual)
+                      if (totalCost <= 0) return;
+                      const targetPriceBeforeDiscount = price / (1 - discountPct / 100);
+                      const newMargin = Math.max(0, ((targetPriceBeforeDiscount - totalCost) / totalCost) * 100);
+                      setMargin(Number(newMargin.toFixed(1)));
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Seção 6: Condições de Pagamento */}
