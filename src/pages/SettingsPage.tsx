@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard, Package2, Upload } from 'lucide-react';
+import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard, Package2, Upload, Download, Wallet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -44,6 +44,7 @@ interface CompanySettings {
   min_margin: string;
   default_commission: string;
   monthly_goal: string;
+  avg_projects_per_month: string;
   card_fees: CardFees;
 }
 
@@ -62,6 +63,23 @@ interface MaterialCatalogItem {
   supplier: string | null;
   source: string;
 }
+
+interface OperationalCost {
+  id: string;
+  name: string;
+  category: string;
+  monthly_amount: number;
+  active: boolean;
+  notes: string | null;
+}
+
+const OPERATIONAL_CATEGORIES = [
+  { value: 'rent', label: 'Aluguel' },
+  { value: 'utilities', label: 'Energia / Água' },
+  { value: 'salary', label: 'Funcionários' },
+  { value: 'transport', label: 'Transporte / Frete' },
+  { value: 'other', label: 'Outros' },
+];
 
 function parseSpreadsheetCurrency(value: unknown) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
@@ -118,7 +136,8 @@ export default function SettingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [company, setCompany] = useState<CompanySettings>({
     company_name: '', cnpj: '', phone: '', email: '', address: '', city: '', state: '', cep: '',
-    default_margin: '40', min_margin: '20', default_commission: '0', monthly_goal: '0', card_fees: {},
+    default_margin: '40', min_margin: '20', default_commission: '0', monthly_goal: '0',
+    avg_projects_per_month: '4', card_fees: {},
   });
 
   // Team access
@@ -158,6 +177,7 @@ export default function SettingsPage() {
         min_margin: String((data as any).min_margin ?? 20),
         default_commission: String((data as any).default_commission ?? 0),
         monthly_goal: String((data as any).monthly_goal ?? 0),
+        avg_projects_per_month: String((data as any).avg_projects_per_month ?? 4),
         card_fees: (data as any).card_fees || {},
       });
     }
@@ -266,6 +286,7 @@ export default function SettingsPage() {
       min_margin: parseFloat(company.min_margin) || 0,
       default_commission: parseFloat(company.default_commission) || 0,
       monthly_goal: parseFloat(company.monthly_goal) || 0,
+      avg_projects_per_month: parseInt(company.avg_projects_per_month) || 4,
       card_fees: company.card_fees,
     } as any;
     if (existing) {
