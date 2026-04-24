@@ -286,6 +286,7 @@ export default function SettingsPage() {
       min_margin: parseFloat(company.min_margin) || 0,
       default_commission: parseFloat(company.default_commission) || 0,
       monthly_goal: parseFloat(company.monthly_goal) || 0,
+      avg_projects_per_month: parseInt(company.avg_projects_per_month) || 4,
       card_fees: company.card_fees,
     } as any;
     if (existing) {
