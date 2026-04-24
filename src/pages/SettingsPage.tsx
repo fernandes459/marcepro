@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard, Package2, Upload, Download, Wallet } from 'lucide-react';
+import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard, Package2, Upload, Download, Wallet, Receipt, Calculator } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
