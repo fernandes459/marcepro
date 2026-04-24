@@ -1,6 +1,15 @@
 import { formatBRL } from '@/lib/format';
 
-interface BudgetPdfData {
+export interface BudgetPdfItem {
+  name: string;
+  quantity: number;
+  unit_price: number;
+  room_label?: string | null;
+  material_cost?: number;
+  labor_cost?: number;
+}
+
+export interface BudgetPdfData {
   code: string;
   projectName: string | null;
   finalPrice: number;
@@ -23,13 +32,16 @@ interface BudgetPdfData {
     state: string | null;
     cep: string | null;
   } | null;
-  items: { name: string; quantity: number; unit_price: number }[];
+  items: BudgetPdfItem[];
   companyName?: string;
   companyCnpj?: string;
   companyPhone?: string;
   companyEmail?: string;
   companyAddress?: string;
   contractClauses: string[];
+  /** 'client' = limpo estilo Apple (sem custos);  'internal' = completo c/ custos. */
+  mode?: 'client' | 'internal';
+  /** legacy: mantém compat */
   simplified?: boolean;
 }
 
@@ -44,206 +56,300 @@ function addBusinessDays(startDate: Date, numDays: number): Date {
   return result;
 }
 
-function buildHeader(data: BudgetPdfData): string {
-  return `
-  <div class="header">
-    <div>
-      <div class="company-name">${data.companyName || 'Marcenaria Pro'}</div>
-      ${data.companyCnpj ? `<div style="font-size:12px;color:#6b7280">CNPJ: ${data.companyCnpj}</div>` : ''}
-      ${data.companyPhone ? `<div style="font-size:12px;color:#6b7280">Tel: ${data.companyPhone}</div>` : ''}
-      ${data.companyEmail ? `<div style="font-size:12px;color:#6b7280">${data.companyEmail}</div>` : ''}
-      ${data.companyAddress ? `<div style="font-size:12px;color:#6b7280">${data.companyAddress}</div>` : ''}
-    </div>
-    <div>
-      <div class="doc-title">ORÇAMENTO</div>
-      <div class="doc-code">${data.code} • ${new Date(data.createdAt).toLocaleDateString('pt-BR')}</div>
-    </div>
-  </div>`;
-}
-
-function buildClientSection(data: BudgetPdfData, simplified: boolean): string {
-  if (!data.client) return '';
-  if (simplified) {
-    return `
-    <div class="section">
-      <div class="section-title">Cliente</div>
-      <div class="info-grid">
-        <div class="info-item"><span class="info-label">Nome: </span>${data.client.name}</div>
-        <div class="info-item"><span class="info-label">Telefone: </span>${data.client.phone}</div>
-      </div>
-    </div>`;
+function groupByRoom(items: BudgetPdfItem[]) {
+  const map = new Map<string, BudgetPdfItem[]>();
+  for (const it of items) {
+    const key = (it.room_label || 'Geral').trim() || 'Geral';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(it);
   }
-  const clientAddress = [
-    data.client.address,
-    data.client.address_number ? `Nº ${data.client.address_number}` : '',
-    data.client.complement,
-    data.client.neighborhood,
-    data.client.city && data.client.state ? `${data.client.city}/${data.client.state}` : data.client.city,
-    data.client.cep ? `CEP: ${data.client.cep}` : '',
-  ].filter(Boolean).join(', ');
-
-  return `
-  <div class="section">
-    <div class="section-title">Dados do Cliente</div>
-    <div class="info-grid">
-      <div class="info-item"><span class="info-label">Nome: </span>${data.client.name}</div>
-      <div class="info-item"><span class="info-label">Telefone: </span>${data.client.phone}</div>
-      ${data.client.email ? `<div class="info-item"><span class="info-label">Email: </span>${data.client.email}</div>` : ''}
-      ${data.client.cpf_cnpj ? `<div class="info-item"><span class="info-label">CPF/CNPJ: </span>${data.client.cpf_cnpj}</div>` : ''}
-    </div>
-    ${clientAddress ? `<div class="info-item" style="margin-top:6px"><span class="info-label">Endereço: </span>${clientAddress}</div>` : ''}
-  </div>`;
+  return Array.from(map.entries());
 }
 
-function buildProjectSection(data: BudgetPdfData): string {
-  const startDate = new Date(data.createdAt);
-  const deliveryDate = addBusinessDays(startDate, data.deliveryDays);
-  const deliveryDateFormatted = deliveryDate.toLocaleDateString('pt-BR');
+/* ===========================================================
+   MODO CLIENTE — Estilo Apple, minimalista, muito espaço em branco.
+   Mostra apenas: ambientes + valor por ambiente + total + condições.
+   =========================================================== */
+function renderClientPdf(data: BudgetPdfData): string {
+  const grouped = groupByRoom(data.items);
+  const deliveryDate = addBusinessDays(new Date(data.createdAt), data.deliveryDays);
 
-  return `
-  <div class="section">
-    <div class="section-title">Projeto</div>
-    <div class="info-grid">
-      ${data.projectName ? `<div class="info-item"><span class="info-label">Nome: </span>${data.projectName}</div>` : ''}
-      <div class="info-item"><span class="info-label">Prazo de Entrega: </span>${data.deliveryDays} dias úteis</div>
-      <div class="info-item"><span class="info-label">Data Prevista: </span>${deliveryDateFormatted}</div>
-    </div>
-  </div>`;
-}
+  const roomsHtml = grouped
+    .map(([room, list]) => {
+      const subtotal = list.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+      const namesPreview = list.slice(0, 4).map((i) => i.name).join(' · ');
+      const more = list.length > 4 ? ` +${list.length - 4}` : '';
+      return `
+        <div class="room">
+          <div class="room-head">
+            <div class="room-name">${room}</div>
+            <div class="room-value">${formatBRL(subtotal)}</div>
+          </div>
+          ${namesPreview ? `<div class="room-sub">${namesPreview}${more}</div>` : ''}
+        </div>`;
+    })
+    .join('');
 
-function buildTotalBox(data: BudgetPdfData): string {
-  return `
-  <div class="total-box">
-    <div class="total-label">VALOR TOTAL</div>
-    <div class="total-value">${formatBRL(data.finalPrice)}</div>
-  </div>`;
-}
+  const addressLine = data.client
+    ? [data.client.city, data.client.state].filter(Boolean).join(' / ')
+    : '';
 
-function buildPaymentSection(data: BudgetPdfData): string {
-  if (!data.paymentMethod) return '';
-  return `
-  <div class="section">
-    <div class="section-title">Condições de Pagamento</div>
-    <p style="font-size:14px;line-height:1.6">${data.paymentMethod}</p>
-  </div>`;
-}
-
-function buildItemsTable(data: BudgetPdfData): string {
-  if (data.items.length === 0) return '';
-  const itemsHtml = data.items.map((item, i) => `
-    <tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:13px">${i + 1}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px">${item.name}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:13px">${item.quantity}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:13px">${formatBRL(item.unit_price)}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:13px;font-weight:600">${formatBRL(item.unit_price * item.quantity)}</td>
-    </tr>
-  `).join('');
-
-  return `
-  <div class="section">
-    <div class="section-title">Itens do Orçamento</div>
-    <table>
-      <thead>
-        <tr>
-          <th style="text-align:center;border-radius:6px 0 0 0">#</th>
-          <th style="text-align:left">Descrição</th>
-          <th style="text-align:center">Qtd</th>
-          <th style="text-align:right">Unit.</th>
-          <th style="text-align:right;border-radius:0 6px 0 0">Total</th>
-        </tr>
-      </thead>
-      <tbody>${itemsHtml}</tbody>
-    </table>
-  </div>`;
-}
-
-function buildContractSection(data: BudgetPdfData): string {
-  if (data.contractClauses.length === 0) return '';
-  const clausesHtml = data.contractClauses.map((clause, i) => `
-    <p style="margin:6px 0;font-size:12px;line-height:1.5;color:#374151">
-      <strong>${i + 1}.</strong> ${clause}
-    </p>
-  `).join('');
-
-  return `
-  <div class="contract-section">
-    <div class="contract-title">TERMOS E CONDIÇÕES CONTRATUAIS</div>
-    ${clausesHtml}
-  </div>`;
-}
-
-function buildSignatureArea(data: BudgetPdfData): string {
-  return `
-  <div class="signature-area">
-    <div><div class="signature-line">${data.companyName || 'Marcenaria Pro'}<br>Contratada</div></div>
-    <div><div class="signature-line">${data.client?.name || 'Cliente'}<br>Contratante</div></div>
-  </div>`;
-}
-
-const pdfStyles = `
-  @page { size: A4; margin: 15mm; }
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Orçamento ${data.code}</title>
+<style>
+  @page { size: A4; margin: 22mm 18mm; }
   * { box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1f2e; margin: 0; padding: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #e07a3a; padding-bottom: 16px; margin-bottom: 24px; }
-  .company-name { font-size: 24px; font-weight: 800; color: #e07a3a; }
-  .doc-title { font-size: 20px; font-weight: 700; color: #1a1f2e; text-align: right; }
-  .doc-code { font-size: 14px; color: #6b7280; text-align: right; }
-  .section { margin: 20px 0; }
-  .section-title { font-size: 14px; font-weight: 700; color: #e07a3a; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #fed7aa; padding-bottom: 4px; margin-bottom: 12px; }
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .info-item { font-size: 13px; }
-  .info-label { color: #6b7280; font-weight: 500; }
-  .total-box { background: linear-gradient(135deg, #e07a3a, #d4693a); color: white; padding: 16px 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin: 20px 0; }
-  .total-label { font-size: 16px; font-weight: 600; }
-  .total-value { font-size: 28px; font-weight: 800; }
-  .contract-section { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-top: 24px; }
-  .contract-title { font-size: 16px; font-weight: 700; color: #1a1f2e; margin-bottom: 12px; }
-  .signature-area { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; text-align: center; }
-  .signature-line { border-top: 1px solid #1a1f2e; padding-top: 8px; font-size: 12px; color: #6b7280; }
-  table { width: 100%; border-collapse: collapse; }
-  th { background: #1a1f2e; color: white; padding: 10px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Inter, sans-serif;
+    color: #1d1d1f; margin: 0; padding: 24px;
+    -webkit-font-smoothing: antialiased; letter-spacing: -0.01em;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .page { max-width: 720px; margin: 0 auto; }
+  .brand { font-size: 13px; color: #86868b; letter-spacing: 0.4px; text-transform: uppercase; }
+  .hero { margin: 48px 0 64px; }
+  .hero h1 { font-size: 56px; font-weight: 600; margin: 8px 0 12px; line-height: 1.05; letter-spacing: -0.02em; }
+  .hero p { font-size: 19px; color: #515154; margin: 0; max-width: 560px; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 48px; margin: 56px 0; }
+  .meta-label { font-size: 11px; color: #86868b; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+  .meta-value { font-size: 17px; color: #1d1d1f; font-weight: 500; }
+  .section-title { font-size: 13px; color: #86868b; text-transform: uppercase; letter-spacing: 0.8px; margin: 64px 0 16px; }
+  .room { padding: 22px 0; border-bottom: 1px solid #f2f2f4; }
+  .room:last-child { border-bottom: none; }
+  .room-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .room-name { font-size: 22px; font-weight: 500; }
+  .room-value { font-size: 22px; font-weight: 500; color: #1d1d1f; }
+  .room-sub { font-size: 13px; color: #86868b; margin-top: 6px; line-height: 1.5; }
+  .total-card {
+    margin: 64px 0 40px; padding: 40px 32px; background: #f5f5f7; border-radius: 24px;
+    text-align: center;
+  }
+  .total-card .label { font-size: 13px; color: #86868b; text-transform: uppercase; letter-spacing: 0.8px; }
+  .total-card .value { font-size: 56px; font-weight: 600; margin-top: 6px; letter-spacing: -0.02em; }
+  .pay { font-size: 16px; color: #515154; line-height: 1.6; max-width: 580px; }
+  .footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid #f2f2f4; text-align: center; font-size: 12px; color: #86868b; }
+  .signature-area { margin-top: 80px; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; }
+  .sig { border-top: 1px solid #1d1d1f; padding-top: 8px; font-size: 12px; color: #86868b; text-align: center; }
+  @media print {
+    body { padding: 0; }
+    .no-print { display: none !important; }
+  }
+  .no-print {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1d1d1f; color: #fff; padding: 14px 28px; border-radius: 980px;
+    border: none; font-size: 15px; font-weight: 500; cursor: pointer;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18); z-index: 9999;
+  }
+</style></head><body>
+<div class="page">
+  <div class="brand">${data.companyName || 'Marcenaria'}</div>
+
+  <div class="hero">
+    <h1>${data.projectName || 'Seu projeto'}</h1>
+    <p>Proposta exclusiva preparada para ${data.client?.name || 'você'}.</p>
+  </div>
+
+  <div class="meta-grid">
+    <div>
+      <div class="meta-label">Cliente</div>
+      <div class="meta-value">${data.client?.name || '—'}</div>
+    </div>
+    <div>
+      <div class="meta-label">Cidade</div>
+      <div class="meta-value">${addressLine || '—'}</div>
+    </div>
+    <div>
+      <div class="meta-label">Proposta</div>
+      <div class="meta-value">${data.code}</div>
+    </div>
+    <div>
+      <div class="meta-label">Entrega prevista</div>
+      <div class="meta-value">${deliveryDate.toLocaleDateString('pt-BR')} <span style="color:#86868b;font-weight:400">(${data.deliveryDays} dias úteis)</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">O que está incluso</div>
+  ${roomsHtml || '<div class="room"><div class="room-head"><div class="room-name">Projeto</div><div class="room-value">' + formatBRL(data.finalPrice) + '</div></div></div>'}
+
+  <div class="total-card">
+    <div class="label">Investimento total</div>
+    <div class="value">${formatBRL(data.finalPrice)}</div>
+  </div>
+
+  ${data.paymentMethod ? `
+    <div class="section-title">Condições de pagamento</div>
+    <div class="pay">${data.paymentMethod}</div>
+  ` : ''}
+
+  <div class="signature-area">
+    <div class="sig">${data.companyName || 'Contratada'}</div>
+    <div class="sig">${data.client?.name || 'Cliente'}</div>
+  </div>
+
+  <div class="footer">
+    ${data.companyName || 'Marcenaria'}${data.companyPhone ? ` · ${data.companyPhone}` : ''}${data.companyEmail ? ` · ${data.companyEmail}` : ''}<br/>
+    Documento gerado em ${new Date().toLocaleDateString('pt-BR')}.
+  </div>
+</div>
+<button class="no-print" onclick="window.print()">Imprimir / Salvar PDF</button>
+</body></html>`;
+}
+
+/* ===========================================================
+   MODO INTERNO — Completo, com custos, margem e contrato.
+   Visual também limpo, mas técnico.
+   =========================================================== */
+function renderInternalPdf(data: BudgetPdfData): string {
+  const grouped = groupByRoom(data.items);
+  const deliveryDate = addBusinessDays(new Date(data.createdAt), data.deliveryDays);
+
+  const tablesHtml = grouped
+    .map(([room, list]) => {
+      const rows = list
+        .map(
+          (i, idx) => `
+          <tr>
+            <td>${idx + 1}</td>
+            <td>${i.name}</td>
+            <td class="num">${i.quantity}</td>
+            <td class="num">${formatBRL(i.unit_price)}</td>
+            <td class="num strong">${formatBRL(i.unit_price * i.quantity)}</td>
+          </tr>`,
+        )
+        .join('');
+      const subtotal = list.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+      return `
+        <h3 class="room-title">${room}</h3>
+        <table>
+          <thead><tr><th>#</th><th>Descrição</th><th class="num">Qtd</th><th class="num">Unitário</th><th class="num">Total</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><td colspan="4" class="num">Subtotal ${room}</td><td class="num strong">${formatBRL(subtotal)}</td></tr></tfoot>
+        </table>`;
+    })
+    .join('');
+
+  const profit = data.finalPrice - data.totalCost;
+
+  const clausesHtml = data.contractClauses
+    .map((c, i) => `<li><strong>${i + 1}.</strong> ${c}</li>`)
+    .join('');
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Orçamento Interno ${data.code}</title>
+<style>
+  @page { size: A4; margin: 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Inter, sans-serif;
+    color: #1d1d1f; margin: 0; padding: 16px; font-size: 12px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  h1, h2, h3 { letter-spacing: -0.01em; }
+  .header { display: flex; justify-content: space-between; align-items: flex-end;
+    border-bottom: 1px solid #d2d2d7; padding-bottom: 12px; margin-bottom: 20px; }
+  .brand { font-size: 18px; font-weight: 600; }
+  .doc { text-align: right; font-size: 11px; color: #6e6e73; }
+  .doc strong { font-size: 14px; color: #1d1d1f; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0 24px; }
+  .card { border: 1px solid #d2d2d7; border-radius: 12px; padding: 12px 16px; }
+  .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: #86868b; }
+  .value { font-size: 14px; font-weight: 500; margin-top: 2px; }
+  .room-title { margin: 24px 0 8px; font-size: 14px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { text-align: left; background: #f5f5f7; padding: 8px 10px; font-weight: 600; color: #515154; }
+  td { padding: 7px 10px; border-bottom: 1px solid #f2f2f4; }
+  td.num, th.num { text-align: right; }
+  .strong { font-weight: 600; }
+  tfoot td { background: #fafafc; font-weight: 600; }
+  .totals { margin-top: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .totals .card { text-align: center; }
+  .totals .value { font-size: 18px; }
+  .contract { margin-top: 28px; }
+  .contract h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .contract ol, .contract ul { padding-left: 0; list-style: none; }
+  .contract li { margin: 6px 0; line-height: 1.5; color: #3a3a3d; }
+  .signature-area { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
+  .sig { border-top: 1px solid #1d1d1f; padding-top: 6px; font-size: 11px; color: #6e6e73; text-align: center; }
+  .no-print {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: #1d1d1f; color: #fff; padding: 12px 24px; border-radius: 999px;
+    border: none; font-size: 14px; cursor: pointer; z-index: 9999;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  }
   @media print { body { padding: 0; } .no-print { display: none !important; } }
-`;
+</style></head><body>
+<div class="header">
+  <div>
+    <div class="brand">${data.companyName || 'Marcenaria Pro'}</div>
+    ${data.companyCnpj ? `<div style="color:#6e6e73">CNPJ: ${data.companyCnpj}</div>` : ''}
+    ${data.companyPhone ? `<div style="color:#6e6e73">${data.companyPhone}</div>` : ''}
+  </div>
+  <div class="doc">
+    <div>Orçamento (uso interno)</div>
+    <strong>${data.code}</strong>
+    <div>${new Date(data.createdAt).toLocaleDateString('pt-BR')}</div>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <div class="label">Cliente</div>
+    <div class="value">${data.client?.name || '—'}</div>
+    <div style="font-size:11px;color:#6e6e73;margin-top:4px">
+      ${data.client?.phone || ''}${data.client?.email ? ' · ' + data.client.email : ''}
+    </div>
+  </div>
+  <div class="card">
+    <div class="label">Projeto</div>
+    <div class="value">${data.projectName || '—'}</div>
+    <div style="font-size:11px;color:#6e6e73;margin-top:4px">
+      Entrega: ${deliveryDate.toLocaleDateString('pt-BR')} (${data.deliveryDays} dias úteis)
+    </div>
+  </div>
+</div>
+
+${tablesHtml}
+
+<div class="totals">
+  <div class="card"><div class="label">Custo Total</div><div class="value">${formatBRL(data.totalCost)}</div></div>
+  <div class="card"><div class="label">Margem</div><div class="value">${data.profitMargin.toFixed(1)}%</div></div>
+  <div class="card"><div class="label">Lucro</div><div class="value">${formatBRL(profit)}</div></div>
+  <div class="card" style="background:#1d1d1f;color:#fff;border-color:#1d1d1f">
+    <div class="label" style="color:#a1a1a6">Preço Final</div>
+    <div class="value">${formatBRL(data.finalPrice)}</div>
+  </div>
+</div>
+
+${data.paymentMethod ? `
+  <div class="card" style="margin-top:20px">
+    <div class="label">Condições de Pagamento</div>
+    <div style="margin-top:6px;font-size:12px;line-height:1.5">${data.paymentMethod}</div>
+  </div>` : ''}
+
+${data.notes ? `
+  <div class="card" style="margin-top:12px">
+    <div class="label">Observações</div>
+    <div style="margin-top:6px;font-size:11px;line-height:1.5;color:#3a3a3d">${data.notes.replace(/<!--BUDGET_META:.*?-->/s, '').trim()}</div>
+  </div>` : ''}
+
+${data.contractClauses.length ? `
+  <div class="contract">
+    <h2>Termos e Condições Contratuais</h2>
+    <ul>${clausesHtml}</ul>
+  </div>` : ''}
+
+<div class="signature-area">
+  <div class="sig">${data.companyName || 'Contratada'}</div>
+  <div class="sig">${data.client?.name || 'Cliente'}</div>
+</div>
+
+<button class="no-print" onclick="window.print()">Imprimir / Salvar PDF</button>
+</body></html>`;
+}
 
 export function generateBudgetPdf(data: BudgetPdfData): void {
-  const simplified = data.simplified ?? false;
-
-  const bodyContent = [
-    buildHeader(data),
-    buildClientSection(data, simplified),
-    buildProjectSection(data),
-    !simplified ? buildItemsTable(data) : '',
-    buildTotalBox(data),
-    buildPaymentSection(data),
-    !simplified && data.notes ? `
-    <div class="section">
-      <div class="section-title">Observações</div>
-      <p style="font-size:13px;line-height:1.5;color:#374151">${data.notes}</p>
-    </div>` : '',
-    !simplified ? buildContractSection(data) : '',
-    buildSignatureArea(data),
-    `<div class="footer">Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')} • ${data.companyName || 'Marcenaria Pro'} — ERP</div>`,
-    `<div class="no-print" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:9999;">
-      <button onclick="window.print()" style="background:#e07a3a;color:white;border:none;padding:14px 32px;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(224,122,58,0.4);">
-        📄 Imprimir / Salvar PDF
-      </button>
-    </div>`,
-  ].filter(Boolean).join('\n');
-
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Orçamento ${data.code}${simplified ? ' (Simplificado)' : ''}</title>
-  <style>${pdfStyles}</style>
-</head>
-<body>
-  ${bodyContent}
-</body>
-</html>`;
+  const mode: 'client' | 'internal' = data.mode ?? (data.simplified ? 'client' : 'internal');
+  const html = mode === 'client' ? renderClientPdf(data) : renderInternalPdf(data);
 
   const blob = new Blob([html], { type: 'text/html' });
   const blobUrl = URL.createObjectURL(blob);
@@ -253,7 +359,7 @@ export function generateBudgetPdf(data: BudgetPdfData): void {
   } else {
     const link = document.createElement('a');
     link.href = blobUrl;
-    link.download = `Orcamento_${data.code}${simplified ? '_simplificado' : ''}.html`;
+    link.download = `Orcamento_${data.code}_${mode}.html`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
