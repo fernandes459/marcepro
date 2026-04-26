@@ -633,14 +633,21 @@ const openEditBudget = async (budget: Budget) => {
         neighborhood: client.neighborhood, city: client.city,
         state: client.state, cep: client.cep,
       } : null,
-      items: (budgetItems || []).map((i: any) => ({ name: i.name, quantity: i.quantity, unit_price: i.unit_price })),
+      items: (budgetItems || []).map((i: any) => ({
+        name: i.name,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        room_label: i.room_label,
+        material_cost: i.material_cost,
+        labor_cost: i.labor_cost,
+      })),
       companyName: companySettings?.company_name,
       companyCnpj: companySettings?.cnpj,
       companyPhone: companySettings?.phone,
       companyEmail: companySettings?.email,
       companyAddress: companySettings?.address,
       contractClauses: activeClauses,
-      simplified: pdfSimplified,
+      mode: pdfSimplified ? 'client' : 'internal',
     });
     setPdfDialogOpen(false);
   };
