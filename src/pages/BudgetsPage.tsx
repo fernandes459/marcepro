@@ -26,6 +26,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { generateBudgetPdf, defaultContractClauses } from '@/components/finance/BudgetPdfGenerator';
+import { SearchInput } from '@/components/SearchInput';
 import ModuleConfigurator, { ModuleConfig, ModuleResult } from '@/components/budget/ModuleConfigurator';
 import ContractDRE from '@/components/finance/ContractDRE';
 import PaymentMilestones from '@/components/finance/PaymentMilestones';
@@ -116,6 +117,7 @@ export default function BudgetsPage() {
   const [materialCatalog, setMaterialCatalog] = useState<MaterialCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
@@ -214,10 +216,12 @@ const [selectedClientId, setSelectedClientId] = useState('');
   );
 
   const filtered = budgets.filter(b => {
+    if (filterStatus !== 'all' && b.status !== filterStatus) return false;
     const clientName = (b.clients as any)?.name || '';
-    return clientName.toLowerCase().includes(search.toLowerCase()) ||
-      b.code.toLowerCase().includes(search.toLowerCase()) ||
-      (b.project_name || '').toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    return clientName.toLowerCase().includes(q) ||
+      b.code.toLowerCase().includes(q) ||
+      (b.project_name || '').toLowerCase().includes(q);
   });
 
   const totalMaterial = items.reduce((s, i) => s + i.materialCost * i.quantity, 0);
@@ -1102,9 +1106,22 @@ const openEditBudget = async (budget: Budget) => {
         </Dialog>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar orçamentos..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      <div className="flex flex-wrap gap-2 items-center">
+        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por código, projeto ou cliente..." className="flex-1 min-w-[220px] max-w-md" />
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-44 h-10 rounded-full bg-muted/40 border-0">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            {Object.entries(statusConfig).map(([key, cfg]) => (
+              <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {(search || filterStatus !== 'all') && (
+          <span className="text-xs text-muted-foreground">{filtered.length} resultado(s)</span>
+        )}
       </div>
 
       {loading ? (

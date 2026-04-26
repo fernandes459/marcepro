@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { SearchInput } from '@/components/SearchInput';
 
 interface Client {
   id: string;
@@ -258,9 +259,9 @@ export default function ClientsPage() {
         </Dialog>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar clientes..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      <div className="flex flex-wrap gap-2 items-center">
+        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nome, telefone ou cidade..." className="flex-1 min-w-[220px] max-w-md" />
+        {search && <span className="text-xs text-muted-foreground">{filtered.length} resultado(s)</span>}
       </div>
 
       {loading ? (
