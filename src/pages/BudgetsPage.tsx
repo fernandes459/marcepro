@@ -1105,9 +1105,22 @@ const openEditBudget = async (budget: Budget) => {
         </Dialog>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar orçamentos..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      <div className="flex flex-wrap gap-2 items-center">
+        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por código, projeto ou cliente..." className="flex-1 min-w-[220px] max-w-md" />
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-44 h-10 rounded-full bg-muted/40 border-0">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            {Object.entries(statusConfig).map(([key, cfg]) => (
+              <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {(search || filterStatus !== 'all') && (
+          <span className="text-xs text-muted-foreground">{filtered.length} resultado(s)</span>
+        )}
       </div>
 
       {loading ? (
