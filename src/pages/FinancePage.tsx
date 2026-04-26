@@ -840,101 +840,165 @@ export default function FinancePage() {
   }
 
   function renderAVencer() {
-    const upcoming = periodTransactions.filter(t => t.status === 'pending' || t.status === 'overdue').sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
+    const upcoming = periodTransactions
+      .filter(t => t.status === 'pending' || t.status === 'overdue')
+      .sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
+    const totalPendente = upcoming.reduce((s, t) => s + Number(t.amount), 0);
+    const totalReceber = upcoming.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
+    const totalPagar = upcoming.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
+
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-display flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-warning" /> Contas a Pagar / Receber — {formatBRL(upcoming.reduce((s, t) => s + Number(t.amount), 0))}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">Tipo</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">Descrição</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground hidden sm:table-cell">Cliente</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">Vencimento</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Valor</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-muted-foreground">Status</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-muted-foreground">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {upcoming.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhuma conta pendente</td></tr>
-                ) : upcoming.map(tx => {
+      <div className="space-y-4">
+        {/* Resumo */}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Card className="border-l-4 border-l-warning">
+            <CardContent className="p-4">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Total pendente</p>
+              <p className="text-xl font-bold font-display mt-1">{formatBRL(totalPendente)}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-success">
+            <CardContent className="p-4">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">A receber</p>
+              <p className="text-xl font-bold font-display text-success mt-1">{formatBRL(totalReceber)}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-destructive">
+            <CardContent className="p-4">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">A pagar</p>
+              <p className="text-xl font-bold font-display text-destructive mt-1">{formatBRL(totalPagar)}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-display flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-warning" /> Próximos vencimentos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {upcoming.length === 0 ? (
+              <div className="text-center py-16 px-4">
+                <CheckCircle2 className="h-10 w-10 text-success/40 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">Tudo em dia! Nenhuma conta pendente.</p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {upcoming.map(tx => {
                   const isOverdue = tx.status === 'overdue' || (tx.due_date && tx.due_date < today);
+                  const isIncome = tx.type === 'income';
+                  const clientName = tx.client_id ? clients.find(c => c.id === tx.client_id)?.name : null;
+                  const daysToDue = tx.due_date
+                    ? Math.ceil((new Date(tx.due_date + 'T12:00:00').getTime() - new Date(today + 'T12:00:00').getTime()) / 86400000)
+                    : null;
                   return (
-                    <tr key={tx.id} className={`border-b last:border-0 hover:bg-muted/30 ${isOverdue ? 'bg-destructive/5' : ''}`}>
-                      <td className="px-4 py-3">
-                        {tx.type === 'income' ? <Badge variant="outline" className="text-success border-success/30 text-[10px]">Receber</Badge> : <Badge variant="outline" className="text-destructive border-destructive/30 text-[10px]">Pagar</Badge>}
-                      </td>
-                      <td className="px-4 py-3 text-sm">{tx.description}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">{tx.client_id ? clients.find(c => c.id === tx.client_id)?.name : '—'}</td>
-                      <td className={`px-4 py-3 text-sm font-medium ${isOverdue ? 'text-destructive' : ''}`}>{tx.due_date ? new Date(tx.due_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-                      <td className={`px-4 py-3 text-sm text-right font-semibold ${tx.type === 'income' ? 'text-success' : 'text-destructive'}`}>{formatBRL(Number(tx.amount))}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusConfig[tx.status]?.className ?? ''}`}>
-                          {statusConfig[tx.status]?.label ?? tx.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => markPaid(tx.id)}>
-                          {tx.type === 'income' ? 'Receber' : 'Pagar'}
-                        </Button>
-                      </td>
-                    </tr>
+                    <li key={tx.id} className={`flex items-center gap-3 px-4 sm:px-6 py-3.5 hover:bg-accent/40 transition-colors ${isOverdue ? 'bg-destructive/5' : ''}`}>
+                      <div className={`h-11 w-11 rounded-full flex items-center justify-center shrink-0 ${
+                        isOverdue ? 'bg-destructive/10 text-destructive' :
+                        isIncome ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
+                      }`}>
+                        {isOverdue ? <AlertTriangle className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{tx.description}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {clientName ? `${clientName} • ` : ''}
+                          {tx.due_date ? `Vence ${new Date(tx.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}` : 'Sem vencimento'}
+                          {daysToDue !== null && (
+                            <span className={`ml-1 font-semibold ${isOverdue ? 'text-destructive' : daysToDue <= 3 ? 'text-warning' : ''}`}>
+                              {isOverdue ? `(${Math.abs(daysToDue)}d atrasado)` : daysToDue === 0 ? '(hoje)' : `(em ${daysToDue}d)`}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`text-sm font-bold ${isIncome ? 'text-success' : 'text-destructive'}`}>
+                          {isIncome ? '+' : '−'} {formatBRL(Number(tx.amount))}
+                        </p>
+                        <Badge variant="outline" className={`text-[9px] mt-0.5 ${isIncome ? 'text-success border-success/30' : 'text-destructive border-destructive/30'}`}>
+                          {isIncome ? 'Receber' : 'Pagar'}
+                        </Badge>
+                      </div>
+                      <Button
+                        size="sm"
+                        className={`h-8 text-xs rounded-full ml-1 shrink-0 ${
+                          isIncome ? 'bg-success hover:bg-success/90 text-success-foreground' : 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+                        }`}
+                        onClick={() => markPaid(tx.id)}
+                      >
+                        {isIncome ? 'Receber' : 'Pagar'}
+                      </Button>
+                    </li>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   function renderRecebidos() {
-    const paid = transactions.filter(t => t.type === 'income' && t.status === 'paid').sort((a, b) => (b.paid_date || b.date).localeCompare(a.paid_date || a.date));
+    const paid = transactions
+      .filter(t => t.type === 'income' && t.status === 'paid')
+      .sort((a, b) => (b.paid_date || b.date).localeCompare(a.paid_date || a.date));
+    const periodPaid = paid.filter(t => isDateWithinRange(t.paid_date || t.date, period.start, period.end));
+    const periodTotal = periodPaid.reduce((s, t) => s + Number(t.amount), 0);
+
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-display flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-success" /> Valores Recebidos — {formatBRL(paidIncome)}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">Descrição</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground hidden sm:table-cell">Cliente</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">Recebido em</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-muted-foreground hidden md:table-cell">Pagamento</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Valor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paid.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhum recebimento registrado</td></tr>
-                ) : paid.map(tx => (
-                  <tr key={tx.id} className="border-b last:border-0 hover:bg-muted/30">
-                    <td className="px-4 py-3 text-sm">{tx.description}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">{tx.client_id ? clients.find(c => c.id === tx.client_id)?.name : '—'}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{tx.paid_date ? new Date(tx.paid_date + 'T12:00:00').toLocaleDateString('pt-BR') : new Date(tx.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">{tx.payment_method || '—'}</td>
-                    <td className="px-4 py-3 text-sm text-right font-semibold text-success">{formatBRL(Number(tx.amount))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-success/10 via-success/5 to-transparent">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Total recebido no período</p>
+              <p className="text-3xl font-bold font-display text-success mt-1">{formatBRL(periodTotal)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{periodPaid.length} {periodPaid.length === 1 ? 'recebimento' : 'recebimentos'}</p>
+            </div>
+            <div className="h-14 w-14 rounded-2xl bg-success/15 flex items-center justify-center">
+              <CheckCircle2 className="h-7 w-7 text-success" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-display">Histórico de recebimentos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {paid.length === 0 ? (
+              <div className="text-center py-16 px-4">
+                <CheckCircle2 className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">Nenhum recebimento registrado ainda.</p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {paid.map(tx => {
+                  const clientName = tx.client_id ? clients.find(c => c.id === tx.client_id)?.name : null;
+                  const dateStr = tx.paid_date || tx.date;
+                  return (
+                    <li key={tx.id} className="flex items-center gap-3 px-4 sm:px-6 py-3.5 hover:bg-accent/40 transition-colors">
+                      <div className="h-11 w-11 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{tx.description}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {clientName ? `${clientName} • ` : ''}
+                          Recebido em {new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR')}
+                          {tx.payment_method ? ` • ${tx.payment_method}` : ''}
+                        </p>
+                      </div>
+                      <p className="text-sm font-bold text-success shrink-0">+ {formatBRL(Number(tx.amount))}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
