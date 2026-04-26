@@ -116,6 +116,7 @@ export default function BudgetsPage() {
   const [materialCatalog, setMaterialCatalog] = useState<MaterialCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
