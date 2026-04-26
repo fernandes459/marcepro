@@ -215,10 +215,12 @@ const [selectedClientId, setSelectedClientId] = useState('');
   );
 
   const filtered = budgets.filter(b => {
+    if (filterStatus !== 'all' && b.status !== filterStatus) return false;
     const clientName = (b.clients as any)?.name || '';
-    return clientName.toLowerCase().includes(search.toLowerCase()) ||
-      b.code.toLowerCase().includes(search.toLowerCase()) ||
-      (b.project_name || '').toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    return clientName.toLowerCase().includes(q) ||
+      b.code.toLowerCase().includes(q) ||
+      (b.project_name || '').toLowerCase().includes(q);
   });
 
   const totalMaterial = items.reduce((s, i) => s + i.materialCost * i.quantity, 0);
