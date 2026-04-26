@@ -411,85 +411,263 @@ export default function FinancePage() {
   }
 
   function renderHome() {
+    const recentTransactions = [...periodTransactions]
+      .sort((a, b) => (b.paid_date || b.date).localeCompare(a.paid_date || a.date))
+      .slice(0, 8);
+
+    const quickActions: { id: Section | 'new'; label: string; icon: typeof Plus; onClick: () => void }[] = [
+      { id: 'new', label: 'Lançar', icon: Plus, onClick: () => setDialogOpen(true) },
+      { id: 'contas', label: 'Contas', icon: Building2, onClick: () => setActiveSection('contas') },
+      { id: 'vencer', label: 'A Vencer', icon: Clock, onClick: () => setActiveSection('vencer') },
+      { id: 'recebidos', label: 'Recebidos', icon: CheckCircle2, onClick: () => setActiveSection('recebidos') },
+      { id: 'dre', label: 'DRE', icon: BarChart3, onClick: () => setActiveSection('dre') },
+      { id: 'relatorio', label: 'Relatório', icon: FileBarChart, onClick: () => setActiveSection('relatorio') },
+      { id: 'marcos', label: 'Marcos', icon: Milestone, onClick: () => setActiveSection('marcos') },
+      { id: 'lancamentos', label: 'Histórico', icon: Receipt, onClick: () => setActiveSection('lancamentos') },
+    ];
+
     return (
       <>
-        {/* KPI Summary */}
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-            {[
-              { title: 'Faturamento', value: formatBRL(totalIncome), icon: TrendingUp, positive: true },
-              { title: 'Custos', value: formatBRL(totalExpense), icon: TrendingDown, positive: false },
-              { title: 'Lucro Líquido', value: formatBRL(profit), icon: DollarSign, positive: profit >= 0 },
-              { title: 'A Receber', value: formatBRL(pendingReceivable), icon: Wallet, positive: pendingReceivable >= 0 },
-            ].map((kpi) => (
-            <motion.div key={kpi.title} variants={itemVariants}>
-              <Card className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1 min-w-0">
-                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{kpi.title}</p>
-                      <p className={`text-lg font-bold font-display ${kpi.positive ? 'text-success' : 'text-destructive'}`}>{kpi.value}</p>
-                    </div>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent shrink-0">
-                      <kpi.icon className="h-4 w-4 text-accent-foreground" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+        {/* HERO — Saldo total estilo banking app */}
+        <motion.div variants={itemVariants}>
+          <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-[hsl(215,28%,17%)] via-[hsl(215,25%,22%)] to-[hsl(215,30%,15%)] text-white">
+            <CardContent className="p-6 sm:p-8 space-y-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/60 font-medium">Saldo total disponível</p>
+                  <p className="text-3xl sm:text-4xl font-bold font-display tracking-tight">{formatBRL(totalBankBalance)}</p>
+                  <p className="text-xs text-white/50">{bankAccounts.length} {bankAccounts.length === 1 ? 'conta ativa' : 'contas ativas'}</p>
+                </div>
+                <button
+                  onClick={() => setActiveSection('contas')}
+                  className="rounded-full bg-white/10 hover:bg-white/20 transition-colors p-2.5"
+                  title="Ver contas"
+                >
+                  <Wallet className="h-4 w-4" />
+                </button>
+              </div>
 
-        {/* Mini Cards Navigation */}
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-          {miniCards.map((card) => (
-            <motion.div key={card.id} variants={itemVariants}>
-              <Card
-                className="cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 border-2 border-transparent hover:border-primary/30 group"
-                onClick={() => setActiveSection(card.id)}
+              {/* Resumo do período */}
+              <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/10">
+                <div>
+                  <div className="flex items-center gap-1 text-white/60 text-[10px] uppercase tracking-wider font-medium">
+                    <ArrowUpRight className="h-3 w-3" /> Entradas
+                  </div>
+                  <p className="text-base sm:text-lg font-bold mt-1 text-emerald-300">{formatBRL(totalIncome)}</p>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1 text-white/60 text-[10px] uppercase tracking-wider font-medium">
+                    <ArrowDownRight className="h-3 w-3" /> Saídas
+                  </div>
+                  <p className="text-base sm:text-lg font-bold mt-1 text-rose-300">{formatBRL(totalExpense)}</p>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1 text-white/60 text-[10px] uppercase tracking-wider font-medium">
+                    <DollarSign className="h-3 w-3" /> Resultado
+                  </div>
+                  <p className={`text-base sm:text-lg font-bold mt-1 ${profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatBRL(profit)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Quick Actions — pills horizontais */}
+        <motion.div variants={itemVariants}>
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+            {quickActions.map((action) => (
+              <button
+                key={action.id}
+                onClick={action.onClick}
+                className="flex flex-col items-center gap-2 min-w-[72px] group"
               >
-                <CardContent className="p-4 text-center space-y-2">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-accent group-hover:bg-primary/10 transition-colors">
-                    <card.icon className={`h-6 w-6 ${card.color}`} />
+                <div className={`h-14 w-14 rounded-2xl flex items-center justify-center transition-all group-hover:scale-105 group-active:scale-95 ${
+                  action.id === 'new'
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                    : 'bg-card border border-border text-foreground group-hover:border-primary/30 group-hover:bg-accent'
+                }`}>
+                  <action.icon className="h-5 w-5" />
+                </div>
+                <span className="text-[11px] font-medium text-muted-foreground text-center leading-tight">{action.label}</span>
+              </button>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Contas — cards horizontais */}
+        {bankAccounts.length > 0 && (
+          <motion.div variants={itemVariants} className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Minhas contas</h3>
+              <button onClick={() => setActiveSection('contas')} className="text-xs font-medium text-primary hover:underline">
+                Ver todas
+              </button>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide snap-x">
+              {bankAccounts.slice(0, 6).map(acc => (
+                <Card
+                  key={acc.id}
+                  onClick={() => setActiveSection('contas')}
+                  className="min-w-[220px] sm:min-w-[240px] snap-start cursor-pointer overflow-hidden border-0 shadow-sm hover:shadow-md transition-all relative"
+                  style={{ background: `linear-gradient(135deg, ${acc.color} 0%, ${acc.color}cc 100%)` }}
+                >
+                  <CardContent className="p-4 text-white relative z-10 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="rounded-lg bg-white/15 p-2">
+                        <Building2 className="h-4 w-4" />
+                      </div>
+                      {acc.is_main && (
+                        <span className="text-[9px] uppercase tracking-wider bg-white/20 rounded-full px-2 py-0.5 font-semibold">Principal</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/80 font-medium truncate">{acc.name}</p>
+                      <p className="text-[10px] text-white/60 truncate">{acc.bank_name || acc.account_type}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-white/60 uppercase tracking-wider">Saldo</p>
+                      <p className="text-lg font-bold font-display">{formatBRL(acc.current_balance)}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              <button
+                onClick={() => { setActiveSection('contas'); setBankDialogOpen(true); }}
+                className="min-w-[120px] snap-start rounded-lg border-2 border-dashed border-border hover:border-primary/40 hover:bg-accent/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary"
+              >
+                <Plus className="h-5 w-5" />
+                <span className="text-xs font-medium">Nova conta</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Atividade recente + Fluxo de caixa */}
+        <div className="grid gap-4 lg:grid-cols-5">
+          <motion.div variants={itemVariants} className="lg:col-span-3">
+            <Card className="h-full">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base font-display">Atividade recente</CardTitle>
+                <button onClick={() => setActiveSection('lancamentos')} className="text-xs font-medium text-primary hover:underline">
+                  Ver tudo
+                </button>
+              </CardHeader>
+              <CardContent className="p-0">
+                {recentTransactions.length === 0 ? (
+                  <div className="text-center py-12 px-4">
+                    <Receipt className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground">Nenhum lançamento neste período.</p>
+                    <Button size="sm" variant="outline" className="mt-4" onClick={() => setDialogOpen(true)}>
+                      <Plus className="h-3.5 w-3.5 mr-1.5" /> Criar primeiro lançamento
+                    </Button>
                   </div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{card.title}</p>
-                  <p className={`text-base font-bold font-display ${card.color}`}>{card.value}</p>
-                  <p className="text-[10px] text-muted-foreground">{card.sub}</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {recentTransactions.map((tx) => {
+                      const clientName = tx.client_id ? clients.find(c => c.id === tx.client_id)?.name : null;
+                      const isIncome = tx.type === 'income';
+                      return (
+                        <li
+                          key={tx.id}
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-accent/40 cursor-pointer transition-colors"
+                          onClick={() => openEditTransaction(tx)}
+                        >
+                          <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${
+                            isIncome ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+                          }`}>
+                            {isIncome ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{tx.description}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {clientName ? `${clientName} • ` : ''}
+                              {new Date(tx.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className={`text-sm font-bold ${isIncome ? 'text-success' : 'text-destructive'}`}>
+                              {isIncome ? '+' : '−'} {formatBRL(Number(tx.amount))}
+                            </p>
+                            <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-semibold mt-0.5 ${statusConfig[tx.status]?.className ?? ''}`}>
+                              {statusConfig[tx.status]?.label ?? tx.status}
+                            </span>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={itemVariants} className="lg:col-span-2">
+            <Card className="h-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-display">Fluxo de caixa</CardTitle>
+                <p className="text-xs text-muted-foreground">Últimos meses do período</p>
+              </CardHeader>
+              <CardContent>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorEntrada" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(152, 60%, 42%)" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="hsl(152, 60%, 42%)" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="colorSaida" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(0, 72%, 51%)" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="hsl(0, 72%, 51%)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 16%, 90%)" vertical={false} />
+                      <XAxis dataKey="month" axisLine={false} tickLine={false} fontSize={11} />
+                      <YAxis axisLine={false} tickLine={false} fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(value: number) => formatBRL(value)} contentStyle={{ borderRadius: '0.75rem', border: '1px solid hsl(220, 16%, 90%)', fontSize: '12px' }} />
+                      <Area type="monotone" dataKey="entrada" stroke="hsl(152, 60%, 42%)" fill="url(#colorEntrada)" strokeWidth={2} name="Receita" />
+                      <Area type="monotone" dataKey="saida" stroke="hsl(0, 72%, 51%)" fill="url(#colorSaida)" strokeWidth={2} name="Despesa" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-12">Sem dados para o período.</p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
 
-        {/* Chart */}
-        <Card>
-          <CardHeader><CardTitle className="text-base font-display">Fluxo de Caixa</CardTitle></CardHeader>
-          <CardContent>
-            {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorEntrada" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(152, 60%, 42%)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(152, 60%, 42%)" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorSaida" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(0, 72%, 51%)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(0, 72%, 51%)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 16%, 90%)" vertical={false} />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} fontSize={12} />
-                  <YAxis axisLine={false} tickLine={false} fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(value: number) => formatBRL(value)} contentStyle={{ borderRadius: '0.75rem', border: '1px solid hsl(220, 16%, 90%)' }} />
-                  <Area type="monotone" dataKey="entrada" stroke="hsl(152, 60%, 42%)" fill="url(#colorEntrada)" strokeWidth={2} name="Receita" />
-                  <Area type="monotone" dataKey="saida" stroke="hsl(0, 72%, 51%)" fill="url(#colorSaida)" strokeWidth={2} name="Despesa" />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-12">Nenhum lançamento registrado ainda. Crie um lançamento para ver o gráfico.</p>
-            )}
-          </CardContent>
-        </Card>
+        {/* Resumo rápido — A Receber / A Pagar */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <motion.div variants={itemVariants}>
+            <Card
+              className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-success"
+              onClick={() => setActiveSection('vencer')}
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">A receber no período</p>
+                  <p className="text-xl font-bold font-display text-success mt-1">{formatBRL(pendingReceivable)}</p>
+                </div>
+                <ArrowUpRight className="h-5 w-5 text-success/60" />
+              </CardContent>
+            </Card>
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <Card
+              className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-destructive"
+              onClick={() => setActiveSection('vencer')}
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">A pagar no período</p>
+                  <p className="text-xl font-bold font-display text-destructive mt-1">{formatBRL(pendingPayable)}</p>
+                </div>
+                <ArrowDownRight className="h-5 w-5 text-destructive/60" />
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
       </>
     );
   }
