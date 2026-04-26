@@ -674,16 +674,19 @@ export default function FinancePage() {
 
   function renderLancamentos() {
     return (
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          <CardTitle className="text-base font-display">Todos os Lançamentos</CardTitle>
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between pb-4">
+          <div>
+            <CardTitle className="text-base font-display">Todos os Lançamentos</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">{filtered.length} {filtered.length === 1 ? 'registro' : 'registros'}</p>
+          </div>
           <div className="flex flex-wrap gap-2">
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-8 w-40" placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-9 w-44 h-9 rounded-full bg-muted/40 border-0 focus-visible:ring-1" placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-32 h-9 rounded-full bg-muted/40 border-0"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="income">Receitas</SelectItem>
@@ -691,74 +694,68 @@ export default function FinancePage() {
               </SelectContent>
             </Select>
             <Select value={filterClient} onValueChange={setFilterClient}>
-              <SelectTrigger className="w-36"><SelectValue placeholder="Cliente" /></SelectTrigger>
+              <SelectTrigger className="w-40 h-9 rounded-full bg-muted/40 border-0"><SelectValue placeholder="Cliente" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos Clientes</SelectItem>
+                <SelectItem value="all">Todos clientes</SelectItem>
                 {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Descrição</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Cliente</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Categoria</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Data</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Valor</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhum lançamento encontrado</td></tr>
-                ) : filtered.map((tx) => {
-                  const clientName = tx.client_id ? clients.find(c => c.id === tx.client_id)?.name : null;
-                  return (
-                    <tr key={tx.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          {tx.type === 'income' ? <ArrowUpRight className="h-4 w-4 text-success shrink-0" /> : <ArrowDownRight className="h-4 w-4 text-destructive shrink-0" />}
-                          <div>
-                            <span className="text-sm">{tx.description}</span>
-                            {tx.order_number && <span className="ml-1.5 text-[10px] bg-accent text-accent-foreground rounded px-1.5 py-0.5">OS: {tx.order_number}</span>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground hidden sm:table-cell">{clientName || '—'}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground hidden md:table-cell">{getCategoryLabel(mergedCategories, tx.category)}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(tx.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
-                      <td className={`px-4 py-3 text-sm text-right font-semibold ${tx.type === 'income' ? 'text-success' : 'text-destructive'}`}>
-                        {tx.type === 'income' ? '+' : '-'} {formatBRL(Number(tx.amount))}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusConfig[tx.status]?.className ?? ''}`}>
-                          {statusConfig[tx.status]?.label ?? tx.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {(tx.status === 'pending' || tx.status === 'overdue') && (
-                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => markPaid(tx.id)}>Pagar</Button>
-                          )}
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditTransaction(tx)} title="Editar">
-                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteTransaction(tx.id)} title="Excluir">
-                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {filtered.length === 0 ? (
+            <div className="text-center py-16 px-4">
+              <Receipt className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">Nenhum lançamento encontrado.</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {filtered.map((tx) => {
+                const clientName = tx.client_id ? clients.find(c => c.id === tx.client_id)?.name : null;
+                const isIncome = tx.type === 'income';
+                return (
+                  <li key={tx.id} className="group flex items-center gap-3 px-4 sm:px-6 py-3.5 hover:bg-accent/40 transition-colors">
+                    <div className={`h-11 w-11 rounded-full flex items-center justify-center shrink-0 ${
+                      isIncome ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+                    }`}>
+                      {isIncome ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{tx.description}</p>
+                        {tx.order_number && <span className="text-[9px] bg-accent text-accent-foreground rounded-full px-1.5 py-0.5 font-semibold shrink-0">OS {tx.order_number}</span>}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {clientName ? `${clientName} • ` : ''}
+                        {getCategoryLabel(mergedCategories, tx.category)} • {new Date(tx.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-sm font-bold ${isIncome ? 'text-success' : 'text-destructive'}`}>
+                        {isIncome ? '+' : '−'} {formatBRL(Number(tx.amount))}
+                      </p>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold mt-0.5 ${statusConfig[tx.status]?.className ?? ''}`}>
+                        {statusConfig[tx.status]?.label ?? tx.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {(tx.status === 'pending' || tx.status === 'overdue') && (
+                        <Button size="sm" variant="ghost" className="h-8 text-xs rounded-full" onClick={() => markPaid(tx.id)}>
+                          {isIncome ? 'Receber' : 'Pagar'}
+                        </Button>
+                      )}
+                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => openEditTransaction(tx)} title="Editar">
+                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => deleteTransaction(tx.id)} title="Excluir">
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </CardContent>
       </Card>
     );
