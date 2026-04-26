@@ -143,4 +143,7 @@
   .shadow-card    { box-shadow: var(--shadow-card); }
   .shadow-soft    { box-shadow: var(--shadow-md); }
   .shadow-premium { box-shadow: var(--shadow-lg); }
+
+  .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
 }
