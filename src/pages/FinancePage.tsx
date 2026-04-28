@@ -103,6 +103,7 @@ export default function FinancePage() {
   const [customStart, setCustomStart] = useState(`${today.slice(0, 7)}-01`);
   const [customEnd, setCustomEnd] = useState(today);
   const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
+  const [editingBankId, setEditingBankId] = useState<string | null>(null);
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
   
   // Edit transaction state - uses full TransactionDialog
@@ -200,18 +201,61 @@ export default function FinancePage() {
 
   async function handleSaveBank() {
     if (!bankForm.name) { toast.error('Nome da conta é obrigatório'); return; }
-    const { error } = await supabase.from('bank_accounts').insert({
-      user_id: user!.id, name: bankForm.name, bank_name: bankForm.bank_name || null,
-      account_type: bankForm.account_type, agency: bankForm.agency || null,
-      account_number: bankForm.account_number || null, initial_balance: bankForm.initial_balance,
-      current_balance: bankForm.initial_balance, color: bankForm.color,
-      is_main: bankAccounts.length === 0,
-    } as any);
-    if (error) { toast.error('Erro ao salvar conta'); return; }
-    toast.success('Conta cadastrada!');
+    if (editingBankId) {
+      // Update — recalcula saldo: novo saldo = saldo atual + (novo inicial - inicial antigo)
+      const existing = bankAccounts.find((a) => a.id === editingBankId);
+      const balanceDelta = bankForm.initial_balance - (existing?.initial_balance ?? 0);
+      const newBalance = (existing?.current_balance ?? 0) + balanceDelta;
+      const { error } = await supabase.from('bank_accounts').update({
+        name: bankForm.name, bank_name: bankForm.bank_name || null,
+        account_type: bankForm.account_type, agency: bankForm.agency || null,
+        account_number: bankForm.account_number || null,
+        initial_balance: bankForm.initial_balance,
+        current_balance: newBalance,
+        color: bankForm.color,
+      } as any).eq('id', editingBankId);
+      if (error) { toast.error('Erro ao atualizar conta'); return; }
+      toast.success('Conta atualizada!');
+    } else {
+      const { error } = await supabase.from('bank_accounts').insert({
+        user_id: user!.id, name: bankForm.name, bank_name: bankForm.bank_name || null,
+        account_type: bankForm.account_type, agency: bankForm.agency || null,
+        account_number: bankForm.account_number || null, initial_balance: bankForm.initial_balance,
+        current_balance: bankForm.initial_balance, color: bankForm.color,
+        is_main: bankAccounts.length === 0,
+      } as any);
+      if (error) { toast.error('Erro ao salvar conta'); return; }
+      toast.success('Conta cadastrada!');
+    }
     setBankDialogOpen(false);
+    setEditingBankId(null);
     setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
     fetchAll();
+  }
+
+  function openEditBank(acc: BankAccount) {
+    setEditingBankId(acc.id);
+    setBankForm({
+      name: acc.name,
+      bank_name: acc.bank_name ?? '',
+      account_type: acc.account_type,
+      agency: acc.agency ?? '',
+      account_number: acc.account_number ?? '',
+      initial_balance: Number(acc.initial_balance) || 0,
+      color: acc.color,
+    });
+    setBankDialogOpen(true);
+  }
+
+  async function deleteBankConfirm(id: string) {
+    const acc = bankAccounts.find((a) => a.id === id);
+    if (!acc) return;
+    const linked = transactions.some((t) => t.bank_account_id === id);
+    const msg = linked
+      ? `A conta "${acc.name}" possui lançamentos vinculados. Excluir mesmo assim? Os lançamentos ficarão sem conta.`
+      : `Excluir a conta "${acc.name}"?`;
+    if (!window.confirm(msg)) return;
+    await deleteBank(id);
   }
 
   async function handleTransfer() {
@@ -430,51 +474,55 @@ export default function FinancePage() {
 
     return (
       <>
-        {/* HERO — Saldo total estilo banking app */}
+        {/* HERO PREMIUM — Saldo dourado (estilo Power BI) */}
         <motion.div variants={itemVariants}>
-          <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-[hsl(215,28%,17%)] via-[hsl(215,25%,22%)] to-[hsl(215,30%,15%)] text-white">
-            <CardContent className="p-6 sm:p-8 space-y-6">
+          <Card className="overflow-hidden border-0 shadow-premium relative bg-gradient-to-br from-[hsl(28,40%,18%)] via-[hsl(25,30%,12%)] to-[hsl(220,16%,10%)]">
+            {/* radial gold glow */}
+            <div className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+            <CardContent className="p-6 sm:p-8 space-y-6 relative">
               <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/60 font-medium">Saldo total disponível</p>
-                  <p className="text-3xl sm:text-4xl font-bold font-display tracking-tight">{formatBRL(totalBankBalance)}</p>
+                <div className="space-y-1.5">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-primary/80 font-bold">Saldo total disponível</p>
+                  <p className="text-4xl sm:text-5xl font-bold font-display text-gold tracking-tight tabular-nums">
+                    {formatBRL(totalBankBalance)}
+                  </p>
                   <p className="text-xs text-white/50">{bankAccounts.length} {bankAccounts.length === 1 ? 'conta ativa' : 'contas ativas'}</p>
                 </div>
                 <button
                   onClick={() => setActiveSection('contas')}
-                  className="rounded-full bg-white/10 hover:bg-white/20 transition-colors p-2.5"
+                  className="rounded-full bg-white/10 hover:bg-white/20 transition-colors p-2.5 text-white"
                   title="Ver contas"
                 >
                   <Wallet className="h-4 w-4" />
                 </button>
               </div>
 
-              {/* Resumo do período */}
-              <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/10">
+              {/* 3 KPIs — Entradas / Saídas / Resultado */}
+              <div className="grid grid-cols-3 gap-4 pt-5 border-t border-white/10">
                 <div>
-                  <div className="flex items-center gap-1 text-white/60 text-[10px] uppercase tracking-wider font-medium">
-                    <ArrowUpRight className="h-3 w-3" /> Entradas
+                  <div className="flex items-center gap-1.5 text-success text-[10px] uppercase tracking-[0.18em] font-bold">
+                    <ArrowUpRight className="h-3.5 w-3.5" /> Entradas
                   </div>
-                  <p className="text-base sm:text-lg font-bold mt-1 text-emerald-300">{formatBRL(totalIncome)}</p>
+                  <p className="text-lg sm:text-2xl font-bold font-display mt-1.5 text-success tabular-nums">{formatBRL(totalIncome)}</p>
                 </div>
                 <div>
-                  <div className="flex items-center gap-1 text-white/60 text-[10px] uppercase tracking-wider font-medium">
-                    <ArrowDownRight className="h-3 w-3" /> Saídas
+                  <div className="flex items-center gap-1.5 text-destructive text-[10px] uppercase tracking-[0.18em] font-bold">
+                    <ArrowDownRight className="h-3.5 w-3.5" /> Saídas
                   </div>
-                  <p className="text-base sm:text-lg font-bold mt-1 text-rose-300">{formatBRL(totalExpense)}</p>
+                  <p className="text-lg sm:text-2xl font-bold font-display mt-1.5 text-destructive tabular-nums">{formatBRL(totalExpense)}</p>
                 </div>
                 <div>
-                  <div className="flex items-center gap-1 text-white/60 text-[10px] uppercase tracking-wider font-medium">
-                    <DollarSign className="h-3 w-3" /> Resultado
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-bold" style={{ color: profit >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))' }}>
+                    <DollarSign className="h-3.5 w-3.5" /> Resultado
                   </div>
-                  <p className={`text-base sm:text-lg font-bold mt-1 ${profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatBRL(profit)}</p>
+                  <p className={`text-lg sm:text-2xl font-bold font-display mt-1.5 tabular-nums ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatBRL(profit)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Quick Actions — pills horizontais */}
+        {/* Quick Actions — pills */}
         <motion.div variants={itemVariants}>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
             {quickActions.map((action) => (
@@ -485,7 +533,7 @@ export default function FinancePage() {
               >
                 <div className={`h-14 w-14 rounded-2xl flex items-center justify-center transition-all group-hover:scale-105 group-active:scale-95 ${
                   action.id === 'new'
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                    ? 'gradient-primary text-primary-foreground shadow-primary'
                     : 'bg-card border border-border text-foreground group-hover:border-primary/30 group-hover:bg-accent'
                 }`}>
                   <action.icon className="h-5 w-5" />
@@ -496,11 +544,81 @@ export default function FinancePage() {
           </div>
         </motion.div>
 
+        {/* ============ POWER BI ROW: Evolução Mensal (Bar) + Análise por Categoria (Donut) ============ */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <motion.div variants={itemVariants}>
+            <Card className="card-premium h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs uppercase tracking-[0.18em] text-muted-foreground font-bold">Evolução Mensal</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip
+                        formatter={(value: number) => formatBRL(value)}
+                        contentStyle={{ borderRadius: '0.75rem', border: '1px solid hsl(var(--border))', background: 'hsl(var(--popover))', fontSize: '12px', color: 'hsl(var(--foreground))' }}
+                        cursor={{ fill: 'hsl(var(--accent) / 0.3)' }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} iconType="circle" />
+                      <Bar dataKey="entrada" name="Entradas" fill="hsl(var(--success))" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                      <Bar dataKey="saida" name="Saídas" fill="hsl(var(--destructive))" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[260px] flex items-center justify-center text-sm text-muted-foreground">Sem dados no período</div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <Card className="card-premium h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs uppercase tracking-[0.18em] text-muted-foreground font-bold">Análise por Categoria</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {expenseByCat.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-4 items-center">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie data={expenseByCat} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                          {expenseByCat.map((_, i) => <Cell key={i} fill={EXPENSE_COLORS[i % EXPENSE_COLORS.length]} stroke="hsl(var(--card))" strokeWidth={2} />)}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: number) => formatBRL(value)}
+                          contentStyle={{ borderRadius: '0.75rem', border: '1px solid hsl(var(--border))', background: 'hsl(var(--popover))', fontSize: '12px', color: 'hsl(var(--foreground))' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <ul className="space-y-1.5 text-xs">
+                      {expenseByCat.slice(0, 6).map((d, i) => (
+                        <li key={d.name} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: EXPENSE_COLORS[i % EXPENSE_COLORS.length] }} />
+                            <span className="truncate text-foreground/80">{d.name}</span>
+                          </div>
+                          <span className="font-semibold tabular-nums shrink-0">{formatBRL(d.value)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">Sem despesas no período</div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
         {/* Contas — cards horizontais */}
         {bankAccounts.length > 0 && (
           <motion.div variants={itemVariants} className="space-y-3">
             <div className="flex items-center justify-between px-1">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Minhas contas</h3>
+              <h3 className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Minhas contas</h3>
               <button onClick={() => setActiveSection('contas')} className="text-xs font-medium text-primary hover:underline">
                 Ver todas
               </button>
@@ -510,7 +628,7 @@ export default function FinancePage() {
                 <Card
                   key={acc.id}
                   onClick={() => setActiveSection('contas')}
-                  className="min-w-[220px] sm:min-w-[240px] snap-start cursor-pointer overflow-hidden border-0 shadow-sm hover:shadow-md transition-all relative"
+                  className="min-w-[220px] sm:min-w-[240px] snap-start cursor-pointer overflow-hidden border-0 shadow-md hover:shadow-lg transition-all relative"
                   style={{ background: `linear-gradient(135deg, ${acc.color} 0%, ${acc.color}cc 100%)` }}
                 >
                   <CardContent className="p-4 text-white relative z-10 space-y-3">
@@ -544,100 +662,74 @@ export default function FinancePage() {
           </motion.div>
         )}
 
-        {/* Atividade recente + Fluxo de caixa */}
-        <div className="grid gap-4 lg:grid-cols-5">
-          <motion.div variants={itemVariants} className="lg:col-span-3">
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <CardTitle className="text-base font-display">Atividade recente</CardTitle>
-                <button onClick={() => setActiveSection('lancamentos')} className="text-xs font-medium text-primary hover:underline">
-                  Ver tudo
-                </button>
-              </CardHeader>
-              <CardContent className="p-0">
-                {recentTransactions.length === 0 ? (
-                  <div className="text-center py-12 px-4">
-                    <Receipt className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground">Nenhum lançamento neste período.</p>
-                    <Button size="sm" variant="outline" className="mt-4" onClick={() => setDialogOpen(true)}>
-                      <Plus className="h-3.5 w-3.5 mr-1.5" /> Criar primeiro lançamento
-                    </Button>
-                  </div>
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {recentTransactions.map((tx) => {
-                      const clientName = tx.client_id ? clients.find(c => c.id === tx.client_id)?.name : null;
-                      const isIncome = tx.type === 'income';
-                      return (
-                        <li
-                          key={tx.id}
-                          className="flex items-center gap-3 px-4 py-3 hover:bg-accent/40 cursor-pointer transition-colors"
-                          onClick={() => openEditTransaction(tx)}
-                        >
-                          <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${
-                            isIncome ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
-                          }`}>
-                            {isIncome ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{tx.description}</p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {clientName ? `${clientName} • ` : ''}
-                              {new Date(tx.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className={`text-sm font-bold ${isIncome ? 'text-success' : 'text-destructive'}`}>
-                              {isIncome ? '+' : '−'} {formatBRL(Number(tx.amount))}
-                            </p>
-                            <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-semibold mt-0.5 ${statusConfig[tx.status]?.className ?? ''}`}>
-                              {statusConfig[tx.status]?.label ?? tx.status}
-                            </span>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div variants={itemVariants} className="lg:col-span-2">
-            <Card className="h-full">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-display">Fluxo de caixa</CardTitle>
-                <p className="text-xs text-muted-foreground">Últimos meses do período</p>
-              </CardHeader>
-              <CardContent>
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorEntrada" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(152, 60%, 42%)" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="hsl(152, 60%, 42%)" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorSaida" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(0, 72%, 51%)" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="hsl(0, 72%, 51%)" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 16%, 90%)" vertical={false} />
-                      <XAxis dataKey="month" axisLine={false} tickLine={false} fontSize={11} />
-                      <YAxis axisLine={false} tickLine={false} fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: number) => formatBRL(value)} contentStyle={{ borderRadius: '0.75rem', border: '1px solid hsl(220, 16%, 90%)', fontSize: '12px' }} />
-                      <Area type="monotone" dataKey="entrada" stroke="hsl(152, 60%, 42%)" fill="url(#colorEntrada)" strokeWidth={2} name="Receita" />
-                      <Area type="monotone" dataKey="saida" stroke="hsl(0, 72%, 51%)" fill="url(#colorSaida)" strokeWidth={2} name="Despesa" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-12">Sem dados para o período.</p>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
+        {/* Atividade recente */}
+        <motion.div variants={itemVariants}>
+          <Card className="card-premium">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle className="text-xs uppercase tracking-[0.18em] text-muted-foreground font-bold">Extrato — atividade recente</CardTitle>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{recentTransactions.length} {recentTransactions.length === 1 ? 'lançamento' : 'lançamentos'}</p>
+              </div>
+              <button onClick={() => setActiveSection('lancamentos')} className="text-xs font-medium text-primary hover:underline">
+                Ver tudo
+              </button>
+            </CardHeader>
+            <CardContent className="p-0">
+              {recentTransactions.length === 0 ? (
+                <div className="text-center py-12 px-4">
+                  <Receipt className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">Nenhum lançamento neste período.</p>
+                  <Button size="sm" variant="outline" className="mt-4" onClick={() => setDialogOpen(true)}>
+                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Criar primeiro lançamento
+                  </Button>
+                </div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {recentTransactions.map((tx) => {
+                    const clientName = tx.client_id ? clients.find(c => c.id === tx.client_id)?.name : null;
+                    const isIncome = tx.type === 'income';
+                    return (
+                      <li
+                        key={tx.id}
+                        className="group flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-accent/40 cursor-pointer transition-colors"
+                        onClick={() => openEditTransaction(tx)}
+                      >
+                        <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${
+                          isIncome ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'
+                        }`}>
+                          {isIncome ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{tx.description}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {clientName ? `${clientName} • ` : ''}
+                            {new Date(tx.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className={`text-sm font-bold tabular-nums ${isIncome ? 'text-success' : 'text-destructive'}`}>
+                            {isIncome ? '+' : '−'} {formatBRL(Number(tx.amount))}
+                          </p>
+                          <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-semibold mt-0.5 ${statusConfig[tx.status]?.className ?? ''}`}>
+                            {statusConfig[tx.status]?.label ?? tx.status}
+                          </span>
+                        </div>
+                        <div className="hidden sm:flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={(e) => { e.stopPropagation(); openEditTransaction(tx); }} title="Editar">
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={(e) => { e.stopPropagation(); deleteTransaction(tx.id); }} title="Excluir">
+                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Resumo rápido — A Receber / A Pagar */}
         <div className="grid gap-3 sm:grid-cols-2">
@@ -649,7 +741,7 @@ export default function FinancePage() {
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">A receber no período</p>
-                  <p className="text-xl font-bold font-display text-success mt-1">{formatBRL(pendingReceivable)}</p>
+                  <p className="text-xl font-bold font-display text-success mt-1 tabular-nums">{formatBRL(pendingReceivable)}</p>
                 </div>
                 <ArrowUpRight className="h-5 w-5 text-success/60" />
               </CardContent>
@@ -663,7 +755,7 @@ export default function FinancePage() {
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">A pagar no período</p>
-                  <p className="text-xl font-bold font-display text-destructive mt-1">{formatBRL(pendingPayable)}</p>
+                  <p className="text-xl font-bold font-display text-destructive mt-1 tabular-nums">{formatBRL(pendingPayable)}</p>
                 </div>
                 <ArrowDownRight className="h-5 w-5 text-destructive/60" />
               </CardContent>
@@ -1067,7 +1159,7 @@ export default function FinancePage() {
     return (
       <div className="space-y-4">
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => setBankDialogOpen(true)}>
+          <Button className="gradient-primary border-0 text-primary-foreground" onClick={() => { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' }); setBankDialogOpen(true); }}>
             <Building2 className="h-4 w-4 mr-2" /> Nova Conta
           </Button>
           <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
@@ -1076,16 +1168,28 @@ export default function FinancePage() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {bankAccounts.map(acc => (
-            <Card key={acc.id} className="border-l-4" style={{ borderLeftColor: acc.color }}>
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">{acc.name}{acc.is_main && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5">Principal</span>}</p>
-                  <p className="text-xs text-muted-foreground">{acc.bank_name || acc.account_type}{acc.agency ? ` • Ag: ${acc.agency}` : ''}{acc.account_number ? ` • CC: ${acc.account_number}` : ''}</p>
-                  <p className="text-lg font-bold font-display mt-1">{formatBRL(acc.current_balance)}</p>
+            <Card key={acc.id} className="border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: acc.color }}>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold truncate">
+                      {acc.name}
+                      {acc.is_main && <span className="ml-1.5 text-[10px] bg-primary/15 text-primary rounded px-1.5 py-0.5 font-bold">Principal</span>}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {acc.bank_name || acc.account_type}{acc.agency ? ` • Ag: ${acc.agency}` : ''}{acc.account_number ? ` • CC: ${acc.account_number}` : ''}
+                    </p>
+                  </div>
                 </div>
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteBank(acc.id)}>
-                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                </Button>
+                <p className="text-2xl font-bold font-display text-gold tabular-nums">{formatBRL(acc.current_balance)}</p>
+                <div className="flex gap-2 pt-2 border-t border-border">
+                  <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => openEditBank(acc)}>
+                    <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1 h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30" onClick={() => deleteBankConfirm(acc.id)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Excluir
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -1206,9 +1310,9 @@ export default function FinancePage() {
         editTransaction={editingTransaction}
       />
 
-      <Dialog open={bankDialogOpen} onOpenChange={setBankDialogOpen}>
+      <Dialog open={bankDialogOpen} onOpenChange={(o) => { setBankDialogOpen(o); if (!o) { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' }); } }}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-display">Nova Conta Bancária</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display">{editingBankId ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><Label>Nome da Conta *</Label><Input value={bankForm.name} onChange={e => setBankForm({ ...bankForm, name: e.target.value })} placeholder="Ex: Conta Principal PJ" /></div>
             <div className="grid grid-cols-2 gap-4">
