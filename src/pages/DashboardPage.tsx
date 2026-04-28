@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
+import { summarizeFinance } from '@/lib/finance-calc';
 
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
@@ -150,17 +151,12 @@ export default function DashboardPage() {
     });
   }, [filterMode, period.end, period.start, selectedMonth, selectedYear]);
 
-  // ===== KPIs do mês =====
-  const monthIncome = useMemo(
-    () => filteredTransactions.filter(t => t.type === 'income' && t.status === 'paid').reduce((s, t) => s + Number(t.amount), 0),
-    [filteredTransactions]
-  );
-  const monthExpense = useMemo(
-    () => filteredTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
-    [filteredTransactions]
-  );
-  const monthProfit = monthIncome - monthExpense;
-  const margin = monthIncome > 0 ? (monthProfit / monthIncome) * 100 : 0;
+  // ===== KPIs do período (regras canônicas em finance-calc) =====
+  const summary = useMemo(() => summarizeFinance(filteredTransactions, todayISO), [filteredTransactions, todayISO]);
+  const monthIncome = summary.income;
+  const monthExpense = summary.expense;
+  const monthProfit = summary.profit;
+  const margin = summary.margin;
   const goalProgress = monthlyGoal > 0 ? Math.min(100, (monthIncome / monthlyGoal) * 100) : 0;
   const goalRemaining = Math.max(0, monthlyGoal - monthIncome);
 
