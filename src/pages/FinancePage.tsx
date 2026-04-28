@@ -1111,7 +1111,7 @@ export default function FinancePage() {
     return (
       <div className="space-y-4">
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => setBankDialogOpen(true)}>
+          <Button className="gradient-primary border-0 text-primary-foreground" onClick={() => { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' }); setBankDialogOpen(true); }}>
             <Building2 className="h-4 w-4 mr-2" /> Nova Conta
           </Button>
           <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
@@ -1120,16 +1120,28 @@ export default function FinancePage() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {bankAccounts.map(acc => (
-            <Card key={acc.id} className="border-l-4" style={{ borderLeftColor: acc.color }}>
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">{acc.name}{acc.is_main && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5">Principal</span>}</p>
-                  <p className="text-xs text-muted-foreground">{acc.bank_name || acc.account_type}{acc.agency ? ` • Ag: ${acc.agency}` : ''}{acc.account_number ? ` • CC: ${acc.account_number}` : ''}</p>
-                  <p className="text-lg font-bold font-display mt-1">{formatBRL(acc.current_balance)}</p>
+            <Card key={acc.id} className="border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: acc.color }}>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold truncate">
+                      {acc.name}
+                      {acc.is_main && <span className="ml-1.5 text-[10px] bg-primary/15 text-primary rounded px-1.5 py-0.5 font-bold">Principal</span>}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {acc.bank_name || acc.account_type}{acc.agency ? ` • Ag: ${acc.agency}` : ''}{acc.account_number ? ` • CC: ${acc.account_number}` : ''}
+                    </p>
+                  </div>
                 </div>
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteBank(acc.id)}>
-                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                </Button>
+                <p className="text-2xl font-bold font-display text-gold tabular-nums">{formatBRL(acc.current_balance)}</p>
+                <div className="flex gap-2 pt-2 border-t border-border">
+                  <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => openEditBank(acc)}>
+                    <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1 h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30" onClick={() => deleteBankConfirm(acc.id)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Excluir
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
