@@ -103,6 +103,7 @@ export default function FinancePage() {
   const [customStart, setCustomStart] = useState(`${today.slice(0, 7)}-01`);
   const [customEnd, setCustomEnd] = useState(today);
   const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
+  const [editingBankId, setEditingBankId] = useState<string | null>(null);
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
   
   // Edit transaction state - uses full TransactionDialog
@@ -200,18 +201,61 @@ export default function FinancePage() {
 
   async function handleSaveBank() {
     if (!bankForm.name) { toast.error('Nome da conta é obrigatório'); return; }
-    const { error } = await supabase.from('bank_accounts').insert({
-      user_id: user!.id, name: bankForm.name, bank_name: bankForm.bank_name || null,
-      account_type: bankForm.account_type, agency: bankForm.agency || null,
-      account_number: bankForm.account_number || null, initial_balance: bankForm.initial_balance,
-      current_balance: bankForm.initial_balance, color: bankForm.color,
-      is_main: bankAccounts.length === 0,
-    } as any);
-    if (error) { toast.error('Erro ao salvar conta'); return; }
-    toast.success('Conta cadastrada!');
+    if (editingBankId) {
+      // Update — recalcula saldo: novo saldo = saldo atual + (novo inicial - inicial antigo)
+      const existing = bankAccounts.find((a) => a.id === editingBankId);
+      const balanceDelta = bankForm.initial_balance - (existing?.initial_balance ?? 0);
+      const newBalance = (existing?.current_balance ?? 0) + balanceDelta;
+      const { error } = await supabase.from('bank_accounts').update({
+        name: bankForm.name, bank_name: bankForm.bank_name || null,
+        account_type: bankForm.account_type, agency: bankForm.agency || null,
+        account_number: bankForm.account_number || null,
+        initial_balance: bankForm.initial_balance,
+        current_balance: newBalance,
+        color: bankForm.color,
+      } as any).eq('id', editingBankId);
+      if (error) { toast.error('Erro ao atualizar conta'); return; }
+      toast.success('Conta atualizada!');
+    } else {
+      const { error } = await supabase.from('bank_accounts').insert({
+        user_id: user!.id, name: bankForm.name, bank_name: bankForm.bank_name || null,
+        account_type: bankForm.account_type, agency: bankForm.agency || null,
+        account_number: bankForm.account_number || null, initial_balance: bankForm.initial_balance,
+        current_balance: bankForm.initial_balance, color: bankForm.color,
+        is_main: bankAccounts.length === 0,
+      } as any);
+      if (error) { toast.error('Erro ao salvar conta'); return; }
+      toast.success('Conta cadastrada!');
+    }
     setBankDialogOpen(false);
+    setEditingBankId(null);
     setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
     fetchAll();
+  }
+
+  function openEditBank(acc: BankAccount) {
+    setEditingBankId(acc.id);
+    setBankForm({
+      name: acc.name,
+      bank_name: acc.bank_name ?? '',
+      account_type: acc.account_type,
+      agency: acc.agency ?? '',
+      account_number: acc.account_number ?? '',
+      initial_balance: Number(acc.initial_balance) || 0,
+      color: acc.color,
+    });
+    setBankDialogOpen(true);
+  }
+
+  async function deleteBankConfirm(id: string) {
+    const acc = bankAccounts.find((a) => a.id === id);
+    if (!acc) return;
+    const linked = transactions.some((t) => t.bank_account_id === id);
+    const msg = linked
+      ? `A conta "${acc.name}" possui lançamentos vinculados. Excluir mesmo assim? Os lançamentos ficarão sem conta.`
+      : `Excluir a conta "${acc.name}"?`;
+    if (!window.confirm(msg)) return;
+    await deleteBank(id);
   }
 
   async function handleTransfer() {
