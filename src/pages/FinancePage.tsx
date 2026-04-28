@@ -1262,9 +1262,9 @@ export default function FinancePage() {
         editTransaction={editingTransaction}
       />
 
-      <Dialog open={bankDialogOpen} onOpenChange={setBankDialogOpen}>
+      <Dialog open={bankDialogOpen} onOpenChange={(o) => { setBankDialogOpen(o); if (!o) { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' }); } }}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="font-display">Nova Conta Bancária</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display">{editingBankId ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><Label>Nome da Conta *</Label><Input value={bankForm.name} onChange={e => setBankForm({ ...bankForm, name: e.target.value })} placeholder="Ex: Conta Principal PJ" /></div>
             <div className="grid grid-cols-2 gap-4">
