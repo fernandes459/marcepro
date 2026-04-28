@@ -25,6 +25,7 @@ import { CurrencyInput } from '@/components/CurrencyInput';
 import { TransactionDialog } from '@/components/finance/TransactionDialog';
 import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
 import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories } from '@/lib/financial';
+import { summarizeFinance } from '@/lib/finance-calc';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
@@ -299,15 +300,16 @@ export default function FinancePage() {
     [period.end, period.start, transactions]
   );
 
-  // Computed
-  const totalIncome = periodTransactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
-  const totalExpense = periodTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
-  const profit = totalIncome - totalExpense;
+  // Computed — regras canônicas (finance-calc): só transações pagas contam como entrada/saída efetiva
+  const summary = useMemo(() => summarizeFinance(periodTransactions, today), [periodTransactions, today]);
+  const totalIncome = summary.income;       // Entradas recebidas no período
+  const totalExpense = summary.expense;     // Saídas pagas no período
+  const profit = summary.profit;            // Resultado
   const totalBankBalance = bankAccounts.reduce((s, a) => s + Number(a.current_balance), 0);
-  const pendingReceivable = periodTransactions.filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
-  const pendingPayable = periodTransactions.filter(t => t.type === 'expense' && (t.status === 'pending' || t.status === 'overdue')).reduce((s, t) => s + Number(t.amount), 0);
+  const pendingReceivable = summary.receivable;
+  const pendingPayable = summary.payable;
   const overdueItems = periodTransactions.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
-  const paidIncome = periodTransactions.filter(t => t.type === 'income' && t.status === 'paid').reduce((s, t) => s + Number(t.amount), 0);
+  const paidIncome = summary.income;
 
   const filtered = useMemo(() => {
     return periodTransactions.filter(t => {
