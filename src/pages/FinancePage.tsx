@@ -102,7 +102,7 @@ export default function FinancePage() {
   const [selectedYear, setSelectedYear] = useState(today.slice(0, 4));
   const [customStart, setCustomStart] = useState(`${today.slice(0, 7)}-01`);
   const [customEnd, setCustomEnd] = useState(today);
-  const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
+  const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' });
   const [editingBankId, setEditingBankId] = useState<string | null>(null);
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
   
