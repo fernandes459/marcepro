@@ -202,16 +202,12 @@ export default function FinancePage() {
   async function handleSaveBank() {
     if (!bankForm.name) { toast.error('Nome da conta é obrigatório'); return; }
     if (editingBankId) {
-      // Update — recalcula saldo: novo saldo = saldo atual + (novo inicial - inicial antigo)
-      const existing = bankAccounts.find((a) => a.id === editingBankId);
-      const balanceDelta = bankForm.initial_balance - (existing?.initial_balance ?? 0);
-      const newBalance = (existing?.current_balance ?? 0) + balanceDelta;
       const { error } = await supabase.from('bank_accounts').update({
         name: bankForm.name, bank_name: bankForm.bank_name || null,
         account_type: bankForm.account_type, agency: bankForm.agency || null,
         account_number: bankForm.account_number || null,
         initial_balance: bankForm.initial_balance,
-        current_balance: newBalance,
+        current_balance: bankForm.current_balance,
         color: bankForm.color,
       } as any).eq('id', editingBankId);
       if (error) { toast.error('Erro ao atualizar conta'); return; }
