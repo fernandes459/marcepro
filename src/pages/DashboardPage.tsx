@@ -191,6 +191,30 @@ export default function DashboardPage() {
     return counts;
   }, [weekEvents]);
 
+  // ===== Power BI: série diária com acúmulo =====
+  const biChartData = useMemo(() => {
+    const byDay: Record<string, { date: string; entrada: number; saida: number }> = {};
+    filteredTransactions.forEach((tx) => {
+      const key = tx.date;
+      if (!byDay[key]) byDay[key] = { date: key, entrada: 0, saida: 0 };
+      const isPaid = tx.status === 'paid';
+      if (!isPaid) return;
+      const amount = Number(tx.amount) || 0;
+      if (tx.type === 'income') byDay[key].entrada += amount;
+      else byDay[key].saida += amount;
+    });
+    const sorted = Object.values(byDay).sort((a, b) => a.date.localeCompare(b.date));
+    let acc = 0;
+    return sorted.map((row) => {
+      acc += row.entrada - row.saida;
+      return {
+        ...row,
+        label: new Date(row.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+        acumulado: acc,
+      };
+    });
+  }, [filteredTransactions]);
+
   // ===== Alertas críticos =====
   const overdueReceivables = useMemo(
     () => filteredTransactions.filter(t => t.type === 'income' && t.status === 'pending' && t.due_date && t.due_date < todayISO),
