@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Send, FileText, Loader2, Trash2, Edit, CheckCircle, XCircle,
   Factory, Download, MessageSquare, Settings2, Eye, EyeOff, Wrench, ChevronDown, ChevronUp,
-  BarChart3, Milestone, Calculator, Handshake, User, Lock,
+  BarChart3, Milestone, Calculator, Handshake, User, Lock, FileSpreadsheet,
+  Clock, CheckCircle2, Hammer, TrendingUp,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Slider } from '@/components/ui/slider';
 import { PricingPanel } from '@/components/budget/PricingPanel';
