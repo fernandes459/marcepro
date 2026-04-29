@@ -1,6 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Share2, Loader2, Trash2, Edit } from 'lucide-react';
+import {
+  Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Share2, Loader2, Trash2, Edit,
+  Users, TrendingUp, Receipt, FileSpreadsheet, MessageCircle,
+} from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +16,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { SearchInput } from '@/components/SearchInput';
+import { formatBRL } from '@/lib/format';
 
 interface Client {
   id: string;
@@ -86,8 +91,45 @@ export default function ClientsPage() {
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search)
+      c.phone.includes(search) ||
+      (c.city || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  const kpis = useMemo(() => {
+    const totalRevenue = clients.reduce((s, c) => s + Number(c.total_spent || 0), 0);
+    const totalBudgets = clients.reduce((s, c) => s + Number(c.budgets_count || 0), 0);
+    const ticket = totalBudgets > 0 ? totalRevenue / totalBudgets : 0;
+    return { count: clients.length, revenue: totalRevenue, ticket };
+  }, [clients]);
+
+  const exportToExcel = () => {
+    if (filtered.length === 0) { toast.error('Nada para exportar'); return; }
+    const rows = filtered.map(c => ({
+      'Nome': c.name,
+      'Telefone': c.phone,
+      'Email': c.email || '',
+      'CPF/CNPJ': c.cpf_cnpj || '',
+      'CEP': c.cep || '',
+      'Endereço': [c.address, c.address_number, c.complement].filter(Boolean).join(', '),
+      'Bairro': c.neighborhood || '',
+      'Cidade': c.city || '',
+      'UF': c.state || '',
+      'Orçamentos': Number(c.budgets_count || 0),
+      'Total Gasto': Number(c.total_spent || 0),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+    XLSX.writeFile(wb, `clientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`${filtered.length} cliente(s) exportado(s)`);
+  };
+
+  const openWhatsAppChat = (client: Client) => {
+    const phone = (client.phone || '').replace(/\D/g, '');
+    if (!phone) { toast.error('Cliente sem telefone'); return; }
+    const intl = phone.startsWith('55') ? phone : `55${phone}`;
+    window.open(`https://wa.me/${intl}`, '_blank');
+  };
 
   const lookupCep = async (cep: string) => {
     const cleaned = cep.replace(/\D/g, '');
@@ -169,8 +211,8 @@ export default function ClientsPage() {
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold font-display">Clientes</h1>
-          <p className="text-muted-foreground text-sm mt-1">{clients.length} clientes cadastrados</p>
+          <h1 className="text-3xl font-bold font-display tracking-tight">Clientes</h1>
+          <p className="text-muted-foreground text-sm mt-1">Carteira ativa e relacionamento</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -259,9 +301,32 @@ export default function ClientsPage() {
         </Dialog>
       </div>
 
+      {/* KPIs Premium */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {[
+          { label: 'Clientes', value: kpis.count, icon: Users, tone: 'text-foreground' },
+          { label: 'Ticket Médio', value: formatBRL(kpis.ticket), icon: Receipt, tone: 'text-info' },
+          { label: 'Faturamento Total', value: formatBRL(kpis.revenue), icon: TrendingUp, tone: 'text-gold' },
+        ].map((k, i) => {
+          const Icon = k.icon;
+          return (
+            <div key={i} className="card-premium rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{k.label}</span>
+                <Icon className={`h-4 w-4 ${k.tone}`} />
+              </div>
+              <p className={`font-display text-2xl font-semibold ${k.tone}`}>{k.value}</p>
+            </div>
+          );
+        })}
+      </div>
+
       <div className="flex flex-wrap gap-2 items-center">
-        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nome, telefone ou cidade..." className="flex-1 min-w-[220px] max-w-md" />
-        {search && <span className="text-xs text-muted-foreground">{filtered.length} resultado(s)</span>}
+        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nome, telefone, email ou cidade..." className="flex-1 min-w-[220px] max-w-md" />
+        <Button variant="outline" size="sm" className="h-9 rounded-full border-border/60 bg-muted/40 gap-1.5" onClick={exportToExcel}>
+          <FileSpreadsheet className="h-3.5 w-3.5 text-success" /> Excel
+        </Button>
+        {search && <span className="text-xs text-muted-foreground ml-auto">{filtered.length} resultado(s)</span>}
       </div>
 
       {loading ? (
@@ -277,66 +342,63 @@ export default function ClientsPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((client) => (
             <motion.div key={client.id} variants={itemVariants}>
-              <Card className="hover:shadow-md transition-shadow group">
+              <Card className="card-premium rounded-2xl hover:shadow-premium hover:-translate-y-0.5 transition-all duration-200 group">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full gradient-primary flex items-center justify-center text-sm font-bold text-primary-foreground">
-                        {client.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-11 w-11 rounded-full gradient-gold flex items-center justify-center text-sm font-bold text-primary-foreground shadow-primary shrink-0">
+                        {client.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                       </div>
-                      <div>
-                        <p className="font-semibold text-sm">{client.name}</p>
-                        <p className="text-xs text-muted-foreground">{client.cpf_cnpj || '—'}</p>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{client.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{client.cpf_cnpj || '—'}</p>
                       </div>
                     </div>
                     <button
                       onClick={() => handleDeleteClient(client.id)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10"
+                      className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"
                       title="Excluir"
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
                     </button>
                   </div>
 
                   <div className="space-y-1.5 text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
-                      <Phone className="h-3.5 w-3.5 shrink-0" />
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-primary/70" />
                       <span>{client.phone}</span>
                     </div>
                     {client.email && (
                       <div className="flex items-center gap-2">
-                        <Mail className="h-3.5 w-3.5 shrink-0" />
-                        <span>{client.email}</span>
+                        <Mail className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                        <span className="truncate">{client.email}</span>
                       </div>
                     )}
                     {(client.city || client.address) && (
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        <span>{[client.city, client.state].filter(Boolean).join(' - ') || client.address}</span>
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                        <span className="truncate">{[client.city, client.state].filter(Boolean).join(' - ') || client.address}</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-3 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-xs"
-                      onClick={() => shareAddressWhatsApp(client)}
-                    >
-                      <Share2 className="h-3 w-3 mr-1" />
-                      Endereço WhatsApp
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="sm" className="text-xs h-8 rounded-lg gap-1" onClick={() => openWhatsAppChat(client)}>
+                      <MessageCircle className="h-3 w-3 text-success" /> Conversar
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-xs h-8 rounded-lg gap-1" onClick={() => shareAddressWhatsApp(client)}>
+                      <Share2 className="h-3 w-3" /> Endereço
                     </Button>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+                  <div className="mt-3 flex items-center justify-between rounded-xl bg-background/40 border border-border/40 px-3 py-2.5">
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total gasto</p>
-                      <p className="text-sm font-bold">R$ {Number(client.total_spent).toLocaleString('pt-BR')}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Total gasto</p>
+                      <p className="font-display text-base font-semibold text-gold">{formatBRL(Number(client.total_spent || 0))}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Orçamentos</p>
-                      <p className="text-sm font-bold">{client.budgets_count}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Orçamentos</p>
+                      <p className="font-display text-base font-semibold">{client.budgets_count}</p>
                     </div>
                   </div>
                 </CardContent>
