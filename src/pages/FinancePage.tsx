@@ -238,6 +238,7 @@ export default function FinancePage() {
       agency: acc.agency ?? '',
       account_number: acc.account_number ?? '',
       initial_balance: Number(acc.initial_balance) || 0,
+      current_balance: Number(acc.current_balance) || 0,
       color: acc.color,
     });
     setBankDialogOpen(true);
