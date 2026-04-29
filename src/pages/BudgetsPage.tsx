@@ -226,6 +226,44 @@ const [selectedClientId, setSelectedClientId] = useState('');
       (b.project_name || '').toLowerCase().includes(q);
   });
 
+  const kpis = useMemo(() => {
+    const sum = (arr: Budget[]) => arr.reduce((s, b) => s + Number(b.final_price || 0), 0);
+    const pending = budgets.filter(b => b.status === 'pending' || b.status === 'draft');
+    const approved = budgets.filter(b => b.status === 'approved');
+    const inProd = budgets.filter(b => b.status === 'in_production');
+    return {
+      total: budgets.length,
+      pending: pending.length,
+      approved: approved.length,
+      inProduction: inProd.length,
+      revenueApproved: sum(approved) + sum(inProd),
+      ticket: budgets.length ? sum(budgets) / budgets.length : 0,
+    };
+  }, [budgets]);
+
+  const exportToExcel = () => {
+    if (filtered.length === 0) { toast.error('Nada para exportar'); return; }
+    const rows = filtered.map(b => ({
+      'Código': b.code,
+      'Projeto': b.project_name || '',
+      'Cliente': (b.clients as any)?.name || '',
+      'Telefone': (b.clients as any)?.phone || '',
+      'Cidade': (b.clients as any)?.city || '',
+      'Status': statusConfig[b.status]?.label || b.status,
+      'Custo Total': Number(b.total_cost || 0),
+      'Margem (%)': Number(b.profit_margin || 0),
+      'Preço Final': Number(b.final_price || 0),
+      'Pagamento': b.payment_method || '',
+      'Criado em': new Date(b.created_at).toLocaleDateString('pt-BR'),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Orçamentos');
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `orcamentos_${stamp}.xlsx`);
+    toast.success(`${filtered.length} orçamento(s) exportado(s)`);
+  };
+
   const totalMaterial = items.reduce((s, i) => s + i.materialCost * i.quantity, 0);
   const totalLabor = items.reduce((s, i) => s + i.laborCost * i.quantity, 0);
   const totalItemsCost = totalMaterial + totalLabor;
