@@ -229,7 +229,7 @@ export default function FinancePage() {
     }
     setBankDialogOpen(false);
     setEditingBankId(null);
-    setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
+    setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' });
     fetchAll();
   }
 
@@ -1159,7 +1159,7 @@ export default function FinancePage() {
     return (
       <div className="space-y-4">
         <div className="flex gap-2 flex-wrap">
-          <Button className="gradient-primary border-0 text-primary-foreground" onClick={() => { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' }); setBankDialogOpen(true); }}>
+          <Button className="gradient-primary border-0 text-primary-foreground" onClick={() => { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' }); setBankDialogOpen(true); }}>
             <Building2 className="h-4 w-4 mr-2" /> Nova Conta
           </Button>
           <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
@@ -1310,7 +1310,7 @@ export default function FinancePage() {
         editTransaction={editingTransaction}
       />
 
-      <Dialog open={bankDialogOpen} onOpenChange={(o) => { setBankDialogOpen(o); if (!o) { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' }); } }}>
+      <Dialog open={bankDialogOpen} onOpenChange={(o) => { setBankDialogOpen(o); if (!o) { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' }); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="font-display">{editingBankId ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
