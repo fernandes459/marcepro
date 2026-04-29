@@ -211,8 +211,8 @@ export default function ClientsPage() {
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold font-display">Clientes</h1>
-          <p className="text-muted-foreground text-sm mt-1">{clients.length} clientes cadastrados</p>
+          <h1 className="text-3xl font-bold font-display tracking-tight">Clientes</h1>
+          <p className="text-muted-foreground text-sm mt-1">Carteira ativa e relacionamento</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
