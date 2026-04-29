@@ -26,6 +26,7 @@ import { TransactionDialog } from '@/components/finance/TransactionDialog';
 import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
 import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories } from '@/lib/financial';
 import { summarizeFinance } from '@/lib/finance-calc';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
@@ -1293,7 +1294,9 @@ export default function FinancePage() {
       )}
 
       <motion.div key={activeSection} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
-        {renderSection()}
+        <ErrorBoundary resetKey={activeSection}>
+          {renderSection()}
+        </ErrorBoundary>
       </motion.div>
 
       {/* Dialogs */}
