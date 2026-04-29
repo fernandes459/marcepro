@@ -714,8 +714,8 @@ const openEditBudget = async (budget: Budget) => {
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold font-display">Orçamentos</h1>
-          <p className="text-muted-foreground text-sm mt-1">{budgets.length} orçamentos</p>
+          <h1 className="text-3xl font-bold font-display tracking-tight">Orçamentos</h1>
+          <p className="text-muted-foreground text-sm mt-1">Pipeline comercial — do rascunho à produção</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
           <DialogTrigger asChild>
