@@ -1331,10 +1331,18 @@ export default function FinancePage() {
               <div className="space-y-2"><Label>Nº Conta</Label><Input value={bankForm.account_number} onChange={e => setBankForm({ ...bankForm, account_number: e.target.value })} placeholder="12345-6" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Saldo Inicial</Label><CurrencyInput value={bankForm.initial_balance} onChange={v => setBankForm({ ...bankForm, initial_balance: v })} /></div>
+              <div className="space-y-2"><Label>{editingBankId ? 'Saldo Inicial (histórico)' : 'Saldo Inicial'}</Label><CurrencyInput value={bankForm.initial_balance} onChange={v => setBankForm({ ...bankForm, initial_balance: v, ...(editingBankId ? {} : { current_balance: v }) })} /></div>
               <div className="space-y-2"><Label>Cor</Label><Input type="color" value={bankForm.color} onChange={e => setBankForm({ ...bankForm, color: e.target.value })} className="h-10" /></div>
             </div>
-            <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleSaveBank}>Cadastrar Conta</Button>
+            {editingBankId && (
+              <div className="space-y-2">
+                <Label>Saldo Atual <span className="text-[10px] text-muted-foreground">(ajuste direto se necessário)</span></Label>
+                <CurrencyInput value={bankForm.current_balance} onChange={v => setBankForm({ ...bankForm, current_balance: v })} />
+              </div>
+            )}
+            <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleSaveBank}>
+              {editingBankId ? 'Salvar Alterações' : 'Cadastrar Conta'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
