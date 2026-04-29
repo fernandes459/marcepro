@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   TrendingUp, Target, Factory, AlertTriangle, Calendar as CalendarIcon,
-  Wrench, Truck, Hammer, Clock, ArrowRight, CheckCircle2, Flame, Activity,
+  Wrench, Truck, Hammer, Clock, ArrowRight, CheckCircle2, Flame, Activity, BarChart3,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,9 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  ComposedChart, Bar, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
@@ -187,6 +190,30 @@ export default function DashboardPage() {
     weekEvents.forEach(e => { counts[e.eventType] = (counts[e.eventType] ?? 0) + 1; });
     return counts;
   }, [weekEvents]);
+
+  // ===== Power BI: série diária com acúmulo =====
+  const biChartData = useMemo(() => {
+    const byDay: Record<string, { date: string; entrada: number; saida: number }> = {};
+    filteredTransactions.forEach((tx) => {
+      const key = tx.date;
+      if (!byDay[key]) byDay[key] = { date: key, entrada: 0, saida: 0 };
+      const isPaid = tx.status === 'paid';
+      if (!isPaid) return;
+      const amount = Number(tx.amount) || 0;
+      if (tx.type === 'income') byDay[key].entrada += amount;
+      else byDay[key].saida += amount;
+    });
+    const sorted = Object.values(byDay).sort((a, b) => a.date.localeCompare(b.date));
+    let acc = 0;
+    return sorted.map((row) => {
+      acc += row.entrada - row.saida;
+      return {
+        ...row,
+        label: new Date(row.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+        acumulado: acc,
+      };
+    });
+  }, [filteredTransactions]);
 
   // ===== Alertas críticos =====
   const overdueReceivables = useMemo(
@@ -425,6 +452,57 @@ export default function DashboardPage() {
           </Link>
         </motion.div>
       </div>
+
+      {/* ============ POWER BI: FLUXO FINANCEIRO ============ */}
+      <motion.div variants={itemVariants}>
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle className="text-base font-display flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                Fluxo Financeiro do Período
+              </CardTitle>
+              <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-success" /> Entradas</span>
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-destructive" /> Saídas</span>
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-primary" /> Saldo acumulado</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {biChartData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <BarChart3 className="h-10 w-10 mb-2 opacity-30" />
+                <p className="text-sm">Sem movimentações pagas no período</p>
+              </div>
+            ) : (
+              <div className="h-[320px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={biChartData} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
+                    <defs>
+                      <linearGradient id="acumColor" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
+                    <Tooltip
+                      contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 12 }}
+                      labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: 4 }}
+                      formatter={(value: number, name: string) => [formatBRL(value), name === 'entrada' ? 'Entradas' : name === 'saida' ? 'Saídas' : 'Acumulado']}
+                    />
+                    <Area type="monotone" dataKey="acumulado" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#acumColor)" />
+                    <Bar dataKey="entrada" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    <Bar dataKey="saida" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* ============ AGENDA DA SEMANA ============ */}
       <motion.div variants={itemVariants}>

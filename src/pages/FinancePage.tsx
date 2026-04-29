@@ -26,6 +26,7 @@ import { TransactionDialog } from '@/components/finance/TransactionDialog';
 import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
 import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories } from '@/lib/financial';
 import { summarizeFinance } from '@/lib/finance-calc';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
@@ -102,7 +103,7 @@ export default function FinancePage() {
   const [selectedYear, setSelectedYear] = useState(today.slice(0, 4));
   const [customStart, setCustomStart] = useState(`${today.slice(0, 7)}-01`);
   const [customEnd, setCustomEnd] = useState(today);
-  const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
+  const [bankForm, setBankForm] = useState({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' });
   const [editingBankId, setEditingBankId] = useState<string | null>(null);
   const [transferForm, setTransferForm] = useState({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
   
@@ -202,16 +203,12 @@ export default function FinancePage() {
   async function handleSaveBank() {
     if (!bankForm.name) { toast.error('Nome da conta é obrigatório'); return; }
     if (editingBankId) {
-      // Update — recalcula saldo: novo saldo = saldo atual + (novo inicial - inicial antigo)
-      const existing = bankAccounts.find((a) => a.id === editingBankId);
-      const balanceDelta = bankForm.initial_balance - (existing?.initial_balance ?? 0);
-      const newBalance = (existing?.current_balance ?? 0) + balanceDelta;
       const { error } = await supabase.from('bank_accounts').update({
         name: bankForm.name, bank_name: bankForm.bank_name || null,
         account_type: bankForm.account_type, agency: bankForm.agency || null,
         account_number: bankForm.account_number || null,
         initial_balance: bankForm.initial_balance,
-        current_balance: newBalance,
+        current_balance: bankForm.current_balance,
         color: bankForm.color,
       } as any).eq('id', editingBankId);
       if (error) { toast.error('Erro ao atualizar conta'); return; }
@@ -229,7 +226,7 @@ export default function FinancePage() {
     }
     setBankDialogOpen(false);
     setEditingBankId(null);
-    setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' });
+    setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' });
     fetchAll();
   }
 
@@ -242,6 +239,7 @@ export default function FinancePage() {
       agency: acc.agency ?? '',
       account_number: acc.account_number ?? '',
       initial_balance: Number(acc.initial_balance) || 0,
+      current_balance: Number(acc.current_balance) || 0,
       color: acc.color,
     });
     setBankDialogOpen(true);
@@ -1159,7 +1157,7 @@ export default function FinancePage() {
     return (
       <div className="space-y-4">
         <div className="flex gap-2 flex-wrap">
-          <Button className="gradient-primary border-0 text-primary-foreground" onClick={() => { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' }); setBankDialogOpen(true); }}>
+          <Button className="gradient-primary border-0 text-primary-foreground" onClick={() => { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' }); setBankDialogOpen(true); }}>
             <Building2 className="h-4 w-4 mr-2" /> Nova Conta
           </Button>
           <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
@@ -1296,7 +1294,9 @@ export default function FinancePage() {
       )}
 
       <motion.div key={activeSection} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
-        {renderSection()}
+        <ErrorBoundary resetKey={activeSection}>
+          {renderSection()}
+        </ErrorBoundary>
       </motion.div>
 
       {/* Dialogs */}
@@ -1310,7 +1310,7 @@ export default function FinancePage() {
         editTransaction={editingTransaction}
       />
 
-      <Dialog open={bankDialogOpen} onOpenChange={(o) => { setBankDialogOpen(o); if (!o) { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, color: '#3B82F6' }); } }}>
+      <Dialog open={bankDialogOpen} onOpenChange={(o) => { setBankDialogOpen(o); if (!o) { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' }); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="font-display">{editingBankId ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
@@ -1334,10 +1334,18 @@ export default function FinancePage() {
               <div className="space-y-2"><Label>Nº Conta</Label><Input value={bankForm.account_number} onChange={e => setBankForm({ ...bankForm, account_number: e.target.value })} placeholder="12345-6" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Saldo Inicial</Label><CurrencyInput value={bankForm.initial_balance} onChange={v => setBankForm({ ...bankForm, initial_balance: v })} /></div>
+              <div className="space-y-2"><Label>{editingBankId ? 'Saldo Inicial (histórico)' : 'Saldo Inicial'}</Label><CurrencyInput value={bankForm.initial_balance} onChange={v => setBankForm({ ...bankForm, initial_balance: v, ...(editingBankId ? {} : { current_balance: v }) })} /></div>
               <div className="space-y-2"><Label>Cor</Label><Input type="color" value={bankForm.color} onChange={e => setBankForm({ ...bankForm, color: e.target.value })} className="h-10" /></div>
             </div>
-            <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleSaveBank}>Cadastrar Conta</Button>
+            {editingBankId && (
+              <div className="space-y-2">
+                <Label>Saldo Atual <span className="text-[10px] text-muted-foreground">(ajuste direto se necessário)</span></Label>
+                <CurrencyInput value={bankForm.current_balance} onChange={v => setBankForm({ ...bankForm, current_balance: v })} />
+              </div>
+            )}
+            <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleSaveBank}>
+              {editingBankId ? 'Salvar Alterações' : 'Cadastrar Conta'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
