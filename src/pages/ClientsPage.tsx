@@ -342,66 +342,63 @@ export default function ClientsPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((client) => (
             <motion.div key={client.id} variants={itemVariants}>
-              <Card className="hover:shadow-md transition-shadow group">
+              <Card className="card-premium rounded-2xl hover:shadow-premium hover:-translate-y-0.5 transition-all duration-200 group">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full gradient-primary flex items-center justify-center text-sm font-bold text-primary-foreground">
-                        {client.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-11 w-11 rounded-full gradient-gold flex items-center justify-center text-sm font-bold text-primary-foreground shadow-primary shrink-0">
+                        {client.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                       </div>
-                      <div>
-                        <p className="font-semibold text-sm">{client.name}</p>
-                        <p className="text-xs text-muted-foreground">{client.cpf_cnpj || '—'}</p>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{client.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{client.cpf_cnpj || '—'}</p>
                       </div>
                     </div>
                     <button
                       onClick={() => handleDeleteClient(client.id)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10"
+                      className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"
                       title="Excluir"
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
                     </button>
                   </div>
 
                   <div className="space-y-1.5 text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
-                      <Phone className="h-3.5 w-3.5 shrink-0" />
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-primary/70" />
                       <span>{client.phone}</span>
                     </div>
                     {client.email && (
                       <div className="flex items-center gap-2">
-                        <Mail className="h-3.5 w-3.5 shrink-0" />
-                        <span>{client.email}</span>
+                        <Mail className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                        <span className="truncate">{client.email}</span>
                       </div>
                     )}
                     {(client.city || client.address) && (
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        <span>{[client.city, client.state].filter(Boolean).join(' - ') || client.address}</span>
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                        <span className="truncate">{[client.city, client.state].filter(Boolean).join(' - ') || client.address}</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-3 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-xs"
-                      onClick={() => shareAddressWhatsApp(client)}
-                    >
-                      <Share2 className="h-3 w-3 mr-1" />
-                      Endereço WhatsApp
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="sm" className="text-xs h-8 rounded-lg gap-1" onClick={() => openWhatsAppChat(client)}>
+                      <MessageCircle className="h-3 w-3 text-success" /> Conversar
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-xs h-8 rounded-lg gap-1" onClick={() => shareAddressWhatsApp(client)}>
+                      <Share2 className="h-3 w-3" /> Endereço
                     </Button>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+                  <div className="mt-3 flex items-center justify-between rounded-xl bg-background/40 border border-border/40 px-3 py-2.5">
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total gasto</p>
-                      <p className="text-sm font-bold">R$ {Number(client.total_spent).toLocaleString('pt-BR')}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Total gasto</p>
+                      <p className="font-display text-base font-semibold text-gold">{formatBRL(Number(client.total_spent || 0))}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Orçamentos</p>
-                      <p className="text-sm font-bold">{client.budgets_count}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Orçamentos</p>
+                      <p className="font-display text-base font-semibold">{client.budgets_count}</p>
                     </div>
                   </div>
                 </CardContent>
