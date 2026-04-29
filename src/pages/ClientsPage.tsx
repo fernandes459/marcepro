@@ -1,6 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Share2, Loader2, Trash2, Edit } from 'lucide-react';
+import {
+  Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Share2, Loader2, Trash2, Edit,
+  Users, TrendingUp, Receipt, FileSpreadsheet, MessageCircle,
+} from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +16,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { SearchInput } from '@/components/SearchInput';
+import { formatBRL } from '@/lib/format';
 
 interface Client {
   id: string;
