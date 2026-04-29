@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Send, FileText, Loader2, Trash2, Edit, CheckCircle, XCircle,
   Factory, Download, MessageSquare, Settings2, Eye, EyeOff, Wrench, ChevronDown, ChevronUp,
-  BarChart3, Milestone, Calculator, Handshake, User, Lock,
+  BarChart3, Milestone, Calculator, Handshake, User, Lock, FileSpreadsheet,
+  Clock, CheckCircle2, Hammer, TrendingUp,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Slider } from '@/components/ui/slider';
 import { PricingPanel } from '@/components/budget/PricingPanel';
@@ -223,6 +225,44 @@ const [selectedClientId, setSelectedClientId] = useState('');
       b.code.toLowerCase().includes(q) ||
       (b.project_name || '').toLowerCase().includes(q);
   });
+
+  const kpis = useMemo(() => {
+    const sum = (arr: Budget[]) => arr.reduce((s, b) => s + Number(b.final_price || 0), 0);
+    const pending = budgets.filter(b => b.status === 'pending' || b.status === 'draft');
+    const approved = budgets.filter(b => b.status === 'approved');
+    const inProd = budgets.filter(b => b.status === 'in_production');
+    return {
+      total: budgets.length,
+      pending: pending.length,
+      approved: approved.length,
+      inProduction: inProd.length,
+      revenueApproved: sum(approved) + sum(inProd),
+      ticket: budgets.length ? sum(budgets) / budgets.length : 0,
+    };
+  }, [budgets]);
+
+  const exportToExcel = () => {
+    if (filtered.length === 0) { toast.error('Nada para exportar'); return; }
+    const rows = filtered.map(b => ({
+      'Código': b.code,
+      'Projeto': b.project_name || '',
+      'Cliente': (b.clients as any)?.name || '',
+      'Telefone': (b.clients as any)?.phone || '',
+      'Cidade': (b.clients as any)?.city || '',
+      'Status': statusConfig[b.status]?.label || b.status,
+      'Custo Total': Number(b.total_cost || 0),
+      'Margem (%)': Number(b.profit_margin || 0),
+      'Preço Final': Number(b.final_price || 0),
+      'Pagamento': b.payment_method || '',
+      'Criado em': new Date(b.created_at).toLocaleDateString('pt-BR'),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Orçamentos');
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `orcamentos_${stamp}.xlsx`);
+    toast.success(`${filtered.length} orçamento(s) exportado(s)`);
+  };
 
   const totalMaterial = items.reduce((s, i) => s + i.materialCost * i.quantity, 0);
   const totalLabor = items.reduce((s, i) => s + i.laborCost * i.quantity, 0);
@@ -674,8 +714,8 @@ const openEditBudget = async (budget: Budget) => {
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold font-display">Orçamentos</h1>
-          <p className="text-muted-foreground text-sm mt-1">{budgets.length} orçamentos</p>
+          <h1 className="text-3xl font-bold font-display tracking-tight">Orçamentos</h1>
+          <p className="text-muted-foreground text-sm mt-1">Pipeline comercial — do rascunho à produção</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
           <DialogTrigger asChild>
@@ -1106,10 +1146,33 @@ const openEditBudget = async (budget: Budget) => {
         </Dialog>
       </div>
 
+      {/* KPIs Premium */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        {[
+          { label: 'Total', value: kpis.total, icon: FileText, tone: 'text-foreground' },
+          { label: 'Pendentes', value: kpis.pending, icon: Clock, tone: 'text-warning' },
+          { label: 'Aprovados', value: kpis.approved, icon: CheckCircle2, tone: 'text-success' },
+          { label: 'Em Produção', value: kpis.inProduction, icon: Hammer, tone: 'text-info' },
+          { label: 'Faturamento Aprovado', value: formatBRL(kpis.revenueApproved), icon: TrendingUp, tone: 'text-gold', wide: true },
+        ].map((k, i) => {
+          const Icon = k.icon;
+          return (
+            <div key={i} className={`card-premium rounded-2xl p-4 ${k.wide ? 'col-span-2 md:col-span-3 lg:col-span-1' : ''}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{k.label}</span>
+                <Icon className={`h-4 w-4 ${k.tone}`} />
+              </div>
+              <p className={`font-display text-2xl font-semibold ${k.tone}`}>{k.value}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Barra de filtros minimalista */}
       <div className="flex flex-wrap gap-2 items-center">
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar por código, projeto ou cliente..." className="flex-1 min-w-[220px] max-w-md" />
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-44 h-10 rounded-full bg-muted/40 border-0">
+          <SelectTrigger className="w-44 h-9 rounded-full bg-muted/40 border-0 text-xs">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -1119,15 +1182,18 @@ const openEditBudget = async (budget: Budget) => {
             ))}
           </SelectContent>
         </Select>
+        <Button variant="outline" size="sm" className="h-9 rounded-full border-border/60 bg-muted/40 gap-1.5" onClick={exportToExcel}>
+          <FileSpreadsheet className="h-3.5 w-3.5 text-success" /> Excel
+        </Button>
         {(search || filterStatus !== 'all') && (
-          <span className="text-xs text-muted-foreground">{filtered.length} resultado(s)</span>
+          <span className="text-xs text-muted-foreground ml-auto">{filtered.length} resultado(s)</span>
         )}
       </div>
 
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : (
-        <Card>
+        <Card className="card-premium rounded-2xl overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
