@@ -301,9 +301,32 @@ export default function ClientsPage() {
         </Dialog>
       </div>
 
+      {/* KPIs Premium */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {[
+          { label: 'Clientes', value: kpis.count, icon: Users, tone: 'text-foreground' },
+          { label: 'Ticket Médio', value: formatBRL(kpis.ticket), icon: Receipt, tone: 'text-info' },
+          { label: 'Faturamento Total', value: formatBRL(kpis.revenue), icon: TrendingUp, tone: 'text-gold' },
+        ].map((k, i) => {
+          const Icon = k.icon;
+          return (
+            <div key={i} className="card-premium rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{k.label}</span>
+                <Icon className={`h-4 w-4 ${k.tone}`} />
+              </div>
+              <p className={`font-display text-2xl font-semibold ${k.tone}`}>{k.value}</p>
+            </div>
+          );
+        })}
+      </div>
+
       <div className="flex flex-wrap gap-2 items-center">
-        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nome, telefone ou cidade..." className="flex-1 min-w-[220px] max-w-md" />
-        {search && <span className="text-xs text-muted-foreground">{filtered.length} resultado(s)</span>}
+        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nome, telefone, email ou cidade..." className="flex-1 min-w-[220px] max-w-md" />
+        <Button variant="outline" size="sm" className="h-9 rounded-full border-border/60 bg-muted/40 gap-1.5" onClick={exportToExcel}>
+          <FileSpreadsheet className="h-3.5 w-3.5 text-success" /> Excel
+        </Button>
+        {search && <span className="text-xs text-muted-foreground ml-auto">{filtered.length} resultado(s)</span>}
       </div>
 
       {loading ? (
