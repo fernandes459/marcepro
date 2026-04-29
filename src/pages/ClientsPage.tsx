@@ -91,8 +91,45 @@ export default function ClientsPage() {
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search)
+      c.phone.includes(search) ||
+      (c.city || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  const kpis = useMemo(() => {
+    const totalRevenue = clients.reduce((s, c) => s + Number(c.total_spent || 0), 0);
+    const totalBudgets = clients.reduce((s, c) => s + Number(c.budgets_count || 0), 0);
+    const ticket = totalBudgets > 0 ? totalRevenue / totalBudgets : 0;
+    return { count: clients.length, revenue: totalRevenue, ticket };
+  }, [clients]);
+
+  const exportToExcel = () => {
+    if (filtered.length === 0) { toast.error('Nada para exportar'); return; }
+    const rows = filtered.map(c => ({
+      'Nome': c.name,
+      'Telefone': c.phone,
+      'Email': c.email || '',
+      'CPF/CNPJ': c.cpf_cnpj || '',
+      'CEP': c.cep || '',
+      'Endereço': [c.address, c.address_number, c.complement].filter(Boolean).join(', '),
+      'Bairro': c.neighborhood || '',
+      'Cidade': c.city || '',
+      'UF': c.state || '',
+      'Orçamentos': Number(c.budgets_count || 0),
+      'Total Gasto': Number(c.total_spent || 0),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+    XLSX.writeFile(wb, `clientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`${filtered.length} cliente(s) exportado(s)`);
+  };
+
+  const openWhatsAppChat = (client: Client) => {
+    const phone = (client.phone || '').replace(/\D/g, '');
+    if (!phone) { toast.error('Cliente sem telefone'); return; }
+    const intl = phone.startsWith('55') ? phone : `55${phone}`;
+    window.open(`https://wa.me/${intl}`, '_blank');
+  };
 
   const lookupCep = async (cep: string) => {
     const cleaned = cep.replace(/\D/g, '');
