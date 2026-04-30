@@ -456,7 +456,6 @@ const openEditBudget = async (budget: Budget) => {
     }
     setComplexityFactor(String(budget.complexity_factor || '1.0'));
     setFinishType(budget.finish_type || '');
-    setDialogOpen(true);
   };
 
   const sendWhatsApp = (budget: Budget, simplified = false) => {
