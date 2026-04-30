@@ -331,6 +331,8 @@ const EXTRAS_BLOCK_RE = /\n?<!--BUDGET_META:(.*?)-->\n?/s;
       useAdvancedPayment, downPayment, downPaymentMethod,
       installments, installmentMethod, cardFeePercent,
       salespersonId: salespersonId || null,
+      includeOverhead,
+      itemUnits: items.map(i => i.unit || 'un'),
     });
     const cleaned = (raw || '').replace(EXTRAS_BLOCK_RE, '').trim();
     return `${cleaned}\n<!--BUDGET_META:${meta}-->`.trim();
@@ -397,6 +399,7 @@ const resetForm = () => {
     setEditingBudgetId(null); setComplexityFactor('1.0'); setFinishType('');
     setUseParametric(false); setModules([{ type: 'armario_inferior', height: 800, width: 600, depth: 550, thickness: 18, shelves: 1, doors: 2 }]);
     setModuleResult(null); setDiscountPct(0); setCalcOpen(false); setSalespersonId('');
+    setIncludeOverhead(true);
   };
 
 const openEditBudget = async (budget: Budget) => {
@@ -422,6 +425,7 @@ const openEditBudget = async (budget: Budget) => {
     setExtraOther(Number(meta.extraOther) || 0);
     setDiscountPct(Number(meta.discountPct) || 0);
     setSalespersonId(meta.salespersonId || '');
+    setIncludeOverhead(meta.includeOverhead !== false);
 
     const { data: budgetItems, error: itemsError } = await supabase.from('budget_items').select('*').eq('budget_id', budget.id);
     if (itemsError) {
