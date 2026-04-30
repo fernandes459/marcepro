@@ -432,17 +432,19 @@ const openEditBudget = async (budget: Budget) => {
       console.error('[BudgetsPage] erro ao carregar itens', itemsError);
       toast.error('Erro ao carregar itens do orçamento');
     }
+    const itemUnits: string[] = Array.isArray(meta.itemUnits) ? meta.itemUnits : [];
     if (budgetItems && budgetItems.length > 0) {
-      setItems(budgetItems.map((i: any) => ({
+      setItems(budgetItems.map((i: any, idx: number) => ({
         name: i.name ?? '',
         quantity: Number(i.quantity) || 1,
         unitPrice: Number(i.unit_price) || 0,
         materialCost: Number(i.material_cost) || 0,
         laborCost: Number(i.labor_cost) || 0,
         roomLabel: i.room_label || '',
+        unit: itemUnits[idx] || 'un',
       })));
     } else {
-      setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '' }]);
+      setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '', unit: 'un' }]);
     }
     // Sempre abre o painel de cálculos ao editar para o usuário ver/ajustar tudo
     setCalcOpen(true);
