@@ -1293,7 +1293,13 @@ export default function FinancePage() {
         </motion.div>
       )}
 
-      <motion.div key={activeSection} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+      <motion.div
+        key={activeSection}
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="space-y-6"
+      >
         <ErrorBoundary resetKey={activeSection}>
           {renderSection()}
         </ErrorBoundary>
