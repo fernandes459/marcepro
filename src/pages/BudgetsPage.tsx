@@ -9,7 +9,7 @@ import {
 import * as XLSX from 'xlsx';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Slider } from '@/components/ui/slider';
-import { PricingPanel } from '@/components/budget/PricingPanel';
+// PricingPanel substituído pela barra inferior fixa premium
 import { AISuggestPricing } from '@/components/budget/AISuggestPricing';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
