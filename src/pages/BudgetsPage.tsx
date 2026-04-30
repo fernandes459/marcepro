@@ -303,6 +303,21 @@ const [selectedClientId, setSelectedClientId] = useState('');
   };
 
   const addItem = () => setItems([...items, { name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '', unit: 'un' }]);
+  const addItemToRoom = (room: string) => setItems([...items, { name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: room, unit: 'un' }]);
+  const addNewRoom = () => {
+    const existing = new Set(items.map(i => (i.roomLabel || '').trim()).filter(Boolean));
+    const suggestions = ['Cozinha', 'Sala', 'Quarto', 'Banheiro', 'Closet', 'Home Office', 'Área de Serviço'];
+    const next = suggestions.find(s => !existing.has(s)) || `Ambiente ${existing.size + 1}`;
+    setItems([...items, { name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: next, unit: 'un' }]);
+  };
+  const renameRoom = (oldName: string, newName: string) => {
+    if (!newName.trim() || newName === oldName) return;
+    setItems(items.map(i => ((i.roomLabel || '').trim() === oldName.trim() ? { ...i, roomLabel: newName } : i)));
+  };
+  const removeRoom = (room: string) => {
+    if (!confirm(`Remover ambiente "${room}" e todos os seus itens?`)) return;
+    setItems(items.filter(i => (i.roomLabel || '').trim() !== room.trim()));
+  };
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
   const resolveCatalogMaterial = (value: string) => materialCatalog.find((material) => material.name.trim().toLowerCase() === value.trim().toLowerCase());
   const applyCatalogMaterial = (idx: number, materialName: string) => {
