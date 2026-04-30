@@ -33,7 +33,8 @@ import ModuleConfigurator, { ModuleConfig, ModuleResult } from '@/components/bud
 import ContractDRE from '@/components/finance/ContractDRE';
 import PaymentMilestones from '@/components/finance/PaymentMilestones';
 
-interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; roomLabel?: string; }
+interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; roomLabel?: string; unit?: string; }
+const UNIT_OPTIONS = ['un', 'm²', 'm', 'kg', 'pç'];
 const DEFAULT_PAYMENT_TEXT = '50% de entrada e o restante na entrega da obra';
 interface Client {
   id: string; name: string; phone: string; email: string | null; city: string | null;
