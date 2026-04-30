@@ -419,17 +419,25 @@ const openEditBudget = async (budget: Budget) => {
     setDiscountPct(Number(meta.discountPct) || 0);
     setSalespersonId(meta.salespersonId || '');
 
-    const { data: budgetItems } = await supabase.from('budget_items').select('*').eq('budget_id', budget.id);
+    const { data: budgetItems, error: itemsError } = await supabase.from('budget_items').select('*').eq('budget_id', budget.id);
+    if (itemsError) {
+      console.error('[BudgetsPage] erro ao carregar itens', itemsError);
+      toast.error('Erro ao carregar itens do orçamento');
+    }
     if (budgetItems && budgetItems.length > 0) {
       setItems(budgetItems.map((i: any) => ({
-        name: i.name, quantity: i.quantity, unitPrice: i.unit_price,
-        materialCost: i.material_cost, laborCost: i.labor_cost,
+        name: i.name ?? '',
+        quantity: Number(i.quantity) || 1,
+        unitPrice: Number(i.unit_price) || 0,
+        materialCost: Number(i.material_cost) || 0,
+        laborCost: Number(i.labor_cost) || 0,
         roomLabel: i.room_label || '',
       })));
-      setCalcOpen(true); // open the internal calc panel so user sees their items immediately
     } else {
       setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '' }]);
     }
+    // Sempre abre o painel de cálculos ao editar para o usuário ver/ajustar tudo
+    setCalcOpen(true);
 
     if (meta.useAdvancedPayment) {
       setUseAdvancedPayment(true);
