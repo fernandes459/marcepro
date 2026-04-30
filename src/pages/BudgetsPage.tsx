@@ -140,7 +140,7 @@ const [selectedClientId, setSelectedClientId] = useState('');
   const [clientDescription, setClientDescription] = useState('');
   const [notes, setNotes] = useState('');
   const [margin, setMargin] = useState(40);
-  const [items, setItems] = useState<BudgetItem[]>([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0 }]);
+  const [items, setItems] = useState<BudgetItem[]>([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, unit: 'un' }]);
   const [extraTaxes, setExtraTaxes] = useState(0);
   const [extraFreight, setExtraFreight] = useState(0);
   const [extraOther, setExtraOther] = useState(0);
@@ -302,7 +302,7 @@ const [selectedClientId, setSelectedClientId] = useState('');
     return parts.join(' + ') || 'A combinar';
   };
 
-  const addItem = () => setItems([...items, { name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '' }]);
+  const addItem = () => setItems([...items, { name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '', unit: 'un' }]);
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
   const resolveCatalogMaterial = (value: string) => materialCatalog.find((material) => material.name.trim().toLowerCase() === value.trim().toLowerCase());
   const applyCatalogMaterial = (idx: number, materialName: string) => {
@@ -392,7 +392,7 @@ const handleCreate = async (e: React.FormEvent) => {
 
 const resetForm = () => {
     setSelectedClientId(''); setProjectName(''); setClientDescription(''); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT); setNotes('');
-    setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '' }]);
+    setMargin(40); setItems([{ name: '', quantity: 1, unitPrice: 0, materialCost: 0, laborCost: 0, roomLabel: '', unit: 'un' }]);
     setExtraTaxes(0); setExtraFreight(0); setExtraOther(0);
     setUseAdvancedPayment(false); setDownPayment(0); setDownPaymentMethod('pix');
     setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
