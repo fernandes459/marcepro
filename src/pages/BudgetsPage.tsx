@@ -767,411 +767,434 @@ const openEditBudget = async (budget: Budget) => {
                   </div>
                 </div>
               </DialogHeader>
-              <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-              {/* Seção 1: Informações Básicas */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2">Informações Básicas</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Cliente *</Label>
-                    <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
-                      <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Nome do Projeto *</Label>
-                    <Input placeholder="Ex: Cozinha Planejada" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Vendedor responsável *</Label>
-                  {employees.length === 0 ? (
-                    <p className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2">
-                      Nenhum colaborador ativo cadastrado. Cadastre um vendedor em <span className="font-semibold">Configurações → Equipe</span>.
-                    </p>
-                  ) : (
-                    <Select value={salespersonId} onValueChange={setSalespersonId}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar vendedor" /></SelectTrigger>
-                      <SelectContent>{employees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  )}
-                  <p className="text-[10px] text-muted-foreground">
-                    Ao aprovar o orçamento, será gerada automaticamente uma ordem de comissão de {Number(companySettings?.default_commission ?? 10) || 10}% sobre (mão de obra + margem).
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Descrição para o Cliente</Label>
-                  <Textarea 
-                    placeholder="Descreva o projeto como será apresentado no orçamento simplificado..." 
-                    value={clientDescription} 
-                    onChange={(e) => setClientDescription(e.target.value)}
-                    className="min-h-[80px]"
-                  />
-                  <p className="text-xs text-muted-foreground">Este texto aparecerá na versão simplificada do orçamento para o cliente.</p>
-                </div>
-              </div>
+              <div className="flex-1 overflow-y-auto pb-44">
+                <div className="mx-auto max-w-4xl px-4 py-5 space-y-5 sm:px-6">
 
-              {/* Seção 2: Configurações de Precificação */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2">Configurações de Precificação</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm">Complexidade</Label>
-                    <Select value={complexityFactor} onValueChange={setComplexityFactor}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                      <SelectContent>
-                        {COMPLEXITY_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label} ({(opt.multiplier * 100 - 100).toFixed(0)}%{opt.multiplier === 1 ? ' base' : ' a mais'})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[10px] text-muted-foreground">
-                      {COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.description}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Acabamento</Label>
-                    <Select value={finishType} onValueChange={setFinishType}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar acabamento" /></SelectTrigger>
-                      <SelectContent>
-                        {FINISH_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label} {opt.multiplier > 1 ? `(+${((opt.multiplier - 1) * 100).toFixed(0)}%)` : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Margem de Lucro (%)</Label>
-                    <Input type="number" value={margin} onChange={(e) => setMargin(Number(e.target.value))} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Seção 3: Motor de Engenharia Paramétrico */}
-              <div className="space-y-3 border border-border rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold flex items-center gap-2"><Wrench className="h-4 w-4 text-primary" /> Motor de Engenharia</Label>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs text-muted-foreground">Ativar</Label>
-                    <Switch checked={useParametric} onCheckedChange={setUseParametric} />
-                  </div>
-                </div>
-                {useParametric && (
-                  <ModuleConfigurator
-                    modules={modules}
-                    onModulesChange={setModules}
-                    mdfPricePerM2={mdfPricePerM2}
-                    edgeTapePricePerM={edgeTapePricePerM}
-                    onMdfPriceChange={setMdfPricePerM2}
-                    onEdgeTapePriceChange={setEdgeTapePricePerM}
-                    onResultChange={setModuleResult}
-                  />
-                )}
-              </div>
-
-              {/* Seção 4: Cálculos Internos (COLAPSÁVEL — oculto por padrão) */}
-              <Collapsible open={calcOpen} onOpenChange={setCalcOpen}>
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="w-full flex items-center justify-between border border-border rounded-xl p-4 hover:bg-muted/30 transition-colors"
-                  >
-                    <span className="text-sm font-semibold flex items-center gap-2">
-                      <Calculator className="h-4 w-4 text-primary" /> Cálculos Internos
-                      <Badge variant="secondary" className="ml-2 text-[10px]">{formatBRL(totalCost)}</Badge>
-                    </span>
-                    {calcOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 border border-t-0 border-border rounded-b-xl p-4 bg-muted/20 -mt-px">
-                  {/* Materiais e Serviços */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-semibold">Materiais e Serviços</Label>
-                      <Button type="button" variant="outline" size="sm" onClick={addItem}><Plus className="h-3 w-3 mr-1" /> Adicionar</Button>
-                    </div>
-                    <div className="space-y-2">
-                      {items.map((item, idx) => {
-                        const itemSubtotal = (item.materialCost + item.laborCost) * item.quantity;
-                        const matchedMaterial = resolveCatalogMaterial(item.name);
-                        return (
-                          <div key={idx} className="rounded-lg bg-background p-3 space-y-2 border">
-                            <div className="flex items-start gap-2">
-                              <div className="flex-1 grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-2">
-                                <div className="space-y-1">
-                                  <Input list={`budget-material-suggestions-${idx}`} placeholder="Nome do material/serviço" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} onBlur={(e) => applyCatalogMaterial(idx, e.target.value)} className="text-sm" />
-                                  <datalist id={`budget-material-suggestions-${idx}`}>
-                                    {materialSuggestions.map((suggestion) => (
-                                      <option key={`${idx}-${suggestion.key}`} value={suggestion.value} label={suggestion.label} />
-                                    ))}
-                                  </datalist>
-                                  {matchedMaterial ? (
-                                    <p className="text-[10px] text-muted-foreground">
-                                      Custo sugerido: <span className="font-medium text-foreground">{formatBRL(Number(matchedMaterial.unit_cost))}</span>
-                                      {matchedMaterial.unit ? ` / ${matchedMaterial.unit}` : ''}
-                                      {matchedMaterial.supplier ? ` · ${matchedMaterial.supplier}` : ''}
-                                    </p>
-                                  ) : materialCatalog.length > 0 ? (
-                                    <p className="text-[10px] text-muted-foreground">Digite para auto completar e preencher o custo automaticamente.</p>
-                                  ) : (
-                                    <p className="text-[10px] text-muted-foreground">Cadastre materiais em Configurações para agilizar os orçamentos.</p>
-                                  )}
-                                </div>
-                                <Input
-                                  list="room-label-suggestions"
-                                  placeholder="Ambiente (ex: Cozinha)"
-                                  value={item.roomLabel || ''}
-                                  onChange={(e) => updateItem(idx, 'roomLabel', e.target.value)}
-                                  className="text-sm"
-                                />
-                              </div>
-                              <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="text-destructive shrink-0 h-8 w-8 p-0"><Trash2 className="h-3.5 w-3.5" /></Button>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <div>
-                                <label className="text-[10px] text-muted-foreground mb-1 block">Qtd</label>
-                                <Input type="number" value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} className="text-sm h-9" />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-muted-foreground mb-1 block">Material (R$)</label>
-                                <CurrencyInput value={item.materialCost} onChange={(v) => updateItem(idx, 'materialCost', v)} placeholder="0,00" />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-muted-foreground mb-1 block">M.O. (R$)</label>
-                                <CurrencyInput value={item.laborCost} onChange={(v) => updateItem(idx, 'laborCost', v)} placeholder="0,00" />
-                              </div>
-                            </div>
-                            {itemSubtotal > 0 && (
-                              <div className="text-right text-xs text-muted-foreground">
-                                Subtotal: <span className="font-semibold text-foreground">{formatBRL(itemSubtotal)}</span>
-                              </div>
-                            )}
+                  {/* HEADER: Cliente / Vendedor / Projeto */}
+                  <section className="card-premium rounded-2xl p-4 sm:p-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Cliente *</Label>
+                        <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                          <SelectTrigger className="h-11"><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
+                          <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                        {selectedClientId && (() => {
+                          const c = clients.find(x => x.id === selectedClientId);
+                          if (!c) return null;
+                          const addr = [c.address, c.address_number].filter(Boolean).join(', ') || c.city || '';
+                          return (
+                            <p className="text-[11px] text-muted-foreground leading-snug">
+                              {c.phone}{addr ? ` · ${addr}` : ''}
+                            </p>
+                          );
+                        })()}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Vendedor *</Label>
+                        {employees.length === 0 ? (
+                          <div className="h-11 rounded-md border border-dashed border-border px-3 flex items-center text-[11px] text-muted-foreground">
+                            Cadastre em Configurações
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Custos adicionais */}
-                  <div className="space-y-3 pt-2 border-t border-border">
-                    <Label className="text-sm font-semibold">Custos Adicionais</Label>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-[10px] text-muted-foreground mb-1 block">Taxas (R$)</label>
-                        <CurrencyInput value={extraTaxes} onChange={setExtraTaxes} placeholder="0,00" />
+                        ) : (
+                          <Select value={salespersonId} onValueChange={setSalespersonId}>
+                            <SelectTrigger className="h-11"><SelectValue placeholder="Selecionar vendedor" /></SelectTrigger>
+                            <SelectContent>{employees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>)}</SelectContent>
+                          </Select>
+                        )}
                       </div>
-                      <div>
-                        <label className="text-[10px] text-muted-foreground mb-1 block">Frete (R$)</label>
-                        <CurrencyInput value={extraFreight} onChange={setExtraFreight} placeholder="0,00" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-muted-foreground mb-1 block">Outros (R$)</label>
-                        <CurrencyInput value={extraOther} onChange={setExtraOther} placeholder="0,00" />
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Nome do Projeto *</Label>
+                        <Input className="h-11" placeholder="Ex: Cozinha Planejada" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
                       </div>
                     </div>
-                  </div>
+                  </section>
 
-                  {/* Resumo financeiro detalhado (técnico) */}
-                  <Card className="bg-background border">
-                    <CardContent className="p-4 space-y-1.5">
-                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Material</span><span className="font-medium">{formatBRL(totalMaterial)}</span></div>
-                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Mão de Obra</span><span className="font-medium">{formatBRL(totalLabor)}</span></div>
-                      {useParametric && parametricCost > 0 && (
-                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Engenharia (MDF + Fita)</span><span className="font-medium text-info">{formatBRL(parametricCost)}</span></div>
-                      )}
-                      {extraTaxes > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxas</span><span className="font-medium">{formatBRL(extraTaxes)}</span></div>}
-                      {extraFreight > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Frete</span><span className="font-medium">{formatBRL(extraFreight)}</span></div>}
-                      {extraOther > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Outros</span><span className="font-medium">{formatBRL(extraOther)}</span></div>}
-                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal Base</span><span className="font-medium">{formatBRL(baseCost)}</span></div>
-                      {complexityMultiplier > 1 && (
-                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Complexidade ({COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.label})</span><span className="font-medium text-warning">×{complexityMultiplier}</span></div>
-                      )}
-                      {finishMultiplier > 1 && (
-                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Acabamento ({FINISH_OPTIONS.find(f => f.value === finishType)?.label})</span><span className="font-medium text-warning">×{finishMultiplier}</span></div>
-                      )}
-                      <div className="flex justify-between text-sm border-t border-border pt-2"><span className="font-semibold">Custo Total Ajustado</span><span className="font-bold">{formatBRL(totalCost)}</span></div>
-                    </CardContent>
-                  </Card>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Seção 5: NEGOCIAÇÃO INTELIGENTE */}
-              <div className="space-y-3 border border-border rounded-xl p-4">
-                <Label className="text-sm font-semibold flex items-center gap-2">
-                  <Handshake className="h-4 w-4 text-primary" /> Negociação Inteligente
-                </Label>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Desconto sobre o preço de tabela</span>
-                    <span className="font-semibold text-base">{discountPct.toFixed(1)}%</span>
-                  </div>
-                  <Slider
-                    value={[discountPct]}
-                    onValueChange={(v) => setDiscountPct(v[0])}
-                    min={0}
-                    max={30}
-                    step={0.5}
-                  />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Preço tabela: {formatBRL(priceBeforeDiscount)}</span>
-                    {discountPct > 0 && (
-                      <span>Economia cliente: <span className="text-destructive font-semibold">-{formatBRL(priceBeforeDiscount - finalPrice)}</span></span>
-                    )}
-                  </div>
-                  {defaultCommission > 0 && (
-                    <div className="text-xs flex items-center justify-between bg-muted/40 rounded-md px-3 py-2">
-                      <span className="text-muted-foreground">Impacto na comissão ({defaultCommission}%)</span>
-                      <span className="font-semibold">{formatBRL(commissionAmount)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* PAINEL DE PRECIFICAÇÃO PREMIUM (sticky) */}
-              <datalist id="room-label-suggestions">
-                {Array.from(new Set(items.map(i => i.roomLabel).filter(Boolean) as string[])).map(r => <option key={r} value={r} />)}
-                <option value="Cozinha" />
-                <option value="Sala" />
-                <option value="Quarto" />
-                <option value="Banheiro" />
-                <option value="Closet" />
-                <option value="Home Office" />
-                <option value="Área de Serviço" />
-              </datalist>
-              <div className="sticky bottom-0 z-10 -mx-1 pt-1 space-y-2">
-                <PricingPanel
-                  totalCost={totalCost}
-                  finalPrice={finalPrice}
-                  margin={margin}
-                  minMargin={minMargin}
-                />
-                <div className="flex justify-end">
-                  <AISuggestPricing
-                    totalCost={totalCost}
-                    defaultMargin={Number(companySettings?.default_margin ?? 40)}
-                    minMargin={minMargin}
-                    projectName={projectName}
-                    finishType={finishType}
-                    complexity={complexityFactor}
-                    rooms={Array.from(new Set(items.map(i => i.roomLabel).filter(Boolean) as string[]))}
-                    onApply={(price) => {
-                      // Adjust margin so finalPrice ~= price (com desconto atual)
-                      if (totalCost <= 0) return;
-                      const targetPriceBeforeDiscount = price / (1 - discountPct / 100);
-                      const newMargin = Math.max(0, ((targetPriceBeforeDiscount - totalCost) / totalCost) * 100);
-                      setMargin(Number(newMargin.toFixed(1)));
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Seção 6: Condições de Pagamento */}
-              <div className="space-y-4 border border-border rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Condições de Pagamento</Label>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs text-muted-foreground">Avançado</Label>
-                    <Switch checked={useAdvancedPayment} onCheckedChange={setUseAdvancedPayment} />
-                  </div>
-                </div>
-                {!useAdvancedPayment ? (
-                  <Textarea
-                    value={simplePaymentMethod}
-                    onChange={(e) => setSimplePaymentMethod(e.target.value)}
-                    placeholder="Ex: 50% de entrada e o restante na entrega da obra"
-                    className="min-h-[60px] text-sm"
-                  />
-                ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label className="text-xs">Entrada</Label><CurrencyInput value={downPayment} onChange={setDownPayment} /></div>
-                      <div className="space-y-2"><Label className="text-xs">Método da Entrada</Label>
-                        <Select value={downPaymentMethod} onValueChange={setDownPaymentMethod}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pix">PIX</SelectItem>
-                            <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                            <SelectItem value="transferencia">Transferência</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label className="text-xs">Parcelas</Label>
-                        <Select value={String(installments)} onValueChange={v => setInstallments(Number(v))}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>{Array.from({length: 18}, (_, i) => i + 1).map(n => <SelectItem key={n} value={String(n)}>{n}x</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2"><Label className="text-xs">Método</Label>
-                        <Select value={installmentMethod} onValueChange={(v) => { setInstallmentMethod(v); if (v !== 'credit') setCardFeePercent(0); }}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="credit">Cartão Crédito</SelectItem>
-                            <SelectItem value="debit">Cartão Débito</SelectItem>
-                            <SelectItem value="boleto">Boleto</SelectItem>
-                            <SelectItem value="pix">PIX (à vista)</SelectItem>
-                            <SelectItem value="dinheiro">Dinheiro (à vista)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    {installmentMethod === 'credit' && (
-                      <div className="space-y-2">
-                        <Label className="text-xs">Taxa do Cartão (%)</Label>
-                        <Input type="number" step="0.1" value={cardFeePercent || ''} onChange={e => setCardFeePercent(Number(e.target.value))} placeholder="Ex: 5.5" />
-                        <p className="text-[10px] text-muted-foreground">
-                          {companySettings && (companySettings as any).card_fees?.[String(installments)]
-                            ? '✓ Taxa preenchida automaticamente das configurações'
-                            : 'Configure taxas padrão em Configurações → Taxas'}
+                  {/* CONTROLES MINIMAIS: Custo Operacional + Complexidade + Acabamento */}
+                  <section className="card-premium rounded-2xl p-4 sm:p-5 space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <Label className="text-sm font-semibold">Incluir Custo Operacional</Label>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {includeOverhead
+                            ? `Adiciona ${formatBRL(overheadPerProject)} por projeto (overhead da empresa)`
+                            : 'Custo operacional desconsiderado neste orçamento'}
                         </p>
                       </div>
-                    )}
-                    <Card className="bg-muted/50">
-                      <CardContent className="p-3 space-y-1 text-sm">
-                        {downPayment > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Entrada ({downPaymentMethod === 'pix' ? 'PIX' : downPaymentMethod})</span><span className="font-medium">{formatBRL(downPayment)}</span></div>}
-                        <div className="flex justify-between"><span className="text-muted-foreground">Restante</span><span className="font-medium">{formatBRL(remaining)}</span></div>
-                        {installmentMethod === 'credit' && cardFeePercent > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Taxa cartão ({cardFeePercent}%)</span><span className="font-medium text-destructive">+{formatBRL(cardFeeAmount)}</span></div>}
-                        {installmentMethod === 'credit' && cardFeePercent > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Total c/ taxa</span><span className="font-medium">{formatBRL(totalWithFee)}</span></div>}
-                        <div className="flex justify-between border-t border-border pt-1"><span className="font-semibold">{installments}x de</span><span className="font-bold">{formatBRL(installmentValue)}</span></div>
-                        {installmentMethod !== 'credit' && <div className="text-[10px] text-success mt-1">✓ Sem taxa de cartão</div>}
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
+                      <Switch checked={includeOverhead} onCheckedChange={setIncludeOverhead} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/60">
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Complexidade</Label>
+                        <Select value={complexityFactor} onValueChange={setComplexityFactor}>
+                          <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {COMPLEXITY_OPTIONS.map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label} {opt.multiplier > 1 ? `(+${((opt.multiplier - 1) * 100).toFixed(0)}%)` : ''}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Acabamento</Label>
+                        <Select value={finishType} onValueChange={setFinishType}>
+                          <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                          <SelectContent>
+                            {FINISH_OPTIONS.map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label} {opt.multiplier > 1 ? `(+${((opt.multiplier - 1) * 100).toFixed(0)}%)` : ''}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* PROJETO POR AMBIENTE */}
+                  <section className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Ambientes do Projeto</h3>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Adicione materiais agrupados por ambiente. Cada um terá total separado.</p>
+                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={addNewRoom} className="h-9 rounded-full">
+                        <Plus className="h-3.5 w-3.5 mr-1" /> Ambiente
+                      </Button>
+                    </div>
+
+                    {(() => {
+                      // Agrupa por ambiente preservando ordem de aparição
+                      const groups = new Map<string, { items: BudgetItem[]; indices: number[] }>();
+                      items.forEach((it, idx) => {
+                        const key = (it.roomLabel || '').trim() || 'Geral';
+                        if (!groups.has(key)) groups.set(key, { items: [], indices: [] });
+                        groups.get(key)!.items.push(it);
+                        groups.get(key)!.indices.push(idx);
+                      });
+                      return Array.from(groups.entries()).map(([roomName, group]) => {
+                        const subtotalCost = group.items.reduce((s, i) => s + (i.materialCost + i.laborCost) * i.quantity, 0);
+                        const subtotalSale = group.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+                        return (
+                          <div key={roomName} className="card-premium rounded-2xl overflow-hidden">
+                            {/* Header do ambiente */}
+                            <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60 bg-muted/20">
+                              <Input
+                                defaultValue={roomName}
+                                onBlur={(e) => renameRoom(roomName, e.target.value)}
+                                className="h-9 max-w-[220px] font-display text-base font-semibold border-0 bg-transparent px-2 focus-visible:bg-background focus-visible:ring-1"
+                                placeholder="Nome do ambiente"
+                              />
+                              <div className="ml-auto text-right">
+                                <p className="text-[10px] uppercase tracking-wide text-muted-foreground leading-none">Total</p>
+                                <p className="font-display text-sm font-semibold text-gold leading-tight">{formatBRL(subtotalSale || subtotalCost)}</p>
+                              </div>
+                              <Button type="button" variant="ghost" size="sm" onClick={() => removeRoom(roomName)} className="h-8 w-8 p-0 text-destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+
+                            {/* Itens do ambiente */}
+                            <div className="p-3 space-y-2">
+                              {group.items.map((item, localIdx) => {
+                                const idx = group.indices[localIdx];
+                                const itemSubtotal = (item.materialCost + item.laborCost) * item.quantity;
+                                return (
+                                  <div key={idx} className="rounded-lg border border-border/60 bg-background/40 p-3 space-y-2">
+                                    <div className="flex items-start gap-2">
+                                      <div className="flex-1">
+                                        <Input
+                                          list={`mat-sug-${idx}`}
+                                          placeholder="Nome do material"
+                                          value={item.name}
+                                          onChange={(e) => updateItem(idx, 'name', e.target.value)}
+                                          onBlur={(e) => applyCatalogMaterial(idx, e.target.value)}
+                                          className="text-sm h-9"
+                                        />
+                                        <datalist id={`mat-sug-${idx}`}>
+                                          {materialSuggestions.map(s => <option key={`${idx}-${s.key}`} value={s.value} label={s.label} />)}
+                                        </datalist>
+                                      </div>
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-9 w-9 p-0 text-destructive shrink-0">
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                      <div>
+                                        <label className="text-[10px] text-muted-foreground mb-0.5 block">Qtd</label>
+                                        <Input type="number" inputMode="decimal" value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} className="h-9 text-sm" />
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-muted-foreground mb-0.5 block">Unidade</label>
+                                        <Select value={item.unit || 'un'} onValueChange={(v) => updateItem(idx, 'unit', v)}>
+                                          <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                                          <SelectContent>{UNIT_OPTIONS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-muted-foreground mb-0.5 block">Material (R$)</label>
+                                        <CurrencyInput value={item.materialCost} onChange={(v) => updateItem(idx, 'materialCost', v)} placeholder="0,00" />
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-muted-foreground mb-0.5 block">M.O. (R$)</label>
+                                        <CurrencyInput value={item.laborCost} onChange={(v) => updateItem(idx, 'laborCost', v)} placeholder="0,00" />
+                                      </div>
+                                    </div>
+                                    {itemSubtotal > 0 && (
+                                      <div className="flex justify-between text-[11px] text-muted-foreground border-t border-border/40 pt-1.5">
+                                        <span>Custo unitário: {formatBRL(item.materialCost + item.laborCost)} / {item.unit || 'un'}</span>
+                                        <span>Subtotal: <span className="font-semibold text-foreground">{formatBRL(itemSubtotal)}</span></span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <Button type="button" variant="ghost" size="sm" onClick={() => addItemToRoom(roomName === 'Geral' ? '' : roomName)} className="w-full h-9 border border-dashed border-border/60 text-muted-foreground hover:text-foreground">
+                                <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar item em {roomName}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </section>
+
+                  {/* AVANÇADO (colapsável): Engenharia + Custos extras + Negociação + Pagamento + Notas */}
+                  <Collapsible open={calcOpen} onOpenChange={setCalcOpen}>
+                    <CollapsibleTrigger asChild>
+                      <button type="button" className="w-full flex items-center justify-between rounded-2xl border border-border/60 px-4 py-3 hover:bg-muted/30 transition-colors text-sm">
+                        <span className="flex items-center gap-2 font-semibold">
+                          <Settings2 className="h-4 w-4 text-primary" /> Opções Avançadas
+                          <span className="text-[10px] text-muted-foreground font-normal">Engenharia, custos extras, negociação, pagamento</span>
+                        </span>
+                        {calcOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-4 mt-3">
+
+                      {/* Motor de Engenharia */}
+                      <div className="card-premium rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold flex items-center gap-2"><Wrench className="h-4 w-4 text-primary" /> Motor de Engenharia</Label>
+                          <Switch checked={useParametric} onCheckedChange={setUseParametric} />
+                        </div>
+                        {useParametric && (
+                          <ModuleConfigurator
+                            modules={modules}
+                            onModulesChange={setModules}
+                            mdfPricePerM2={mdfPricePerM2}
+                            edgeTapePricePerM={edgeTapePricePerM}
+                            onMdfPriceChange={setMdfPricePerM2}
+                            onEdgeTapePriceChange={setEdgeTapePricePerM}
+                            onResultChange={setModuleResult}
+                          />
+                        )}
+                      </div>
+
+                      {/* Custos extras */}
+                      <div className="card-premium rounded-2xl p-4 space-y-3">
+                        <Label className="text-sm font-semibold">Custos Adicionais</Label>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="text-[10px] text-muted-foreground mb-1 block">Taxas</label>
+                            <CurrencyInput value={extraTaxes} onChange={setExtraTaxes} placeholder="0,00" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-foreground mb-1 block">Frete</label>
+                            <CurrencyInput value={extraFreight} onChange={setExtraFreight} placeholder="0,00" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-foreground mb-1 block">Outros</label>
+                            <CurrencyInput value={extraOther} onChange={setExtraOther} placeholder="0,00" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Negociação */}
+                      <div className="card-premium rounded-2xl p-4 space-y-3">
+                        <Label className="text-sm font-semibold flex items-center gap-2">
+                          <Handshake className="h-4 w-4 text-primary" /> Desconto Negociado
+                        </Label>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Desconto sobre preço de tabela</span>
+                            <span className="font-semibold">{discountPct.toFixed(1)}%</span>
+                          </div>
+                          <Slider value={[discountPct]} onValueChange={(v) => setDiscountPct(v[0])} min={0} max={30} step={0.5} />
+                          {discountPct > 0 && (
+                            <p className="text-[11px] text-muted-foreground">
+                              Economia para o cliente: <span className="text-destructive font-semibold">-{formatBRL(priceBeforeDiscount - finalPrice)}</span>
+                            </p>
+                          )}
+                        </div>
+                        <div className="pt-2 border-t border-border/60">
+                          <AISuggestPricing
+                            totalCost={totalCost}
+                            defaultMargin={Number(companySettings?.default_margin ?? 40)}
+                            minMargin={minMargin}
+                            projectName={projectName}
+                            finishType={finishType}
+                            complexity={complexityFactor}
+                            rooms={Array.from(new Set(items.map(i => i.roomLabel).filter(Boolean) as string[]))}
+                            onApply={(price) => {
+                              if (totalCost <= 0) return;
+                              const targetPriceBeforeDiscount = price / (1 - discountPct / 100);
+                              const newMargin = Math.max(0, ((targetPriceBeforeDiscount - totalCost) / totalCost) * 100);
+                              setMargin(Number(newMargin.toFixed(1)));
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Pagamento (Entrada + Saldo) */}
+                      <div className="card-premium rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold">Condições de Pagamento</Label>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground">Avançado</Label>
+                            <Switch checked={useAdvancedPayment} onCheckedChange={setUseAdvancedPayment} />
+                          </div>
+                        </div>
+                        {!useAdvancedPayment ? (
+                          <Textarea
+                            value={simplePaymentMethod}
+                            onChange={(e) => setSimplePaymentMethod(e.target.value)}
+                            placeholder="Ex: 50% de entrada e o restante na entrega"
+                            className="min-h-[60px] text-sm"
+                          />
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1.5"><Label className="text-xs">Entrada (R$)</Label><CurrencyInput value={downPayment} onChange={setDownPayment} /></div>
+                              <div className="space-y-1.5"><Label className="text-xs">Método entrada</Label>
+                                <Select value={downPaymentMethod} onValueChange={setDownPaymentMethod}>
+                                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="pix">PIX</SelectItem>
+                                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                                    <SelectItem value="transferencia">Transferência</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1.5"><Label className="text-xs">Parcelas</Label>
+                                <Select value={String(installments)} onValueChange={v => setInstallments(Number(v))}>
+                                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                  <SelectContent>{Array.from({length: 18}, (_, i) => i + 1).map(n => <SelectItem key={n} value={String(n)}>{n}x</SelectItem>)}</SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1.5"><Label className="text-xs">Método saldo</Label>
+                                <Select value={installmentMethod} onValueChange={(v) => { setInstallmentMethod(v); if (v !== 'credit') setCardFeePercent(0); }}>
+                                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="credit">Cartão Crédito</SelectItem>
+                                    <SelectItem value="debit">Cartão Débito</SelectItem>
+                                    <SelectItem value="boleto">Boleto</SelectItem>
+                                    <SelectItem value="pix">PIX</SelectItem>
+                                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            {installmentMethod === 'credit' && (
+                              <div className="space-y-1.5">
+                                <Label className="text-xs">Taxa do Cartão (%)</Label>
+                                <Input type="number" step="0.1" value={cardFeePercent || ''} onChange={e => setCardFeePercent(Number(e.target.value))} placeholder="Ex: 5.5" className="h-10" />
+                              </div>
+                            )}
+                            <div className="rounded-lg bg-muted/40 p-3 space-y-1 text-sm">
+                              {downPayment > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Entrada</span><span className="font-medium">{formatBRL(downPayment)}</span></div>}
+                              <div className="flex justify-between"><span className="text-muted-foreground">Saldo</span><span className="font-medium">{formatBRL(remaining)}</span></div>
+                              {installmentMethod === 'credit' && cardFeePercent > 0 && (
+                                <div className="flex justify-between"><span className="text-muted-foreground">+ Taxa cartão</span><span className="text-destructive font-medium">{formatBRL(cardFeeAmount)}</span></div>
+                              )}
+                              <div className="flex justify-between border-t border-border/60 pt-1"><span className="font-semibold">{installments}x de</span><span className="font-bold text-gold">{formatBRL(installmentValue)}</span></div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Descrição cliente + observações */}
+                      <div className="card-premium rounded-2xl p-4 space-y-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-sm font-semibold">Descrição para o Cliente</Label>
+                          <Textarea placeholder="Aparece no PDF do cliente..." value={clientDescription} onChange={(e) => setClientDescription(e.target.value)} className="min-h-[70px] text-sm" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-sm font-semibold">Observações Internas</Label>
+                          <Textarea placeholder="Notas internas (não aparecem para o cliente)..." value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-[60px] text-sm" />
+                        </div>
+                      </div>
+
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <datalist id="room-label-suggestions">
+                    {Array.from(new Set(items.map(i => i.roomLabel).filter(Boolean) as string[])).map(r => <option key={r} value={r} />)}
+                    <option value="Cozinha" /><option value="Sala" /><option value="Quarto" />
+                    <option value="Banheiro" /><option value="Closet" /><option value="Home Office" /><option value="Área de Serviço" />
+                  </datalist>
+                </div>
               </div>
 
-              {/* Seção 6: Observações Internas (última) */}
-              <div className="space-y-2">
-                <Label>Observações Internas</Label>
-                <Textarea 
-                  placeholder="Notas internas sobre o orçamento (não aparecem no orçamento do cliente)..." 
-                  value={notes} 
-                  onChange={(e) => setNotes(e.target.value)} 
-                />
-                <p className="text-xs text-muted-foreground">Estas notas são apenas para uso interno e não aparecem nos PDFs ou WhatsApp.</p>
-              </div>
-              
-              </div>
-              <div className="border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-6">
-                <Button
-                  type="submit"
-                  className={`w-full border-0 ${isBelowMin ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : 'gradient-primary shadow-primary'}`}
-                  disabled={saving || isBelowMin}
-                >
-                  {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {isBelowMin ? <Lock className="h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
-                  {isBelowMin
-                    ? `Bloqueado — margem abaixo de ${minMargin}%`
-                    : editingBudgetId
-                      ? 'Salvar Alterações'
-                      : 'Salvar Orçamento'}
-                </Button>
+              {/* BARRA INFERIOR FIXA — Custo / Lucro / Margem / Preço Final + Slider + Ação */}
+              <div className="border-t border-border bg-background/95 backdrop-blur-md shadow-premium">
+                <div className="mx-auto max-w-4xl px-4 py-3 sm:px-6 space-y-2.5">
+                  {/* Linha 1: 4 indicadores + status */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Custo total</p>
+                      <p className="font-display text-base sm:text-lg font-semibold">{formatBRL(totalCost)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Lucro</p>
+                      <p className={`font-display text-base sm:text-lg font-semibold ${isBelowMin ? 'text-destructive' : 'text-success'}`}>{formatBRL(realProfit)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Margem</p>
+                      <p className={`font-display text-base sm:text-lg font-semibold ${isBelowMin ? 'text-destructive' : 'text-foreground'}`}>{realMarginPct.toFixed(1)}%</p>
+                    </div>
+                    <div className="text-right sm:text-left">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Preço final</p>
+                      <p className="font-display text-xl sm:text-2xl font-bold text-gold leading-tight">{formatBRL(finalPrice)}</p>
+                    </div>
+                  </div>
+
+                  {/* Linha 2: slider de margem (sempre visível) */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">Margem alvo</span>
+                    <Slider value={[margin]} onValueChange={(v) => setMargin(v[0])} min={0} max={150} step={1} className="flex-1" />
+                    <span className="text-xs font-semibold tabular-nums w-12 text-right">{margin.toFixed(0)}%</span>
+                  </div>
+
+                  {/* Linha 3: ações */}
+                  <div className="flex gap-2">
+                    <Button
+                      type="submit"
+                      className={`flex-1 h-11 border-0 ${isBelowMin ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : 'gradient-primary shadow-primary'}`}
+                      disabled={saving || isBelowMin}
+                    >
+                      {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      {isBelowMin ? <Lock className="h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
+                      {isBelowMin ? `Margem mín. ${minMargin}%` : editingBudgetId ? 'Salvar Alterações' : 'Salvar Orçamento'}
+                    </Button>
+                    {editingBudgetId && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 border-success/40 text-success hover:bg-success/10"
+                        disabled={saving || isBelowMin}
+                        onClick={async () => {
+                          // Salva primeiro, depois aprova
+                          const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+                          await handleCreate(fakeEvent);
+                          if (editingBudgetId) await updateBudgetStatus(editingBudgetId, 'approved');
+                        }}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1.5" /> Aprovar
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </form>
           </DialogContent>
