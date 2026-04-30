@@ -398,6 +398,8 @@ const resetForm = () => {
   };
 
 const openEditBudget = async (budget: Budget) => {
+    // Abre o dialog imediatamente — UX melhor enquanto carrega os itens
+    setDialogOpen(true);
     setEditingBudgetId(budget.id);
     setSelectedClientId(budget.client_id || '');
     setProjectName(budget.project_name || '');
