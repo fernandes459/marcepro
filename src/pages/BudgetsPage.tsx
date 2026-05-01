@@ -534,7 +534,11 @@ const openEditBudget = async (budget: Budget) => {
   const updateBudgetStatus = async (id: string, status: string) => {
     const budget = budgets.find(b => b.id === id);
     const { error } = await supabase.from('budgets').update({ status } as any).eq('id', id);
-    if (error) { toast.error('Erro ao atualizar status'); return; }
+    if (error) {
+      console.error('Erro ao atualizar status:', error);
+      toast.error(`Erro ao atualizar status: ${error.message}`);
+      return;
+    }
     if (status === 'approved' && budget && user) {
       const client = budget.clients as Client | null;
       const today = new Date().toISOString().slice(0, 10);
