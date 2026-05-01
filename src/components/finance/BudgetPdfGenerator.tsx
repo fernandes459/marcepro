@@ -74,20 +74,34 @@ function renderClientPdf(data: BudgetPdfData): string {
   const grouped = groupByRoom(data.items);
   const deliveryDate = addBusinessDays(new Date(data.createdAt), data.deliveryDays);
 
-  const roomsHtml = grouped
-    .map(([room, list]) => {
-      const subtotal = list.reduce((s, i) => s + i.unit_price * i.quantity, 0);
-      const namesPreview = list.slice(0, 4).map((i) => i.name).join(' · ');
-      const more = list.length > 4 ? ` +${list.length - 4}` : '';
-      return `
+  // Calcula subtotal "bruto" de cada ambiente e escala proporcionalmente ao preço final,
+  // para que a soma dos ambientes seja exatamente igual ao Investimento Total exibido.
+  const roomSubtotals = grouped.map(([room, list]) => ({
+    room,
+    raw: list.reduce((s, i) => s + i.unit_price * i.quantity, 0),
+  }));
+  const rawTotal = roomSubtotals.reduce((s, r) => s + r.raw, 0);
+  const scaled = roomSubtotals.map((r, idx) => {
+    if (rawTotal <= 0) {
+      // distribui igualmente se não houver base
+      return { ...r, value: data.finalPrice / Math.max(1, roomSubtotals.length) };
+    }
+    return { ...r, value: (r.raw / rawTotal) * data.finalPrice };
+  });
+  // Ajuste de arredondamento: força a soma a bater com finalPrice no último item
+  const sumScaled = scaled.reduce((s, r) => s + r.value, 0);
+  if (scaled.length > 0) {
+    scaled[scaled.length - 1].value += data.finalPrice - sumScaled;
+  }
+
+  const roomsHtml = scaled
+    .map(({ room, value }) => `
         <div class="room">
           <div class="room-head">
             <div class="room-name">${room}</div>
-            <div class="room-value">${formatBRL(subtotal)}</div>
+            <div class="room-value">${formatBRL(value)}</div>
           </div>
-          ${namesPreview ? `<div class="room-sub">${namesPreview}${more}</div>` : ''}
-        </div>`;
-    })
+        </div>`)
     .join('');
 
   const addressLine = data.client
