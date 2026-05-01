@@ -374,14 +374,27 @@ const handleCreate = async (e: React.FormEvent) => {
         payment_method: paymentDesc || null, notes: notesWithMeta,
         complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
       } as any).eq('id', editingBudgetId);
-      if (budgetError) { toast.error('Erro ao atualizar orçamento'); setSaving(false); return; }
+      if (budgetError) {
+        console.error('Erro ao atualizar orçamento:', budgetError);
+        toast.error(`Erro ao atualizar: ${budgetError.message}`);
+        setSaving(false);
+        return;
+      }
       await supabase.from('budget_items').delete().eq('budget_id', editingBudgetId);
       const budgetItems = items.filter(i => i.name.trim()).map(i => ({
         budget_id: editingBudgetId, name: i.name, quantity: i.quantity,
         material_cost: i.materialCost, labor_cost: i.laborCost, unit_price: i.unitPrice,
         room_label: i.roomLabel?.trim() || null,
       }));
-      if (budgetItems.length > 0) await supabase.from('budget_items').insert(budgetItems as any);
+      if (budgetItems.length > 0) {
+        const { error: itemsError } = await supabase.from('budget_items').insert(budgetItems as any);
+        if (itemsError) {
+          console.error('Erro ao salvar itens:', itemsError);
+          toast.error(`Erro ao salvar itens: ${itemsError.message}`);
+          setSaving(false);
+          return;
+        }
+      }
       toast.success('Orçamento atualizado!');
     } else {
       const { data: budgetData, error: budgetError } = await supabase.from('budgets').insert({
@@ -392,13 +405,26 @@ const handleCreate = async (e: React.FormEvent) => {
         payment_method: paymentDesc || null, notes: notesWithMeta,
         complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
       } as any).select().single();
-      if (budgetError || !budgetData) { toast.error('Erro ao criar orçamento'); setSaving(false); return; }
+      if (budgetError || !budgetData) {
+        console.error('Erro ao criar orçamento:', budgetError);
+        toast.error(`Erro ao criar: ${budgetError?.message || 'desconhecido'}`);
+        setSaving(false);
+        return;
+      }
       const budgetItems = items.filter(i => i.name.trim()).map(i => ({
         budget_id: (budgetData as any).id, name: i.name, quantity: i.quantity,
         material_cost: i.materialCost, labor_cost: i.laborCost, unit_price: i.unitPrice,
         room_label: i.roomLabel?.trim() || null,
       }));
-      if (budgetItems.length > 0) await supabase.from('budget_items').insert(budgetItems as any);
+      if (budgetItems.length > 0) {
+        const { error: itemsError } = await supabase.from('budget_items').insert(budgetItems as any);
+        if (itemsError) {
+          console.error('Erro ao salvar itens:', itemsError);
+          toast.error(`Erro ao salvar itens: ${itemsError.message}`);
+          setSaving(false);
+          return;
+        }
+      }
       toast.success('Orçamento criado com sucesso!');
     }
     setDialogOpen(false); resetForm(); fetchData(); setSaving(false);
