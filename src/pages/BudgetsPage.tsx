@@ -372,7 +372,7 @@ const handleCreate = async (e: React.FormEvent) => {
         client_description: clientDescription || null,
         total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
         payment_method: paymentDesc || null, notes: notesWithMeta,
-        complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
+        complexity_factor: parseFloat(complexityFactor) || 1.0, finish_type: finishType || null,
       } as any).eq('id', editingBudgetId);
       if (budgetError) {
         console.error('Erro ao atualizar orçamento:', budgetError);
@@ -403,7 +403,7 @@ const handleCreate = async (e: React.FormEvent) => {
         status: 'draft',
         total_cost: totalCost, profit_margin: margin, final_price: finalPrice,
         payment_method: paymentDesc || null, notes: notesWithMeta,
-        complexity_factor: parseFloat(complexityFactor), finish_type: finishType || null,
+        complexity_factor: parseFloat(complexityFactor) || 1.0, finish_type: finishType || null,
       } as any).select().single();
       if (budgetError || !budgetData) {
         console.error('Erro ao criar orçamento:', budgetError);
