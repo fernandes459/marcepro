@@ -178,7 +178,7 @@ function renderClientPdf(data: BudgetPdfData): string {
 
   ${data.paymentMethod ? `
     <div class="section-title">Condições de pagamento</div>
-    <div class="pay">${data.paymentMethod}</div>
+    <div class="pay">${data.paymentMethod.replace(/\s*\(taxa[^)]*\)/gi, '').replace(/\s*taxa[^.+]*/gi, '').trim()}</div>
   ` : ''}
 
   <div class="signature-area">

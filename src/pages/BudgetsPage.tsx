@@ -295,7 +295,6 @@ const [selectedClientId, setSelectedClientId] = useState('');
     if (remaining > 0 && installments > 0) {
       let text = `${installments}x de ${formatBRL(installmentValue)}`;
       if (installmentMethod === 'credit') text += ' no cartão';
-      if (installmentMethod === 'credit' && cardFeePercent > 0) text += ` (taxa ${cardFeePercent}% inclusa)`;
       if (installmentMethod !== 'credit') text += ` (${installmentMethod === 'pix' ? 'PIX' : installmentMethod})`;
       parts.push(text);
     }
