@@ -195,6 +195,13 @@ function renderClientPdf(data: BudgetPdfData): string {
     <div class="pay">${data.paymentMethod.replace(/\s*\(taxa[^)]*\)/gi, '').replace(/\s*taxa[^.+]*/gi, '').trim()}</div>
   ` : ''}
 
+  ${data.contractClauses.length ? `
+    <div class="section-title">Termos e condições</div>
+    <ul style="padding-left:0;list-style:none;font-size:14px;color:#515154;line-height:1.7;">
+      ${data.contractClauses.map((c, i) => `<li style="margin:10px 0;"><strong style="color:#1d1d1f;">${i + 1}.</strong> ${c}</li>`).join('')}
+    </ul>
+  ` : ''}
+
   <div class="signature-area">
     <div class="sig">${data.companyName || 'Contratada'}</div>
     <div class="sig">${data.client?.name || 'Cliente'}</div>
@@ -346,11 +353,6 @@ ${data.notes ? `
     <div style="margin-top:6px;font-size:11px;line-height:1.5;color:#3a3a3d">${data.notes.replace(/<!--BUDGET_META:.*?-->/s, '').trim()}</div>
   </div>` : ''}
 
-${data.contractClauses.length ? `
-  <div class="contract">
-    <h2>Termos e Condições Contratuais</h2>
-    <ul>${clausesHtml}</ul>
-  </div>` : ''}
 
 <div class="signature-area">
   <div class="sig">${data.companyName || 'Contratada'}</div>
