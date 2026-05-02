@@ -251,6 +251,9 @@ export default function ModuleConfigurator({
     (updated[idx] as any)[field] = value;
     onModulesChange(updated);
   };
+  const applyTemplate = (tplModules: ModuleConfig[], mode: 'replace' | 'append') => {
+    onModulesChange(mode === 'replace' ? tplModules : [...modules, ...tplModules]);
+  };
 
   const result = useMemo(() => {
     const allPieces: PieceItem[] = [];
