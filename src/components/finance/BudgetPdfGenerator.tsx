@@ -353,11 +353,6 @@ ${data.notes ? `
     <div style="margin-top:6px;font-size:11px;line-height:1.5;color:#3a3a3d">${data.notes.replace(/<!--BUDGET_META:.*?-->/s, '').trim()}</div>
   </div>` : ''}
 
-${data.contractClauses.length ? `
-  <div class="contract">
-    <h2>Termos e Condições Contratuais</h2>
-    <ul>${clausesHtml}</ul>
-  </div>` : ''}
 
 <div class="signature-area">
   <div class="sig">${data.companyName || 'Contratada'}</div>
