@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Ruler, Box, Layers } from 'lucide-react';
 import { formatBRL } from '@/lib/format';
+import ModuleTemplatePicker from './ModuleTemplatePicker';
 
 export interface ModuleConfig {
   type: string;
@@ -250,6 +251,9 @@ export default function ModuleConfigurator({
     (updated[idx] as any)[field] = value;
     onModulesChange(updated);
   };
+  const applyTemplate = (tplModules: ModuleConfig[], mode: 'replace' | 'append') => {
+    onModulesChange(mode === 'replace' ? tplModules : [...modules, ...tplModules]);
+  };
 
   const result = useMemo(() => {
     const allPieces: PieceItem[] = [];
@@ -293,6 +297,12 @@ export default function ModuleConfigurator({
           <Input type="number" step="0.01" value={edgeTapePricePerM || ''} onChange={e => onEdgeTapePriceChange(Number(e.target.value))} placeholder="Ex: 2.50" className="text-sm h-9" />
         </div>
       </div>
+
+      {/* Templates de módulos prontos */}
+      <ModuleTemplatePicker
+        onApplyTemplate={applyTemplate}
+        hasExistingModules={modules.length > 0}
+      />
 
       {/* Modules */}
       {modules.map((mod, idx) => {
