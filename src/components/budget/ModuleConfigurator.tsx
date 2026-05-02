@@ -298,6 +298,12 @@ export default function ModuleConfigurator({
         </div>
       </div>
 
+      {/* Templates de módulos prontos */}
+      <ModuleTemplatePicker
+        onApplyTemplate={applyTemplate}
+        hasExistingModules={modules.length > 0}
+      />
+
       {/* Modules */}
       {modules.map((mod, idx) => {
         const pieces = explodePieces(mod);
