@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Ruler, Box, Layers } from 'lucide-react';
 import { formatBRL } from '@/lib/format';
+import ModuleTemplatePicker from './ModuleTemplatePicker';
 
 export interface ModuleConfig {
   type: string;
