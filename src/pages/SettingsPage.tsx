@@ -736,6 +736,11 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        {/* Engineering */}
+        <TabsContent value="engineering">
+          <EngineeringCatalogSettings />
+        </TabsContent>
+
         {/* Team */}
         <TabsContent value="team">
           <Card>
