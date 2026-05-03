@@ -342,6 +342,60 @@ export type Database = {
         }
         Relationships: []
       }
+      edge_tapes: {
+        Row: {
+          active: boolean
+          color: string | null
+          created_at: string
+          finish: string | null
+          id: string
+          name: string
+          notes: string | null
+          price_per_m: number
+          price_per_roll: number
+          roll_length_m: number
+          supplier: string | null
+          thickness_mm: number
+          updated_at: string
+          user_id: string
+          width_mm: number
+        }
+        Insert: {
+          active?: boolean
+          color?: string | null
+          created_at?: string
+          finish?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          price_per_m?: number
+          price_per_roll?: number
+          roll_length_m?: number
+          supplier?: string | null
+          thickness_mm?: number
+          updated_at?: string
+          user_id: string
+          width_mm?: number
+        }
+        Update: {
+          active?: boolean
+          color?: string | null
+          created_at?: string
+          finish?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          price_per_m?: number
+          price_per_roll?: number
+          roll_length_m?: number
+          supplier?: string | null
+          thickness_mm?: number
+          updated_at?: string
+          user_id?: string
+          width_mm?: number
+        }
+        Relationships: []
+      }
       employees: {
         Row: {
           cpf: string | null
@@ -522,6 +576,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      hardware_items: {
+        Row: {
+          active: boolean
+          brand: string | null
+          category: string
+          created_at: string
+          finish: string | null
+          id: string
+          length_mm: number | null
+          name: string
+          notes: string | null
+          supplier: string | null
+          unit: string
+          unit_price: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          brand?: string | null
+          category?: string
+          created_at?: string
+          finish?: string | null
+          id?: string
+          length_mm?: number | null
+          name: string
+          notes?: string | null
+          supplier?: string | null
+          unit?: string
+          unit_price?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          brand?: string | null
+          category?: string
+          created_at?: string
+          finish?: string | null
+          id?: string
+          length_mm?: number | null
+          name?: string
+          notes?: string | null
+          supplier?: string | null
+          unit?: string
+          unit_price?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       material_catalog: {
         Row: {
@@ -727,6 +832,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sheet_materials: {
+        Row: {
+          active: boolean
+          color: string | null
+          created_at: string
+          density_kg_m3: number
+          finish: string | null
+          id: string
+          material_type: string
+          name: string
+          notes: string | null
+          price_per_m2: number
+          price_per_sheet: number
+          sheet_height_mm: number
+          sheet_width_mm: number
+          supplier: string | null
+          thickness_mm: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          color?: string | null
+          created_at?: string
+          density_kg_m3?: number
+          finish?: string | null
+          id?: string
+          material_type?: string
+          name: string
+          notes?: string | null
+          price_per_m2?: number
+          price_per_sheet?: number
+          sheet_height_mm?: number
+          sheet_width_mm?: number
+          supplier?: string | null
+          thickness_mm?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          color?: string | null
+          created_at?: string
+          density_kg_m3?: number
+          finish?: string | null
+          id?: string
+          material_type?: string
+          name?: string
+          notes?: string | null
+          price_per_m2?: number
+          price_per_sheet?: number
+          sheet_height_mm?: number
+          sheet_width_mm?: number
+          supplier?: string | null
+          thickness_mm?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       technical_assistance: {
         Row: {
