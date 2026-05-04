@@ -32,6 +32,7 @@ import { SearchInput } from '@/components/SearchInput';
 import ModuleConfigurator, { ModuleConfig, ModuleResult } from '@/components/budget/ModuleConfigurator';
 import ContractDRE from '@/components/finance/ContractDRE';
 import PaymentMilestones from '@/components/finance/PaymentMilestones';
+import ClientPicker from '@/components/budget/ClientPicker';
 
 interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; roomLabel?: string; unit?: string; }
 const UNIT_OPTIONS = ['un', 'm²', 'm', 'kg', 'pç'];
@@ -803,21 +804,12 @@ const openEditBudget = async (budget: Budget) => {
                   <section className="card-premium rounded-2xl p-4 sm:p-5">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-1.5">
-                        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Cliente *</Label>
-                        <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                          <SelectTrigger className="h-11"><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
-                          <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                        {selectedClientId && (() => {
-                          const c = clients.find(x => x.id === selectedClientId);
-                          if (!c) return null;
-                          const addr = [c.address, c.address_number].filter(Boolean).join(', ') || c.city || '';
-                          return (
-                            <p className="text-[11px] text-muted-foreground leading-snug">
-                              {c.phone}{addr ? ` · ${addr}` : ''}
-                            </p>
-                          );
-                        })()}
+                        <ClientPicker
+                          clients={clients as any}
+                          selectedId={selectedClientId}
+                          onSelect={setSelectedClientId}
+                          onClientCreated={(c) => setClients(prev => [...prev, c as any].sort((a, b) => a.name.localeCompare(b.name)))}
+                        />
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Vendedor *</Label>
