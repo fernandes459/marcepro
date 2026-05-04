@@ -32,6 +32,7 @@ import { SearchInput } from '@/components/SearchInput';
 import ModuleConfigurator, { ModuleConfig, ModuleResult } from '@/components/budget/ModuleConfigurator';
 import ContractDRE from '@/components/finance/ContractDRE';
 import PaymentMilestones from '@/components/finance/PaymentMilestones';
+import ClientPicker from '@/components/budget/ClientPicker';
 
 interface BudgetItem { name: string; quantity: number; unitPrice: number; materialCost: number; laborCost: number; roomLabel?: string; unit?: string; }
 const UNIT_OPTIONS = ['un', 'm²', 'm', 'kg', 'pç'];
