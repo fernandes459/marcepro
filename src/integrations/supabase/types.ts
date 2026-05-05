@@ -153,6 +153,7 @@ export type Database = {
       }
       budgets: {
         Row: {
+          budget_mode: string
           client_description: string | null
           client_id: string | null
           code: string
@@ -165,12 +166,15 @@ export type Database = {
           payment_method: string | null
           profit_margin: number
           project_name: string | null
+          project_type: string | null
+          seller_id: string | null
           status: string
           total_cost: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          budget_mode?: string
           client_description?: string | null
           client_id?: string | null
           code: string
@@ -183,12 +187,15 @@ export type Database = {
           payment_method?: string | null
           profit_margin?: number
           project_name?: string | null
+          project_type?: string | null
+          seller_id?: string | null
           status?: string
           total_cost?: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          budget_mode?: string
           client_description?: string | null
           client_id?: string | null
           code?: string
@@ -201,6 +208,8 @@ export type Database = {
           payment_method?: string | null
           profit_margin?: number
           project_name?: string | null
+          project_type?: string | null
+          seller_id?: string | null
           status?: string
           total_cost?: number
           updated_at?: string
