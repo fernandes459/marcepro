@@ -100,6 +100,9 @@ export default function BudgetsPage() {
   const [enabledClauses, setEnabledClauses] = useState<boolean[]>(defaultContractClauses.map(() => true));
   const [newClause, setNewClause] = useState('');
   const [pdfSimplified, setPdfSimplified] = useState(false);
+  const [pdfClientOpts, setPdfClientOpts] = useState({
+    showDescription: true, showItemsList: false, showPaymentTerms: true, showContractClauses: true,
+  });
 
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes, opCostsRes] = await Promise.all([
@@ -361,6 +364,8 @@ export default function BudgetsPage() {
       companyAddress: companySettings?.address,
       contractClauses: activeClauses,
       mode: pdfSimplified ? 'client' : 'internal',
+      clientDescription: (selectedBudget as any).client_description || null,
+      clientPdfOptions: pdfClientOpts,
     });
     setPdfDialogOpen(false);
   };
@@ -567,6 +572,27 @@ export default function BudgetsPage() {
                 Data prevista: <strong>{deliveryDate.toLocaleDateString('pt-BR')}</strong>
               </p>
             </div>
+
+            {pdfSimplified && (
+              <div className="space-y-2 border border-border rounded-xl p-4">
+                <Label className="text-sm font-semibold">Blocos exibidos no PDF do cliente</Label>
+                <p className="text-[11px] text-muted-foreground">Marque o que o cliente deve ver.</p>
+                {[
+                  { key: 'showDescription', label: 'Descrição do projeto (texto livre)' },
+                  { key: 'showItemsList', label: 'Lista detalhada de itens (sem preços)' },
+                  { key: 'showPaymentTerms', label: 'Condições de pagamento' },
+                  { key: 'showContractClauses', label: 'Termos e cláusulas' },
+                ].map(opt => (
+                  <label key={opt.key} className="flex items-center gap-2 text-sm cursor-pointer py-1">
+                    <Checkbox
+                      checked={(pdfClientOpts as any)[opt.key]}
+                      onCheckedChange={(c) => setPdfClientOpts(p => ({ ...p, [opt.key]: c === true }))}
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
 
             {!pdfSimplified && (
               <div className="space-y-3">

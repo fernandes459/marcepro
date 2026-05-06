@@ -1,17 +1,17 @@
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows } from '@react-three/drei';
-import { useMemo, Suspense } from 'react';
+import { useMemo, Suspense, useState } from 'react';
 import * as THREE from 'three';
 
 interface Module3DConfig {
-  height: number;   // mm
-  width: number;    // mm
-  depth: number;    // mm
-  thickness: number;// mm
+  height: number;
+  width: number;
+  depth: number;
+  thickness: number;
   shelves: number;
   doors: number;
   drawers?: number;
-  bodyColor?: string;   // hex / css color
+  bodyColor?: string;
   frontColor?: string;
   hasHandles?: boolean;
 }
@@ -20,6 +20,15 @@ interface Props {
   mod: Module3DConfig;
   className?: string;
 }
+
+const BG_PRESETS: { id: string; label: string; preset: any; ground: string }[] = [
+  { id: 'apartment', label: 'Apartamento', preset: 'apartment', ground: '#e8e6e1' },
+  { id: 'studio', label: 'Estúdio', preset: 'studio', ground: '#f4f4f5' },
+  { id: 'warehouse', label: 'Galpão', preset: 'warehouse', ground: '#d6d3d1' },
+  { id: 'sunset', label: 'Pôr do sol', preset: 'sunset', ground: '#f5e6d3' },
+  { id: 'night', label: 'Noite', preset: 'night', ground: '#1f1f23' },
+  { id: 'city', label: 'Cidade', preset: 'city', ground: '#cfd1d4' },
+];
 
 /**
  * Render a parametric MDF cabinet in 3D using react-three-fiber.

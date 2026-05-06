@@ -191,7 +191,7 @@ export default function BudgetWizardDialog({
     setComplexityFactor(String(b.complexity_factor || '1.0'));
     setFinishType(b.finish_type || 'branco');
     setMargin(Number(b.profit_margin) || 40);
-    setClientDescription(b.notes ? '' : ''); // overridden below
+    setClientDescription(b.client_description || '');
 
     const rawNotes = b.notes || '';
     const metaMatch = rawNotes.match(META_RE);
@@ -203,6 +203,12 @@ export default function BudgetWizardDialog({
     setExtraOther(Number(meta.extraOther) || 0);
     setDiscountPct(Number(meta.discountPct) || 0);
     setIncludeOverhead(meta.includeOverhead !== false);
+    setClientNotes(meta.clientNotes || '');
+    if (meta.projectDate) setProjectDate(meta.projectDate);
+    if (meta.useParametric) setUseParametric(true); else setUseParametric(false);
+    if (Array.isArray(meta.modules)) setModules(meta.modules);
+    if (typeof meta.mdfPricePerM2 === 'number') setMdfPricePerM2(meta.mdfPricePerM2);
+    if (typeof meta.edgeTapePricePerM === 'number') setEdgeTapePricePerM(meta.edgeTapePricePerM);
     if (meta.useAdvancedPayment) {
       setUseAdvancedPayment(true);
       setDownPayment(Number(meta.downPayment) || 0);
@@ -217,7 +223,7 @@ export default function BudgetWizardDialog({
     if (Array.isArray(meta.environments) && meta.environments.length > 0) {
       setEnvironments(meta.environments);
     }
-    if (meta.clientDescription) setClientDescription(meta.clientDescription);
+    if (meta.clientDescription && !b.client_description) setClientDescription(meta.clientDescription);
 
     const { data: bItems } = await supabase
       .from('budget_items').select('*').eq('budget_id', b.id);
@@ -377,8 +383,9 @@ export default function BudgetWizardDialog({
       useAdvancedPayment, downPayment, downPaymentMethod,
       installments, installmentMethod, cardFeePercent,
       includeOverhead, environments, clientDescription,
+      clientNotes, projectDate,
+      useParametric, modules, mdfPricePerM2, edgeTapePricePerM,
       itemUnits: items.map(i => i.unit || 'un'),
-      // legado/compat
       salespersonId: sellerId || null,
     };
     const cleaned = (projectNotes || '').replace(META_RE, '').trim();
@@ -470,8 +477,8 @@ export default function BudgetWizardDialog({
   // ========= RENDER =========
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[100dvh] w-[100dvw] max-w-none rounded-none border-0 p-0">
-        <div className="flex h-full flex-col bg-background">
+      <DialogContent className="h-[100dvh] w-[100dvw] max-w-none rounded-none border-0 p-0 gap-0 grid-rows-[auto_1fr_auto] flex flex-col overflow-hidden sm:rounded-none">
+        <div className="flex h-full min-h-0 flex-col bg-background">
           <DialogHeader className="border-b border-border px-4 py-3 sm:px-6">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -488,9 +495,9 @@ export default function BudgetWizardDialog({
             </div>
           </DialogHeader>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="flex-1 flex flex-col overflow-hidden">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="flex-1 flex flex-col overflow-hidden min-h-0">
             {/* Tabs nav: scroll horizontal em mobile */}
-            <div className="border-b border-border bg-muted/20 overflow-x-auto">
+            <div className="border-b border-border bg-muted/20 overflow-x-auto shrink-0">
               <TabsList className="w-max bg-transparent h-auto p-1 gap-1">
                 {TAB_ORDER.map((k, idx) => {
                   const Icon = TAB_ICONS[k];
@@ -509,7 +516,7 @@ export default function BudgetWizardDialog({
               </TabsList>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
               <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 space-y-5">
 
                 {/* ============ TAB 1: CLIENTE ============ */}

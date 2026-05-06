@@ -39,8 +39,17 @@ export interface BudgetPdfData {
   companyEmail?: string;
   companyAddress?: string;
   contractClauses: string[];
+  /** Texto livre que aparece no PDF do cliente (descrição do projeto). */
+  clientDescription?: string | null;
   /** 'client' = limpo estilo Apple (sem custos);  'internal' = completo c/ custos. */
   mode?: 'client' | 'internal';
+  /** Configuração de blocos opcionais no PDF do cliente. */
+  clientPdfOptions?: {
+    showDescription?: boolean;
+    showItemsList?: boolean;
+    showPaymentTerms?: boolean;
+    showContractClauses?: boolean;
+  };
   /** legacy: mantém compat */
   simplified?: boolean;
 }
@@ -182,20 +191,32 @@ function renderClientPdf(data: BudgetPdfData): string {
     </div>
   </div>
 
+  ${(data.clientPdfOptions?.showDescription ?? true) && data.clientDescription ? `
+    <div class="section-title">Descrição do projeto</div>
+    <div class="pay" style="white-space:pre-wrap;">${data.clientDescription.replace(/</g, '&lt;')}</div>
+  ` : ''}
+
   <div class="section-title">O que está incluso</div>
   ${roomsHtml || '<div class="room"><div class="room-head"><div class="room-name">Projeto</div><div class="room-value">' + formatBRL(data.finalPrice) + '</div></div></div>'}
+
+  ${(data.clientPdfOptions?.showItemsList ?? false) && data.items.length ? `
+    <div class="section-title">Itens detalhados</div>
+    <ul style="padding-left:0;list-style:none;font-size:14px;color:#515154;line-height:1.7;">
+      ${data.items.map(i => `<li style="display:flex;justify-content:space-between;border-bottom:1px solid #f2f2f4;padding:8px 0;"><span>${i.room_label ? `<strong style="color:#1d1d1f">${i.room_label}</strong> · ` : ''}${i.name} <span style="color:#86868b">×${i.quantity}</span></span></li>`).join('')}
+    </ul>
+  ` : ''}
 
   <div class="total-card">
     <div class="label">Investimento total</div>
     <div class="value">${formatBRL(data.finalPrice)}</div>
   </div>
 
-  ${data.paymentMethod ? `
+  ${(data.clientPdfOptions?.showPaymentTerms ?? true) && data.paymentMethod ? `
     <div class="section-title">Condições de pagamento</div>
     <div class="pay">${data.paymentMethod.replace(/\s*\(taxa[^)]*\)/gi, '').replace(/\s*taxa[^.+]*/gi, '').trim()}</div>
   ` : ''}
 
-  ${data.contractClauses.length ? `
+  ${(data.clientPdfOptions?.showContractClauses ?? true) && data.contractClauses.length ? `
     <div class="section-title">Termos e condições</div>
     <ul style="padding-left:0;list-style:none;font-size:14px;color:#515154;line-height:1.7;">
       ${data.contractClauses.map((c, i) => `<li style="margin:10px 0;"><strong style="color:#1d1d1f;">${i + 1}.</strong> ${c}</li>`).join('')}
