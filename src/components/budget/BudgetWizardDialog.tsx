@@ -191,7 +191,7 @@ export default function BudgetWizardDialog({
     setComplexityFactor(String(b.complexity_factor || '1.0'));
     setFinishType(b.finish_type || 'branco');
     setMargin(Number(b.profit_margin) || 40);
-    setClientDescription(b.notes ? '' : ''); // overridden below
+    setClientDescription(b.client_description || '');
 
     const rawNotes = b.notes || '';
     const metaMatch = rawNotes.match(META_RE);
@@ -203,6 +203,12 @@ export default function BudgetWizardDialog({
     setExtraOther(Number(meta.extraOther) || 0);
     setDiscountPct(Number(meta.discountPct) || 0);
     setIncludeOverhead(meta.includeOverhead !== false);
+    setClientNotes(meta.clientNotes || '');
+    if (meta.projectDate) setProjectDate(meta.projectDate);
+    if (meta.useParametric) setUseParametric(true); else setUseParametric(false);
+    if (Array.isArray(meta.modules)) setModules(meta.modules);
+    if (typeof meta.mdfPricePerM2 === 'number') setMdfPricePerM2(meta.mdfPricePerM2);
+    if (typeof meta.edgeTapePricePerM === 'number') setEdgeTapePricePerM(meta.edgeTapePricePerM);
     if (meta.useAdvancedPayment) {
       setUseAdvancedPayment(true);
       setDownPayment(Number(meta.downPayment) || 0);
@@ -217,7 +223,7 @@ export default function BudgetWizardDialog({
     if (Array.isArray(meta.environments) && meta.environments.length > 0) {
       setEnvironments(meta.environments);
     }
-    if (meta.clientDescription) setClientDescription(meta.clientDescription);
+    if (meta.clientDescription && !b.client_description) setClientDescription(meta.clientDescription);
 
     const { data: bItems } = await supabase
       .from('budget_items').select('*').eq('budget_id', b.id);
