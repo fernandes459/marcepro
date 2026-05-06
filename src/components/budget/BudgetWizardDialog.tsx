@@ -470,8 +470,8 @@ export default function BudgetWizardDialog({
   // ========= RENDER =========
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[100dvh] w-[100dvw] max-w-none rounded-none border-0 p-0">
-        <div className="flex h-full flex-col bg-background">
+      <DialogContent className="h-[100dvh] w-[100dvw] max-w-none rounded-none border-0 p-0 gap-0 grid-rows-[auto_1fr_auto] flex flex-col overflow-hidden sm:rounded-none">
+        <div className="flex h-full min-h-0 flex-col bg-background">
           <DialogHeader className="border-b border-border px-4 py-3 sm:px-6">
             <div className="flex items-center justify-between gap-3">
               <div>
