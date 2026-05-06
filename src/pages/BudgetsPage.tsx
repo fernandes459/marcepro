@@ -364,6 +364,8 @@ export default function BudgetsPage() {
       companyAddress: companySettings?.address,
       contractClauses: activeClauses,
       mode: pdfSimplified ? 'client' : 'internal',
+      clientDescription: (selectedBudget as any).client_description || null,
+      clientPdfOptions: pdfClientOpts,
     });
     setPdfDialogOpen(false);
   };
