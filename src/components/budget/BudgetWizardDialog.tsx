@@ -377,8 +377,9 @@ export default function BudgetWizardDialog({
       useAdvancedPayment, downPayment, downPaymentMethod,
       installments, installmentMethod, cardFeePercent,
       includeOverhead, environments, clientDescription,
+      clientNotes, projectDate,
+      useParametric, modules, mdfPricePerM2, edgeTapePricePerM,
       itemUnits: items.map(i => i.unit || 'un'),
-      // legado/compat
       salespersonId: sellerId || null,
     };
     const cleaned = (projectNotes || '').replace(META_RE, '').trim();
