@@ -100,6 +100,9 @@ export default function BudgetsPage() {
   const [enabledClauses, setEnabledClauses] = useState<boolean[]>(defaultContractClauses.map(() => true));
   const [newClause, setNewClause] = useState('');
   const [pdfSimplified, setPdfSimplified] = useState(false);
+  const [pdfClientOpts, setPdfClientOpts] = useState({
+    showDescription: true, showItemsList: false, showPaymentTerms: true, showContractClauses: true,
+  });
 
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes, opCostsRes] = await Promise.all([
