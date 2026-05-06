@@ -39,8 +39,17 @@ export interface BudgetPdfData {
   companyEmail?: string;
   companyAddress?: string;
   contractClauses: string[];
+  /** Texto livre que aparece no PDF do cliente (descrição do projeto). */
+  clientDescription?: string | null;
   /** 'client' = limpo estilo Apple (sem custos);  'internal' = completo c/ custos. */
   mode?: 'client' | 'internal';
+  /** Configuração de blocos opcionais no PDF do cliente. */
+  clientPdfOptions?: {
+    showDescription?: boolean;
+    showItemsList?: boolean;
+    showPaymentTerms?: boolean;
+    showContractClauses?: boolean;
+  };
   /** legacy: mantém compat */
   simplified?: boolean;
 }
