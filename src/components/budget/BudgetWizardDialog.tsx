@@ -488,9 +488,9 @@ export default function BudgetWizardDialog({
             </div>
           </DialogHeader>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="flex-1 flex flex-col overflow-hidden">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="flex-1 flex flex-col overflow-hidden min-h-0">
             {/* Tabs nav: scroll horizontal em mobile */}
-            <div className="border-b border-border bg-muted/20 overflow-x-auto">
+            <div className="border-b border-border bg-muted/20 overflow-x-auto shrink-0">
               <TabsList className="w-max bg-transparent h-auto p-1 gap-1">
                 {TAB_ORDER.map((k, idx) => {
                   const Icon = TAB_ICONS[k];
@@ -509,7 +509,7 @@ export default function BudgetWizardDialog({
               </TabsList>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
               <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 space-y-5">
 
                 {/* ============ TAB 1: CLIENTE ============ */}
