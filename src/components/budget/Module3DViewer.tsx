@@ -413,11 +413,11 @@ export default function Module3DViewer({ mod, className }: Props) {
                   </mesh>
                   {showHardware && (
                     <>
-                      <mesh position={[T + 0.005, y, 0.05]}>
-                        <cylinderGeometry args={[0.003, 0.003, 0.012, 8]} rotation={[0, 0, Math.PI / 2]} />
+                      <mesh position={[T + 0.005, y, 0.05]} rotation={[0, 0, Math.PI / 2]}>
+                        <cylinderGeometry args={[0.003, 0.003, 0.012, 8]} />
                         <meshStandardMaterial color="#a8a8a8" metalness={0.9} />
                       </mesh>
-                      <mesh position={[W - T - 0.005, y, 0.05]}>
+                      <mesh position={[W - T - 0.005, y, 0.05]} rotation={[0, 0, Math.PI / 2]}>
                         <cylinderGeometry args={[0.003, 0.003, 0.012, 8]} />
                         <meshStandardMaterial color="#a8a8a8" metalness={0.9} />
                       </mesh>
