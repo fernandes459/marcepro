@@ -123,7 +123,7 @@ export default function Module3DViewer({ mod, className }: Props) {
           {/* Ground */}
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]} receiveShadow>
             <planeGeometry args={[20, 20]} />
-            <meshStandardMaterial color="#e8e6e1" roughness={0.95} />
+            <meshStandardMaterial color={bg.ground} roughness={0.95} />
           </mesh>
           <ContactShadows position={[0, 0, 0]} opacity={0.5} scale={maxDim * 6} blur={2.4} far={4} />
 
