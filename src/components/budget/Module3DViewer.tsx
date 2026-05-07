@@ -35,6 +35,8 @@ const BG_PRESETS: { id: string; label: string; preset: any; ground: string }[] =
  * Dimensions in mm are converted to meters (÷1000) for Three.js.
  */
 export default function Module3DViewer({ mod, className }: Props) {
+  const [bgId, setBgId] = useState<string>('apartment');
+  const bg = BG_PRESETS.find((b) => b.id === bgId) ?? BG_PRESETS[0];
   const {
     height, width, depth, thickness,
     shelves, doors, drawers = 0,
