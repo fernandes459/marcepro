@@ -193,6 +193,26 @@ export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
           { type: 'armario_superior', height: 700, width: 800, depth: 150, thickness: 18, shelves: 1, doors: 2 },
         ],
       },
+      {
+        id: 'gabinete-duplo',
+        name: 'Gabinete Duplo + Espelheira',
+        description: 'Cuba dupla com torre lateral',
+        icon: '🛁',
+        modules: [
+          { type: 'balcao', height: 600, width: 1500, depth: 500, thickness: 18, shelves: 1, doors: 4 },
+          { type: 'estante', height: 1800, width: 400, depth: 350, thickness: 18, shelves: 4, doors: 1 },
+          { type: 'armario_superior', height: 800, width: 1500, depth: 150, thickness: 18, shelves: 2, doors: 3 },
+        ],
+      },
+      {
+        id: 'nicho-banheiro',
+        name: 'Nicho de Banheiro',
+        description: 'Nicho aberto para shampoo/decoração',
+        icon: '🧴',
+        modules: [
+          { type: 'estante', height: 600, width: 300, depth: 150, thickness: 15, shelves: 2, doors: 0 },
+        ],
+      },
     ],
   },
   {
@@ -202,13 +222,93 @@ export const TEMPLATE_CATEGORIES: TemplateCategory[] = [
     templates: [
       {
         id: 'home-office',
-        name: 'Home Office',
+        name: 'Home Office Compacto',
         description: 'Bancada + gaveteiro + estante',
         icon: '💻',
         modules: [
           { type: 'bancada', height: 40, width: 1600, depth: 600, thickness: 18, shelves: 0, doors: 0 },
           { type: 'gaveteiro', height: 720, width: 400, depth: 550, thickness: 18, shelves: 0, doors: 3 },
           { type: 'estante', height: 1800, width: 1200, depth: 350, thickness: 18, shelves: 4, doors: 0 },
+        ],
+      },
+      {
+        id: 'home-office-l',
+        name: 'Home Office em L',
+        description: 'Mesa em L + armários aéreos',
+        icon: '🖥️',
+        modules: [
+          { type: 'bancada', height: 40, width: 1800, depth: 600, thickness: 25, shelves: 0, doors: 0 },
+          { type: 'bancada', height: 40, width: 1400, depth: 600, thickness: 25, shelves: 0, doors: 0 },
+          { type: 'gaveteiro', height: 720, width: 500, depth: 550, thickness: 18, shelves: 0, doors: 4 },
+          { type: 'armario_superior', height: 700, width: 1800, depth: 350, thickness: 18, shelves: 1, doors: 3 },
+        ],
+      },
+      {
+        id: 'sala-reuniao',
+        name: 'Sala de Reunião',
+        description: 'Mesa grande + credenza + painel TV',
+        icon: '👥',
+        modules: [
+          { type: 'bancada', height: 40, width: 2800, depth: 1200, thickness: 30, shelves: 0, doors: 0 },
+          { type: 'balcao', height: 700, width: 2400, depth: 500, thickness: 18, shelves: 1, doors: 4 },
+          { type: 'painel', height: 1500, width: 2200, depth: 25, thickness: 18, shelves: 0, doors: 0 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'lavanderia',
+    label: 'Lavanderia',
+    icon: '🧺',
+    templates: [
+      {
+        id: 'lavanderia-compacta',
+        name: 'Lavanderia Compacta',
+        description: 'Armário sobre tanque + aéreo',
+        icon: '🧼',
+        modules: [
+          { type: 'armario_superior', height: 700, width: 1200, depth: 350, thickness: 18, shelves: 2, doors: 3 },
+          { type: 'balcao', height: 850, width: 1200, depth: 550, thickness: 18, shelves: 1, doors: 2 },
+        ],
+      },
+      {
+        id: 'lavanderia-completa',
+        name: 'Lavanderia Completa',
+        description: 'Torre máquinas + armário utilitário',
+        icon: '🧴',
+        modules: [
+          { type: 'estante', height: 2400, width: 700, depth: 650, thickness: 18, shelves: 2, doors: 2 },
+          { type: 'estante', height: 2400, width: 600, depth: 400, thickness: 18, shelves: 5, doors: 2 },
+          { type: 'armario_superior', height: 700, width: 1500, depth: 350, thickness: 18, shelves: 2, doors: 3 },
+          { type: 'balcao', height: 900, width: 1500, depth: 600, thickness: 18, shelves: 1, doors: 3 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'comercial',
+    label: 'Comercial / Loja',
+    icon: '🏬',
+    templates: [
+      {
+        id: 'balcao-recepcao',
+        name: 'Balcão Recepção',
+        description: 'Balcão de atendimento com gavetas',
+        icon: '🛎️',
+        modules: [
+          { type: 'balcao', height: 1100, width: 2400, depth: 700, thickness: 25, shelves: 1, doors: 2 },
+          { type: 'gaveteiro', height: 800, width: 600, depth: 500, thickness: 18, shelves: 0, doors: 4 },
+        ],
+      },
+      {
+        id: 'expositor-loja',
+        name: 'Expositor de Loja',
+        description: 'Estantes altas com vidro/iluminação',
+        icon: '🛍️',
+        modules: [
+          { type: 'estante', height: 2600, width: 1200, depth: 400, thickness: 18, shelves: 5, doors: 0 },
+          { type: 'estante', height: 2600, width: 1200, depth: 400, thickness: 18, shelves: 5, doors: 0 },
+          { type: 'balcao', height: 950, width: 1800, depth: 550, thickness: 18, shelves: 1, doors: 4 },
         ],
       },
     ],
