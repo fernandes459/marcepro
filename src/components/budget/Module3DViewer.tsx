@@ -81,7 +81,28 @@ export default function Module3DViewer({ mod, className }: Props) {
   const drawerHeight = drawers > 0 ? (H - 2 * T) / drawers : 0;
 
   return (
-    <div className={className} style={{ width: '100%', height: 360, borderRadius: 12, overflow: 'hidden', background: 'linear-gradient(180deg, hsl(var(--muted)) 0%, hsl(var(--background)) 100%)' }}>
+    <div className={className} style={{ width: '100%', borderRadius: 12, overflow: 'hidden', background: 'linear-gradient(180deg, hsl(var(--muted)) 0%, hsl(var(--background)) 100%)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: 8, background: 'hsl(var(--muted))' }}>
+        {BG_PRESETS.map((b) => (
+          <button
+            key={b.id}
+            type="button"
+            onClick={() => setBgId(b.id)}
+            style={{
+              padding: '4px 10px',
+              fontSize: 12,
+              borderRadius: 6,
+              border: '1px solid hsl(var(--border))',
+              background: bgId === b.id ? 'hsl(var(--primary))' : 'hsl(var(--background))',
+              color: bgId === b.id ? 'hsl(var(--primary-foreground))' : 'hsl(var(--foreground))',
+              cursor: 'pointer',
+            }}
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
+      <div style={{ width: '100%', height: 360 }}>
       <Canvas
         shadows
         camera={{ position: [camDist, camDist * 0.8, camDist], fov: 35 }}
