@@ -218,9 +218,10 @@ export default function Module3DViewer({ mod, className }: Props) {
             maxPolarAngle={Math.PI / 2 - 0.05}
             target={[0, H / 2, 0]}
           />
-          <Environment preset="apartment" />
+          <Environment preset={bg.preset as any} />
         </Suspense>
       </Canvas>
+      </div>
     </div>
   );
 }
