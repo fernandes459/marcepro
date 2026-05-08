@@ -344,13 +344,28 @@ export default function FinancePage() {
 
   // Computed — regras canônicas (finance-calc): só transações pagas contam como entrada/saída efetiva
   const summary = useMemo(() => summarizeFinance(periodTransactions, today), [periodTransactions, today]);
+  // GLOBAL pending — sempre mostra TODOS os pendentes/vencidos, independente do filtro de período
+  const globalPending = useMemo(() => {
+    const all = transactions.filter(t => t.status === 'pending' || t.status === 'overdue');
+    const receivable = all.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+    const payable = all.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+    const overdue = all.filter(t => t.status === 'overdue' || (t.status === 'pending' && t.due_date && t.due_date < today));
+    return { receivable, payable, overdueCount: overdue.length, all };
+  }, [transactions, today]);
+  // Saldo trazido de períodos anteriores: soma de transações pagas antes do período atual
+  const previousBalance = useMemo(() => {
+    const before = transactions.filter(t => t.status === 'paid' && t.date && t.date < period.start);
+    const inc = before.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+    const exp = before.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+    return inc - exp;
+  }, [transactions, period.start]);
   const totalIncome = summary.income;       // Entradas recebidas no período
   const totalExpense = summary.expense;     // Saídas pagas no período
   const profit = summary.profit;            // Resultado
   const totalBankBalance = bankAccounts.reduce((s, a) => s + Number(a.current_balance), 0);
-  const pendingReceivable = summary.receivable;
-  const pendingPayable = summary.payable;
-  const overdueItems = periodTransactions.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
+  const pendingReceivable = globalPending.receivable;
+  const pendingPayable = globalPending.payable;
+  const overdueItems = globalPending.all.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
   const paidIncome = summary.income;
 
   const filtered = useMemo(() => {
