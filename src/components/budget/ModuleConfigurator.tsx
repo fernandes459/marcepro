@@ -23,6 +23,7 @@ import {
 export interface ModuleConfig {
   type: string;
   name?: string;
+  environment?: string;        // ambiente ao qual o módulo pertence
   height: number;
   width: number;
   depth: number;

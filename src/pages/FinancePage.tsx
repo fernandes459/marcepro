@@ -344,13 +344,28 @@ export default function FinancePage() {
 
   // Computed — regras canônicas (finance-calc): só transações pagas contam como entrada/saída efetiva
   const summary = useMemo(() => summarizeFinance(periodTransactions, today), [periodTransactions, today]);
+  // GLOBAL pending — sempre mostra TODOS os pendentes/vencidos, independente do filtro de período
+  const globalPending = useMemo(() => {
+    const all = transactions.filter(t => t.status === 'pending' || t.status === 'overdue');
+    const receivable = all.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+    const payable = all.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+    const overdue = all.filter(t => t.status === 'overdue' || (t.status === 'pending' && t.due_date && t.due_date < today));
+    return { receivable, payable, overdueCount: overdue.length, all };
+  }, [transactions, today]);
+  // Saldo trazido de períodos anteriores: soma de transações pagas antes do período atual
+  const previousBalance = useMemo(() => {
+    const before = transactions.filter(t => t.status === 'paid' && t.date && t.date < period.start);
+    const inc = before.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+    const exp = before.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+    return inc - exp;
+  }, [transactions, period.start]);
   const totalIncome = summary.income;       // Entradas recebidas no período
   const totalExpense = summary.expense;     // Saídas pagas no período
   const profit = summary.profit;            // Resultado
   const totalBankBalance = bankAccounts.reduce((s, a) => s + Number(a.current_balance), 0);
-  const pendingReceivable = summary.receivable;
-  const pendingPayable = summary.payable;
-  const overdueItems = periodTransactions.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
+  const pendingReceivable = globalPending.receivable;
+  const pendingPayable = globalPending.payable;
+  const overdueItems = globalPending.all.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
   const paidIncome = summary.income;
 
   const filtered = useMemo(() => {
@@ -435,7 +450,7 @@ export default function FinancePage() {
   const miniCards = [
     { id: 'lancamentos' as Section, title: 'Lançamentos', icon: Receipt, value: String(periodTransactions.length), sub: 'registros', color: 'text-primary' },
     { id: 'dre' as Section, title: 'DRE', icon: BarChart3, value: formatBRL(dreData.profit), sub: 'resultado do período', color: dreData.profit >= 0 ? 'text-success' : 'text-destructive' },
-    { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(periodTransactions.filter(t => t.status === 'pending' || t.status === 'overdue').length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
+    { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(globalPending.all.length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
     { id: 'recebidos' as Section, title: 'Recebidos', icon: CheckCircle2, value: formatBRL(paidIncome), sub: 'total recebido', color: 'text-success' },
     { id: 'relatorio' as Section, title: 'Relatório', icon: FileBarChart, value: String(clientProfitData.length), sub: 'clientes', color: 'text-info' },
     { id: 'contas' as Section, title: 'Contas', icon: Building2, value: formatBRL(totalBankBalance), sub: `${bankAccounts.length} conta(s)`, color: 'text-primary' },
@@ -520,7 +535,32 @@ export default function FinancePage() {
           </Card>
         </motion.div>
 
-        {/* Quick Actions — pills */}
+        {/* Banner — Saldo do mês anterior + pendentes globais (sempre visível) */}
+        <motion.div variants={itemVariants}>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <Card className="border-l-4 border-l-info">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Saldo anterior</p>
+                <p className={`text-base sm:text-lg font-bold font-display tabular-nums mt-0.5 ${previousBalance >= 0 ? 'text-info' : 'text-destructive'}`}>{formatBRL(previousBalance)}</p>
+                <p className="text-[10px] text-muted-foreground">veio de períodos passados</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-success cursor-pointer hover:bg-accent/30" onClick={() => setActiveSection('vencer')}>
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">A receber (total)</p>
+                <p className="text-base sm:text-lg font-bold font-display text-success tabular-nums mt-0.5">{formatBRL(globalPending.receivable)}</p>
+                <p className="text-[10px] text-muted-foreground">inclui meses anteriores</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-destructive cursor-pointer hover:bg-accent/30" onClick={() => setActiveSection('vencer')}>
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">A pagar (total)</p>
+                <p className="text-base sm:text-lg font-bold font-display text-destructive tabular-nums mt-0.5">{formatBRL(globalPending.payable)}</p>
+                <p className="text-[10px] text-muted-foreground">inclui meses anteriores</p>
+              </CardContent>
+            </Card>
+          </div>
+        </motion.div>
         <motion.div variants={itemVariants}>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
             {quickActions.map((action) => (
@@ -932,8 +972,9 @@ export default function FinancePage() {
   }
 
   function renderAVencer() {
-    const upcoming = periodTransactions
-      .filter(t => t.status === 'pending' || t.status === 'overdue')
+    // SEMPRE global (todos os pendentes/vencidos, mesmo de meses anteriores)
+    const upcoming = globalPending.all
+      .slice()
       .sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
     const totalPendente = upcoming.reduce((s, t) => s + Number(t.amount), 0);
     const totalReceber = upcoming.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
