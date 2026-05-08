@@ -947,8 +947,9 @@ export default function FinancePage() {
   }
 
   function renderAVencer() {
-    const upcoming = periodTransactions
-      .filter(t => t.status === 'pending' || t.status === 'overdue')
+    // SEMPRE global (todos os pendentes/vencidos, mesmo de meses anteriores)
+    const upcoming = globalPending.all
+      .slice()
       .sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
     const totalPendente = upcoming.reduce((s, t) => s + Number(t.amount), 0);
     const totalReceber = upcoming.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
