@@ -1,100 +1,123 @@
-# Plano: Biblioteca 3D Profissional + Fluxo de Orçamento Refinado
+# Plano: Engenharia por Cor, Ambientes Isolados, Parcelamento e Correções Financeiras
 
-Vou expandir drasticamente a biblioteca de módulos, melhorar a visualização 3D (com portas/gavetas abertas, puxadores, corrediças) e revisar todo o fluxo do orçamento até o PDF.
-
----
-
-## 1. Biblioteca de Módulos (de ~25 para 100+)
-
-Reescrever `src/components/budget/moduleTemplates.ts` com módulos categorizados estilo CorteCloud:
-
-**Categorias e quantidade alvo:**
-- **Armários Base** (15): 1, 2, 3, 4 colunas; com/sem gavetas; caixas separadas; cantos em L
-- **Cozinha** (20): aéreos 1/2/3 portas, basculantes, torre quente, torre forno+microondas, despenseiro, balcão pia, balcão cooktop, gaveteiro 3/4/5 gavetas, canto otimizado
-- **Dormitório** (15): GR 2/3/4/6/8 portas, GR de canto, cabeceira + criados, sapateira, cômoda 4/6 gavetas
-- **Closet** (10): módulos abertos cabideiro, prateleiras, gaveteiro com vidro, sapateira diagonal, ilha central
-- **Banheiro** (8): gabinete simples/duplo, espelheira, torre alta, nicho box
-- **Home/Sala** (12): rack suspenso, painel TV liso/ripado, estante livros, bar, adega, aparador
-- **Escritório** (10): mesa reta/L/U, gaveteiro volante, armário arquivo, estante alta, mesa reunião 6/8/12 lugares
-- **Lavanderia** (6): torre máquinas, armário tanque, prateleira utilidades
-- **Comercial** (8): balcão atendimento, expositor vidro, prateleira loja, caixa, vitrine
-
-Cada template terá: nome, descrição, ícone, dimensões padrão profissionais (mm), quantidade de portas/gavetas/prateleiras corretas.
+Vou resolver 7 problemas reais que você levantou, em uma única entrega. Sem mudar o que já funciona.
 
 ---
 
-## 2. Visualização 3D Profissional (`Module3DViewer.tsx`)
+## 1. Paleta 3D = Cor real do material (não decorativa)
 
-Reescrever o renderizador Three.js para mostrar realismo CorteCloud-like:
+**Hoje:** a paleta no 3D só muda visual, não impacta nada.
 
-**Componentes visuais por módulo:**
-- **Caixa**: laterais, base, tampo, fundo (3mm recuado) com espessura visível
-- **Prateleiras**: com pinos suportes visíveis
-- **Portas**: animadas (fechadas/abertas a 90°/110°) com toggle
-- **Gavetas**: animadas (fechadas/abertas) com frente + caixa interna + corrediças laterais visíveis
-- **Puxadores**: barras horizontais cromadas em portas e gavetas
-- **Dobradiças**: cilindros pequenos visíveis quando porta aberta
-- **Pés/sapatas**: cilindros na base de balcões/torres
+**Vai virar:** seletor de **chapa por componente** (Corpo, Frentes, Fundo) usando o catálogo real de chapas (Configurações → Engenharia). Cada módulo guarda qual chapa foi usada onde.
 
-**Controles novos:**
-- Toggle "Abrir portas/gavetas" (anima tudo simultaneamente)
-- Toggle "Mostrar interno" (oculta portas)
-- Toggle "Mostrar puxadores/ferragens"
-- Modos de visualização: Perspectiva / Frontal / Lateral / Topo / Isométrica
-- Presets de ambiente (manter os 6 atuais)
-- Zoom para módulo específico
-- Cor do material configurável (branco, madeirado, preto)
+**Resumo final mostrará:**
+```
+Chapas necessárias por cor:
+- MDF 15mm Branco TX:  3 chapas (8,4 m²)
+- MDF 15mm Areia:      2 chapas (5,1 m²)
+- MDF 15mm Preto:      1 chapa  (2,8 m²)
+Total: 6 chapas
+```
 
-**Implementação:** componente `<ModuleMesh>` recebe config + estado de animação; usa `@react-three/drei` `useSpring` ou lerp manual via `useFrame` para abrir/fechar suavemente.
+Cálculo continua via `engineering-calc.ts` (decimal.js, sobra 20%), mas agora **agrupado por chapa** em vez de uma chapa só pro orçamento todo.
 
 ---
 
-## 3. Fluxo de Orçamento Refinado
+## 2. Custo Operacional = Dias
 
-Revisar `BudgetWizardDialog.tsx` end-to-end:
+**Hoje:** valor fixo R$.
 
-**Aba 1 — Cliente:** validação obrigatória, exibir avatar/iniciais, badge "novo cliente"
-
-**Aba 2 — Projeto:** auto-preenchimento de número sequencial, validade do orçamento (30 dias default), prioridade
-
-**Aba 3 — Ambientes:** drag-to-reorder, duplicar ambiente, ícone por tipo
-
-**Aba 4 — Módulos:** picker da nova biblioteca grande com busca + filtros por categoria; preview 3D ao lado; edição inline de dimensões
-
-**Aba 5 — Custos:** breakdown visível (chapas, fitas, ferragens, mão de obra, overhead)
-
-**Aba 6 — Margem:** sliders + preview de preço ao vivo + sugestão IA + condições de pagamento
-
-**Aba 7 — Resumo + PDF:**
-- Validação de completude (badge verde/vermelho por aba)
-- Botão "Gerar PDF Cliente" (configurável: descrição, itens, condições, cláusulas)
-- Botão "Gerar PDF Interno" (com custos, plano de corte, materiais)
-- Botão "Enviar via WhatsApp" com link do PDF
-- Botão "Aprovar e Converter em Projeto" (move para produção)
-
-**Persistência:** garantir que TODOS os campos (modules, opções 3D, custos, margem, condições) são salvos no JSON `meta` da budget e recarregados ao reabrir.
+**Vai virar:** campo "Dias de produção" + "Custo operacional / dia" (vem de Configurações). Sistema multiplica = custo operacional do orçamento. Mostra os 2 campos visíveis no breakdown.
 
 ---
 
-## 4. PDF Aprimorado (`BudgetPdfGenerator.tsx`)
+## 3. Ambientes isolados — bug de persistência
 
-- Capa com logo + dados do cliente + número/data/validade
-- Página de descrição do projeto (rich text do campo "Descrição Externa")
-- Lista de ambientes com itens agrupados
-- Tabela de condições de pagamento detalhada
-- Cláusulas contratuais editáveis em Configurações
-- Rodapé com vendedor + assinaturas
-- PDF Interno adiciona: custo por item, total de chapas, fita linear, lista de ferragens
+**Hoje:** ao criar módulo via engenharia, ele cai num "balde global" e não fica preso ao ambiente selecionado.
+
+**Vai virar:** cada ambiente terá seu próprio array `modules: []` no JSON `meta.environments`. Adicionar/remover módulo só afeta o ambiente ativo. Ao recarregar o orçamento, cada ambiente reaparece com seus módulos.
+
+---
+
+## 4. Editor de módulo igual CorteCloud
+
+Pelas suas screenshots, vou reorganizar o `ModuleConfigurator` em 3 abas:
+
+- **Geral:** Nome, Largura, Altura, Profundidade, Quantidade
+- **Opções:** Nº portas, Nº gavetas, Nº prateleiras, Lado da abertura (Esq/Dir/Dupla), Tipo de puxador, Tipo de corrediça (comum/telescópica/soft), Tipo de dobradiça, Pés/sapatas (sim/não), Fundo (3mm/6mm/MDF), Folga das frentes (mm)
+- **Materiais:** seletor de chapa por componente (Corpo / Frentes / Fundo / Gavetas) + fita de borda
+
+Cada campo tem ícone visual à esquerda (igual CorteCloud) e atualiza o 3D em tempo real.
+
+---
+
+## 5. Aba "Pagamento" no orçamento (parcelamento real)
+
+Nova aba **Pagamento** entre Margem e Resumo:
+
+- Define **N parcelas** com: valor, data de vencimento, forma (Dinheiro/PIX/Boleto/Cartão/Transferência), conta de destino
+- Botões rápidos: "Entrada 30% + 2x", "3x iguais", "Sinal + Saldo na entrega"
+- Valida que soma das parcelas = valor total do orçamento
+- Salva em `meta.payment_schedule`
+
+**Ao aprovar o orçamento** (botão "Aprovar e Converter em Projeto"):
+- Cria N transações `income` em `transactions` com status `pending`
+- `due_date` = data da parcela
+- `account_id` = conta escolhida
+- `category` = "installment", `project_id` = projeto criado
+- Aparecem na aba Financeiro como "A Receber"
+
+---
+
+## 6. Financeiro: histórico contínuo + saldo anterior
+
+**Hoje:** o filtro de mês esconde valores em aberto antigos.
+
+**Vai virar:**
+- KPI "A Receber" e "A Pagar" sempre incluem **TODOS** os pendentes/vencidos, independente do filtro de período (não some quando troca o mês)
+- Adicionar card "Saldo do mês anterior" mostrando o caixa que veio do mês passado
+- Lista de transações ganha toggle "Mostrar pendentes anteriores" (default: ligado) que prepende todos os atrasados de meses anteriores no topo, destacados em vermelho
+
+---
+
+## 7. Bug: lançamento não subtrai da conta PJ
+
+**Causa provável:** o saldo da conta é calculado a partir de `transactions.account_id`, mas o `TransactionDialog` ou não está salvando o `account_id`, ou o cálculo do saldo não está somando.
+
+**Vou:**
+1. Auditar `TransactionDialog.tsx` → garantir que `account_id` é gravado em todo INSERT
+2. Auditar `FinancePage.tsx` → recálculo de saldo por conta usa: `saldo_inicial + Σ(income.paid where account_id=X) − Σ(expense.paid where account_id=X)` com decimal.js
+3. Testar: criar despesa paga em conta PJ → saldo PJ deve cair imediatamente (realtime)
 
 ---
 
 ## Arquivos afetados
 
-- `src/components/budget/moduleTemplates.ts` (reescrito, ~100 templates)
-- `src/components/budget/Module3DViewer.tsx` (reescrito, animações + ferragens)
-- `src/components/budget/ModuleTemplatePicker.tsx` (busca + filtros)
-- `src/components/budget/BudgetWizardDialog.tsx` (refinos UX + persistência)
-- `src/components/finance/BudgetPdfGenerator.tsx` (capa + seções configuráveis)
-- `src/pages/SettingsPage.tsx` (cláusulas contratuais editáveis)
+**Engenharia / Orçamento**
+- `src/components/budget/BudgetWizardDialog.tsx` — aba Pagamento, persistência por ambiente, custo operacional em dias
+- `src/components/budget/ModuleConfigurator.tsx` — reorganização em Geral/Opções/Materiais com ícones
+- `src/components/budget/Module3DViewer.tsx` — paleta vira seletor de chapa por componente
+- `src/lib/engineering-calc.ts` — agregação de chapas POR COR (novo `calcSheetsByColor`)
+- `src/components/budget/PricingPanel.tsx` — breakdown mostra chapas por cor + dias operacionais
 
-Sem mudanças de schema — tudo cabe nas colunas existentes + JSON `meta`.
+**Financeiro**
+- `src/components/finance/PaymentMilestones.tsx` (ou novo `BudgetPaymentSchedule.tsx`) — UI de parcelas
+- `src/pages/BudgetsPage.tsx` — ao aprovar, gera N transações pending
+- `src/pages/FinancePage.tsx` — KPIs sempre globais, card saldo mês anterior, toggle pendentes antigos
+- `src/components/finance/TransactionDialog.tsx` — garantir `account_id` salvo
+- Recálculo de saldo por conta com decimal.js
+
+**Sem migration de banco** — tudo cabe em colunas existentes + JSON `meta` do budget e `transactions` já tem `account_id`.
+
+---
+
+## Ordem de execução
+
+1. Corrigir bug de saldo da conta (rápido, alto impacto)
+2. Persistência por ambiente (corrige perda de dados)
+3. Engenharia por cor + dias operacionais
+4. Reorganizar ModuleConfigurator
+5. Aba Pagamento + geração de transações
+6. Financeiro: KPIs globais + saldo anterior
+
+Posso começar?
