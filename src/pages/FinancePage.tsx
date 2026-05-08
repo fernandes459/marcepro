@@ -535,7 +535,32 @@ export default function FinancePage() {
           </Card>
         </motion.div>
 
-        {/* Quick Actions — pills */}
+        {/* Banner — Saldo do mês anterior + pendentes globais (sempre visível) */}
+        <motion.div variants={itemVariants}>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <Card className="border-l-4 border-l-info">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Saldo anterior</p>
+                <p className={`text-base sm:text-lg font-bold font-display tabular-nums mt-0.5 ${previousBalance >= 0 ? 'text-info' : 'text-destructive'}`}>{formatBRL(previousBalance)}</p>
+                <p className="text-[10px] text-muted-foreground">veio de períodos passados</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-success cursor-pointer hover:bg-accent/30" onClick={() => setActiveSection('vencer')}>
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">A receber (total)</p>
+                <p className="text-base sm:text-lg font-bold font-display text-success tabular-nums mt-0.5">{formatBRL(globalPending.receivable)}</p>
+                <p className="text-[10px] text-muted-foreground">inclui meses anteriores</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-destructive cursor-pointer hover:bg-accent/30" onClick={() => setActiveSection('vencer')}>
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">A pagar (total)</p>
+                <p className="text-base sm:text-lg font-bold font-display text-destructive tabular-nums mt-0.5">{formatBRL(globalPending.payable)}</p>
+                <p className="text-[10px] text-muted-foreground">inclui meses anteriores</p>
+              </CardContent>
+            </Card>
+          </div>
+        </motion.div>
         <motion.div variants={itemVariants}>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
             {quickActions.map((action) => (
