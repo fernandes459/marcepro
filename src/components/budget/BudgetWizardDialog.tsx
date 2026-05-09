@@ -1370,6 +1370,12 @@ export default function BudgetWizardDialog({
                       </Button>
                     )}
                   </div>
+                  <div className="rounded-lg border border-info/30 bg-info/5 p-3 text-[11px] text-muted-foreground space-y-1">
+                    <p className="font-semibold text-foreground">📊 O que acontece ao aprovar este orçamento:</p>
+                    <p>• Receitas: {paymentSchedule.length > 0 ? `${paymentSchedule.length} parcela(s)` : '1 conta a receber'} criada(s) no Financeiro vinculadas ao cliente.</p>
+                    <p>• Despesas previstas: materiais, custos extras, operacional e comissão lançados como pendentes.</p>
+                    <p>• Você acompanha o lucro real do cliente em <strong>Financeiro → Cliente</strong> (receitas − todos os custos).</p>
+                  </div>
                   <p className="text-[11px] text-muted-foreground text-center">
                     Após salvar, gere PDFs (Cliente / Interno) pela lista de orçamentos.
                   </p>
