@@ -480,6 +480,30 @@ export default function BudgetWizardDialog({
       if (iErr) { toast.error(`Erro nos itens: ${iErr.message}`); setSaving(false); return; }
     }
 
+    // Sync payment_milestones from explicit paymentSchedule
+    if (budgetId) {
+      await supabase.from('payment_milestones').delete().eq('budget_id', budgetId);
+      if (paymentSchedule.length > 0) {
+        const total = paymentSchedule.reduce((s, p) => s + Number(p.amount || 0), 0);
+        const msInserts = paymentSchedule
+          .filter(p => Number(p.amount) > 0)
+          .map((p, i) => ({
+            budget_id: budgetId,
+            user_id: user.id,
+            title: p.title || `Parcela ${i + 1}`,
+            amount: Number(p.amount) || 0,
+            percentage: total > 0 ? +(Number(p.amount) / total * 100).toFixed(2) : 0,
+            due_date: p.due_date || null,
+            sort_order: i,
+            status: 'pending',
+            notes: p.method ? `Forma: ${p.method}` : null,
+          }));
+        if (msInserts.length > 0) {
+          await supabase.from('payment_milestones').insert(msInserts as any);
+        }
+      }
+    }
+
     toast.success(editingBudget ? 'Orçamento atualizado!' : 'Orçamento criado!');
     if (approveAfter && budgetId && onApprove) await onApprove(budgetId);
     onSaved(budgetId!);
