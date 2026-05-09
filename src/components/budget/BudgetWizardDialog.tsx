@@ -128,6 +128,13 @@ export default function BudgetWizardDialog({
   const [extraTaxes, setExtraTaxes] = useState(0);
   const [extraFreight, setExtraFreight] = useState(0);
   const [extraOther, setExtraOther] = useState(0);
+  const [productionDays, setProductionDays] = useState(0);
+  const [commissionPctOverride, setCommissionPctOverride] = useState<number | null>(null);
+  // Pagamento parcelado explícito (Tab 6)
+  type PaymentInstallment = {
+    title: string; amount: number; due_date: string; method: string;
+  };
+  const [paymentSchedule, setPaymentSchedule] = useState<PaymentInstallment[]>([]);
 
   // Tab 6: Precificação
   const [margin, setMargin] = useState(40);
