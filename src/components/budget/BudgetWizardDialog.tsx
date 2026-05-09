@@ -1070,8 +1070,154 @@ export default function BudgetWizardDialog({
                     )}
                   </div>
 
-                  <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-1.5">
-                    <Label className="text-sm font-semibold">Descrição para o Cliente (PDF)</Label>
+                  {/* ============ Pagamento Parcelado (gera lançamentos no Financeiro) ============ */}
+                  <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <Label className="text-sm font-semibold">Pagamento Parcelado</Label>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Cada parcela vira uma conta a receber pendente quando o orçamento for aprovado.
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button" variant="outline" size="sm" className="h-8 text-xs"
+                          onClick={() => {
+                            const today = new Date();
+                            const presets = [
+                              { title: 'Entrada', pct: 50, days: 0, method: 'pix' },
+                              { title: 'Entrega', pct: 50, days: 30, method: 'pix' },
+                            ];
+                            setPaymentSchedule(presets.map(p => {
+                              const d = new Date(today); d.setDate(d.getDate() + p.days);
+                              return {
+                                title: p.title,
+                                amount: +(calc.finalPrice * p.pct / 100).toFixed(2),
+                                due_date: d.toISOString().slice(0, 10),
+                                method: p.method,
+                              };
+                            }));
+                          }}
+                        >50/50</Button>
+                        <Button
+                          type="button" variant="outline" size="sm" className="h-8 text-xs"
+                          onClick={() => {
+                            const today = new Date();
+                            const presets = [
+                              { title: 'Entrada', pct: 30, days: 0 },
+                              { title: 'Início', pct: 30, days: 15 },
+                              { title: 'Montagem', pct: 20, days: 30 },
+                              { title: 'Entrega', pct: 20, days: 45 },
+                            ];
+                            setPaymentSchedule(presets.map(p => {
+                              const d = new Date(today); d.setDate(d.getDate() + p.days);
+                              return {
+                                title: p.title,
+                                amount: +(calc.finalPrice * p.pct / 100).toFixed(2),
+                                due_date: d.toISOString().slice(0, 10),
+                                method: 'pix',
+                              };
+                            }));
+                          }}
+                        >30/30/20/20</Button>
+                      </div>
+                    </div>
+
+                    {paymentSchedule.length === 0 ? (
+                      <Button
+                        type="button" variant="outline" className="w-full h-10 border-dashed"
+                        onClick={() => setPaymentSchedule([{
+                          title: 'Parcela 1', amount: calc.finalPrice,
+                          due_date: new Date().toISOString().slice(0, 10), method: 'pix',
+                        }])}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar parcela
+                      </Button>
+                    ) : (
+                      <div className="space-y-2">
+                        {paymentSchedule.map((p, idx) => (
+                          <div key={idx} className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-[10px] shrink-0">#{idx + 1}</Badge>
+                              <Input
+                                value={p.title}
+                                onChange={(e) => setPaymentSchedule(prev => prev.map((x, i) => i === idx ? { ...x, title: e.target.value } : x))}
+                                placeholder="Ex: Entrada"
+                                className="h-9 text-sm flex-1"
+                              />
+                              <Button
+                                type="button" variant="ghost" size="sm" className="h-9 w-9 p-0 text-destructive shrink-0"
+                                onClick={() => setPaymentSchedule(prev => prev.filter((_, i) => i !== idx))}
+                              ><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Valor</Label>
+                                <CurrencyInput
+                                  value={p.amount}
+                                  onChange={(v) => setPaymentSchedule(prev => prev.map((x, i) => i === idx ? { ...x, amount: v } : x))}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Vencimento</Label>
+                                <Input
+                                  type="date" value={p.due_date}
+                                  onChange={(e) => setPaymentSchedule(prev => prev.map((x, i) => i === idx ? { ...x, due_date: e.target.value } : x))}
+                                  className="h-10"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Forma</Label>
+                                <Select
+                                  value={p.method}
+                                  onValueChange={(v) => setPaymentSchedule(prev => prev.map((x, i) => i === idx ? { ...x, method: v } : x))}
+                                >
+                                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="pix">PIX</SelectItem>
+                                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                                    <SelectItem value="transferencia">Transferência</SelectItem>
+                                    <SelectItem value="boleto">Boleto</SelectItem>
+                                    <SelectItem value="credit">Cartão Crédito</SelectItem>
+                                    <SelectItem value="debit">Cartão Débito</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        <Button
+                          type="button" variant="ghost" size="sm"
+                          className="w-full h-9 border border-dashed border-border/60"
+                          onClick={() => {
+                            const last = paymentSchedule[paymentSchedule.length - 1];
+                            const next = new Date(last?.due_date || new Date().toISOString().slice(0, 10));
+                            next.setDate(next.getDate() + 30);
+                            setPaymentSchedule(prev => [...prev, {
+                              title: `Parcela ${prev.length + 1}`,
+                              amount: 0,
+                              due_date: next.toISOString().slice(0, 10),
+                              method: 'pix',
+                            }]);
+                          }}
+                        ><Plus className="h-3.5 w-3.5 mr-1" /> Adicionar parcela</Button>
+
+                        {(() => {
+                          const sum = paymentSchedule.reduce((s, p) => s + Number(p.amount || 0), 0);
+                          const diff = calc.finalPrice - sum;
+                          return (
+                            <div className="flex justify-between items-center px-2 text-xs">
+                              <span className="text-muted-foreground">Soma das parcelas</span>
+                              <span className={`tabular-nums font-semibold ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-warning'}`}>
+                                {formatBRL(sum)} {Math.abs(diff) >= 0.01 && `(faltam ${formatBRL(diff)})`}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
                     <Textarea
                       value={clientDescription}
                       onChange={(e) => setClientDescription(e.target.value)}
