@@ -833,6 +833,93 @@ export default function BudgetWizardDialog({
                       </div>
                     </div>
                   </div>
+
+                  {/* Comissão do Vendedor */}
+                  <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Handshake className="h-4 w-4 text-primary" />
+                      <Label className="text-sm font-semibold">Comissão do Vendedor</Label>
+                    </div>
+                    {!sellerId ? (
+                      <p className="text-[11px] text-warning">
+                        ⚠ Selecione um vendedor na aba Projeto para gerar comissão automaticamente.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">
+                              Comissão (%) — em branco usa padrão da empresa ({Number(companySettings?.default_commission ?? 10)}%)
+                            </Label>
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min={0}
+                              max={100}
+                              value={commissionPctOverride ?? ''}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setCommissionPctOverride(v === '' ? null : Number(v));
+                              }}
+                              placeholder={String(companySettings?.default_commission ?? 10)}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">Vendedor</Label>
+                            <div className="h-10 rounded-md border border-border bg-muted/20 px-3 flex items-center text-sm">
+                              {selectedSeller?.name || '—'}
+                            </div>
+                          </div>
+                        </div>
+                        {(() => {
+                          const pct = commissionPctOverride ?? Number(companySettings?.default_commission ?? 10);
+                          const profit = Math.max(0, calc.realProfit);
+                          const base = calc.totalLabor + profit;
+                          const value = base * (pct / 100);
+                          return (
+                            <div className="rounded-lg bg-muted/40 p-3 text-sm space-y-1">
+                              <Row label={`Base (mão-de-obra + lucro)`} value={formatBRL(base)} />
+                              <div className="flex justify-between border-t border-border/60 pt-1 font-semibold">
+                                <span>Comissão estimada ({pct}%)</span>
+                                <span className="text-gold">{formatBRL(value)}</span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                Lançada como despesa pendente no Financeiro ao aprovar o orçamento.
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Dias de Produção */}
+                  <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-3">
+                    <Label className="text-sm font-semibold">Prazo de Produção</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground">Dias estimados de produção</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={productionDays || ''}
+                          onChange={(e) => setProductionDays(Number(e.target.value) || 0)}
+                          placeholder="Ex: 30"
+                          className="h-10"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground">Custo operacional do período</Label>
+                        <div className="h-10 rounded-md border border-border bg-muted/20 px-3 flex items-center text-sm tabular-nums">
+                          {formatBRL((overheadPerProject / 30) * (productionDays || 0))}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Calculado a partir do overhead mensal ÷ 30 × dias informados (apenas referência).
+                    </p>
+                  </div>
                 </TabsContent>
 
                 {/* ============ TAB 6: MARGEM E PRECIFICAÇÃO ============ */}
