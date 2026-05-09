@@ -401,6 +401,8 @@ export default function BudgetWizardDialog({
       useParametric, modules, mdfPricePerM2, edgeTapePricePerM,
       itemUnits: items.map(i => i.unit || 'un'),
       salespersonId: sellerId || null,
+      productionDays, commissionPctOverride,
+      paymentSchedule,
     };
     const cleaned = (projectNotes || '').replace(META_RE, '').trim();
     return `${cleaned}\n<!--BUDGET_META:${JSON.stringify(meta)}-->`.trim();
