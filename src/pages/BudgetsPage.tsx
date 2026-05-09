@@ -230,7 +230,7 @@ export default function BudgetsPage() {
     // Wipe previous auto-generated entries for this budget (receivables + auto costs)
     const { data: existingReceivables } = await supabase
       .from('financial_transactions').select('id').eq('budget_id', budget.id)
-      .in('category', ['project', 'installment', 'material', 'operational', 'extras']);
+      .in('category', ['project', 'installment', 'material', 'operational', 'extras', 'commission']);
     if (existingReceivables && existingReceivables.length > 0) {
       await supabase.from('financial_transactions').delete().in('id', existingReceivables.map(t => t.id));
     }
