@@ -1218,6 +1218,8 @@ export default function BudgetWizardDialog({
                     )}
                   </div>
 
+                  <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-1.5">
+                    <Label className="text-sm font-semibold">Descrição para o Cliente (PDF)</Label>
                     <Textarea
                       value={clientDescription}
                       onChange={(e) => setClientDescription(e.target.value)}
