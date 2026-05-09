@@ -209,6 +209,12 @@ export default function BudgetWizardDialog({
     setExtraTaxes(Number(meta.extraTaxes) || 0);
     setExtraFreight(Number(meta.extraFreight) || 0);
     setExtraOther(Number(meta.extraOther) || 0);
+    setProductionDays(Number(meta.productionDays) || 0);
+    setCommissionPctOverride(
+      meta.commissionPctOverride !== undefined && meta.commissionPctOverride !== null
+        ? Number(meta.commissionPctOverride) : null
+    );
+    setPaymentSchedule(Array.isArray(meta.paymentSchedule) ? meta.paymentSchedule : []);
     setDiscountPct(Number(meta.discountPct) || 0);
     setIncludeOverhead(meta.includeOverhead !== false);
     setClientNotes(meta.clientNotes || '');
