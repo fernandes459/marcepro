@@ -216,11 +216,21 @@ export default function BudgetsPage() {
     const today = new Date().toISOString().slice(0, 10);
     const baseDesc = `${budget.code} — ${client?.name || 'Cliente'}`;
 
+    // Parse meta from notes
+    const META_RE = /<!--BUDGET_META:(.*?)-->/s;
+    let meta: any = {};
+    try {
+      const m = (budget.notes || '').match(META_RE);
+      if (m) meta = JSON.parse(m[1]);
+    } catch { /* noop */ }
+
     const { data: milestones } = await supabase
       .from('payment_milestones').select('*').eq('budget_id', budget.id).order('sort_order');
 
+    // Wipe previous auto-generated entries for this budget (receivables + auto costs)
     const { data: existingReceivables } = await supabase
-      .from('financial_transactions').select('id').eq('budget_id', budget.id).in('category', ['project', 'installment']);
+      .from('financial_transactions').select('id').eq('budget_id', budget.id)
+      .in('category', ['project', 'installment', 'material', 'operational', 'extras']);
     if (existingReceivables && existingReceivables.length > 0) {
       await supabase.from('financial_transactions').delete().in('id', existingReceivables.map(t => t.id));
     }
@@ -228,12 +238,14 @@ export default function BudgetsPage() {
     if (milestones && milestones.length > 0) {
       const inserts = milestones.map((ms: any, idx: number) => {
         const dueDate = ms.due_date || addBusinessDays(new Date(), 30 * (idx + 1)).toISOString().slice(0, 10);
+        // try to parse method from notes "Forma: pix"
+        const methodMatch = (ms.notes || '').match(/Forma:\s*(\w+)/);
         return {
           user_id: user.id, type: 'income', category: 'installment',
-          description: `${baseDesc} — ${ms.title} (${ms.percentage}%)`,
+          description: `${baseDesc} — ${ms.title} (${Number(ms.percentage).toFixed(0)}%)`,
           amount: ms.amount, date: today, status: 'pending', due_date: dueDate,
           client_id: budget.client_id, budget_id: budget.id, order_number: budget.code,
-          payment_method: budget.payment_method || null,
+          payment_method: methodMatch?.[1] || budget.payment_method || null,
           notes: `Marco "${ms.title}" do orçamento ${budget.code}`,
         };
       });
@@ -276,35 +288,82 @@ export default function BudgetsPage() {
     }
     toast.info('Contas a receber geradas');
 
-    // Comissão para vendedor (usa seller_id agora persistido em coluna)
+    // ============ CUSTOS ATRELADOS AO CLIENTE (para calcular lucro real) ============
     try {
-      const sellerId = (budget as any).seller_id;
-      if (sellerId) {
-        const { data: existing } = await supabase
-          .from('financial_transactions').select('id').eq('budget_id', budget.id).eq('category', 'commission').limit(1);
-        if (!existing || existing.length === 0) {
-          const { data: bItems } = await supabase.from('budget_items').select('labor_cost, quantity').eq('budget_id', budget.id);
-          const laborTotal = (bItems || []).reduce((s: number, i: any) => s + Number(i.labor_cost || 0) * Number(i.quantity || 1), 0);
-          const profit = Number(budget.final_price) - Number(budget.total_cost);
-          const commissionBase = laborTotal + Math.max(0, profit);
-          const commissionPct = Number(companySettings?.default_commission ?? 10) || 10;
-          const commissionAmt = +(commissionBase * (commissionPct / 100)).toFixed(2);
-          const seller = employees.find(e => e.id === sellerId);
-          const sellerName = seller?.name || 'Vendedor';
-          if (commissionAmt > 0) {
-            await supabase.from('financial_transactions').insert({
-              user_id: user.id, type: 'expense', category: 'commission', subcategory: sellerName,
-              description: `Comissão ${sellerName} — ${baseDesc}`, amount: commissionAmt, date: today,
-              due_date: addBusinessDays(new Date(), 30).toISOString().slice(0, 10),
-              status: 'pending', client_id: budget.client_id, budget_id: budget.id,
-              order_number: budget.code,
-              notes: `Comissão gerada na aprovação do orçamento ${budget.code}.\nVendedor: ${sellerName}\nBase: ${formatBRL(commissionBase)} × ${commissionPct}%`,
-            } as any);
-            toast.info(`Comissão de ${formatBRL(commissionAmt)} criada`);
-          }
+      const { data: bItems } = await supabase
+        .from('budget_items').select('material_cost, labor_cost, quantity').eq('budget_id', budget.id);
+      const totalMaterial = (bItems || []).reduce((s: number, i: any) => s + Number(i.material_cost || 0) * Number(i.quantity || 1), 0);
+      const laborTotal = (bItems || []).reduce((s: number, i: any) => s + Number(i.labor_cost || 0) * Number(i.quantity || 1), 0);
+      const dueIn7 = addBusinessDays(new Date(), 7).toISOString().slice(0, 10);
+      const costInserts: any[] = [];
+
+      if (totalMaterial > 0) {
+        costInserts.push({
+          user_id: user.id, type: 'expense', category: 'material',
+          description: `Materiais — ${baseDesc}`, amount: +totalMaterial.toFixed(2),
+          date: today, status: 'pending', due_date: dueIn7,
+          client_id: budget.client_id, budget_id: budget.id, order_number: budget.code,
+          notes: `Custo de materiais previsto do orçamento ${budget.code}. Confirme como pago ao adquirir os materiais.`,
+        });
+      }
+      const extras = Number(meta.extraTaxes || 0) + Number(meta.extraFreight || 0) + Number(meta.extraOther || 0);
+      if (extras > 0) {
+        costInserts.push({
+          user_id: user.id, type: 'expense', category: 'extras',
+          description: `Custos extras — ${baseDesc}`, amount: +extras.toFixed(2),
+          date: today, status: 'pending', due_date: dueIn7,
+          client_id: budget.client_id, budget_id: budget.id, order_number: budget.code,
+          notes: `Taxas/Frete/Outros do orçamento ${budget.code}.`,
+        });
+      }
+      if (meta.includeOverhead !== false) {
+        const opCost = Number(budget.total_cost) > 0
+          ? Math.max(0, Number(budget.total_cost) - totalMaterial - laborTotal - extras)
+          : 0;
+        if (opCost > 0) {
+          costInserts.push({
+            user_id: user.id, type: 'expense', category: 'operational',
+            description: `Custo operacional — ${baseDesc}`, amount: +opCost.toFixed(2),
+            date: today, status: 'pending', due_date: dueIn7,
+            client_id: budget.client_id, budget_id: budget.id, order_number: budget.code,
+            notes: `Rateio de custos fixos para o orçamento ${budget.code}.`,
+          });
         }
       }
-    } catch (e) { console.error('[commission]', e); }
+      if (costInserts.length > 0) {
+        await supabase.from('financial_transactions').insert(costInserts as any);
+        toast.info(`${costInserts.length} custo(s) lançado(s) no Financeiro`);
+      }
+
+      // Comissão para vendedor
+      const sellerId = (budget as any).seller_id;
+      if (sellerId) {
+        const profit = Number(budget.final_price) - Number(budget.total_cost);
+        const commissionBase = laborTotal + Math.max(0, profit);
+        const overridePct = meta.commissionPctOverride;
+        const commissionPct = (overridePct !== undefined && overridePct !== null && overridePct !== '')
+          ? Number(overridePct)
+          : (Number(companySettings?.default_commission ?? 10) || 10);
+        const commissionAmt = +(commissionBase * (commissionPct / 100)).toFixed(2);
+        const seller = employees.find(e => e.id === sellerId);
+        const sellerName = seller?.name || 'Vendedor';
+        if (commissionAmt > 0) {
+          await supabase.from('financial_transactions').insert({
+            user_id: user.id, type: 'expense', category: 'commission', subcategory: sellerName,
+            description: `Comissão ${sellerName} — ${baseDesc}`, amount: commissionAmt, date: today,
+            due_date: addBusinessDays(new Date(), 30).toISOString().slice(0, 10),
+            status: 'pending', client_id: budget.client_id, budget_id: budget.id,
+            order_number: budget.code,
+            notes: `Comissão gerada na aprovação do orçamento ${budget.code}.\nVendedor: ${sellerName}\nBase: ${formatBRL(commissionBase)} × ${commissionPct}%`,
+          } as any);
+          toast.info(`Comissão de ${formatBRL(commissionAmt)} criada`);
+        } else {
+          toast.warning('Comissão não gerada: base de cálculo é zero');
+        }
+      } else {
+        toast.warning('Comissão não gerada: vendedor não definido no orçamento');
+      }
+    } catch (e) { console.error('[receivables/costs/commission]', e); }
   };
 
   const sendToProduction = async (budget: BudgetWithClient) => {
