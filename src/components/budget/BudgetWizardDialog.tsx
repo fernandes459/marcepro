@@ -128,6 +128,13 @@ export default function BudgetWizardDialog({
   const [extraTaxes, setExtraTaxes] = useState(0);
   const [extraFreight, setExtraFreight] = useState(0);
   const [extraOther, setExtraOther] = useState(0);
+  const [productionDays, setProductionDays] = useState(0);
+  const [commissionPctOverride, setCommissionPctOverride] = useState<number | null>(null);
+  // Pagamento parcelado explícito (Tab 6)
+  type PaymentInstallment = {
+    title: string; amount: number; due_date: string; method: string;
+  };
+  const [paymentSchedule, setPaymentSchedule] = useState<PaymentInstallment[]>([]);
 
   // Tab 6: Precificação
   const [margin, setMargin] = useState(40);
@@ -175,6 +182,7 @@ export default function BudgetWizardDialog({
     setItems([]);
     setUseParametric(false); setModules([]); setModuleResult(null);
     setIncludeOverhead(true); setExtraTaxes(0); setExtraFreight(0); setExtraOther(0);
+    setProductionDays(0); setCommissionPctOverride(null); setPaymentSchedule([]);
     setMargin(Number(companySettings?.default_margin ?? 40));
     setDiscountPct(0); setComplexityFactor('1.0'); setFinishType('branco');
     setUseAdvancedPayment(false); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT);
@@ -201,6 +209,12 @@ export default function BudgetWizardDialog({
     setExtraTaxes(Number(meta.extraTaxes) || 0);
     setExtraFreight(Number(meta.extraFreight) || 0);
     setExtraOther(Number(meta.extraOther) || 0);
+    setProductionDays(Number(meta.productionDays) || 0);
+    setCommissionPctOverride(
+      meta.commissionPctOverride !== undefined && meta.commissionPctOverride !== null
+        ? Number(meta.commissionPctOverride) : null
+    );
+    setPaymentSchedule(Array.isArray(meta.paymentSchedule) ? meta.paymentSchedule : []);
     setDiscountPct(Number(meta.discountPct) || 0);
     setIncludeOverhead(meta.includeOverhead !== false);
     setClientNotes(meta.clientNotes || '');
@@ -387,6 +401,8 @@ export default function BudgetWizardDialog({
       useParametric, modules, mdfPricePerM2, edgeTapePricePerM,
       itemUnits: items.map(i => i.unit || 'un'),
       salespersonId: sellerId || null,
+      productionDays, commissionPctOverride,
+      paymentSchedule,
     };
     const cleaned = (projectNotes || '').replace(META_RE, '').trim();
     return `${cleaned}\n<!--BUDGET_META:${JSON.stringify(meta)}-->`.trim();
@@ -462,6 +478,30 @@ export default function BudgetWizardDialog({
     if (insertable.length > 0) {
       const { error: iErr } = await supabase.from('budget_items').insert(insertable as any);
       if (iErr) { toast.error(`Erro nos itens: ${iErr.message}`); setSaving(false); return; }
+    }
+
+    // Sync payment_milestones from explicit paymentSchedule
+    if (budgetId) {
+      await supabase.from('payment_milestones').delete().eq('budget_id', budgetId);
+      if (paymentSchedule.length > 0) {
+        const total = paymentSchedule.reduce((s, p) => s + Number(p.amount || 0), 0);
+        const msInserts = paymentSchedule
+          .filter(p => Number(p.amount) > 0)
+          .map((p, i) => ({
+            budget_id: budgetId,
+            user_id: user.id,
+            title: p.title || `Parcela ${i + 1}`,
+            amount: Number(p.amount) || 0,
+            percentage: total > 0 ? +(Number(p.amount) / total * 100).toFixed(2) : 0,
+            due_date: p.due_date || null,
+            sort_order: i,
+            status: 'pending',
+            notes: p.method ? `Forma: ${p.method}` : null,
+          }));
+        if (msInserts.length > 0) {
+          await supabase.from('payment_milestones').insert(msInserts as any);
+        }
+      }
     }
 
     toast.success(editingBudget ? 'Orçamento atualizado!' : 'Orçamento criado!');
@@ -793,6 +833,93 @@ export default function BudgetWizardDialog({
                       </div>
                     </div>
                   </div>
+
+                  {/* Comissão do Vendedor */}
+                  <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Handshake className="h-4 w-4 text-primary" />
+                      <Label className="text-sm font-semibold">Comissão do Vendedor</Label>
+                    </div>
+                    {!sellerId ? (
+                      <p className="text-[11px] text-warning">
+                        ⚠ Selecione um vendedor na aba Projeto para gerar comissão automaticamente.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">
+                              Comissão (%) — em branco usa padrão da empresa ({Number(companySettings?.default_commission ?? 10)}%)
+                            </Label>
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min={0}
+                              max={100}
+                              value={commissionPctOverride ?? ''}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setCommissionPctOverride(v === '' ? null : Number(v));
+                              }}
+                              placeholder={String(companySettings?.default_commission ?? 10)}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">Vendedor</Label>
+                            <div className="h-10 rounded-md border border-border bg-muted/20 px-3 flex items-center text-sm">
+                              {selectedSeller?.name || '—'}
+                            </div>
+                          </div>
+                        </div>
+                        {(() => {
+                          const pct = commissionPctOverride ?? Number(companySettings?.default_commission ?? 10);
+                          const profit = Math.max(0, calc.realProfit);
+                          const base = calc.totalLabor + profit;
+                          const value = base * (pct / 100);
+                          return (
+                            <div className="rounded-lg bg-muted/40 p-3 text-sm space-y-1">
+                              <Row label={`Base (mão-de-obra + lucro)`} value={formatBRL(base)} />
+                              <div className="flex justify-between border-t border-border/60 pt-1 font-semibold">
+                                <span>Comissão estimada ({pct}%)</span>
+                                <span className="text-gold">{formatBRL(value)}</span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                Lançada como despesa pendente no Financeiro ao aprovar o orçamento.
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Dias de Produção */}
+                  <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-3">
+                    <Label className="text-sm font-semibold">Prazo de Produção</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground">Dias estimados de produção</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={productionDays || ''}
+                          onChange={(e) => setProductionDays(Number(e.target.value) || 0)}
+                          placeholder="Ex: 30"
+                          className="h-10"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground">Custo operacional do período</Label>
+                        <div className="h-10 rounded-md border border-border bg-muted/20 px-3 flex items-center text-sm tabular-nums">
+                          {formatBRL((overheadPerProject / 30) * (productionDays || 0))}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Calculado a partir do overhead mensal ÷ 30 × dias informados (apenas referência).
+                    </p>
+                  </div>
                 </TabsContent>
 
                 {/* ============ TAB 6: MARGEM E PRECIFICAÇÃO ============ */}
@@ -939,6 +1066,154 @@ export default function BudgetWizardDialog({
                             <span className="text-gold">{formatBRL(installmentValue)}</span>
                           </div>
                         </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ============ Pagamento Parcelado (gera lançamentos no Financeiro) ============ */}
+                  <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <Label className="text-sm font-semibold">Pagamento Parcelado</Label>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Cada parcela vira uma conta a receber pendente quando o orçamento for aprovado.
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button" variant="outline" size="sm" className="h-8 text-xs"
+                          onClick={() => {
+                            const today = new Date();
+                            const presets = [
+                              { title: 'Entrada', pct: 50, days: 0, method: 'pix' },
+                              { title: 'Entrega', pct: 50, days: 30, method: 'pix' },
+                            ];
+                            setPaymentSchedule(presets.map(p => {
+                              const d = new Date(today); d.setDate(d.getDate() + p.days);
+                              return {
+                                title: p.title,
+                                amount: +(calc.finalPrice * p.pct / 100).toFixed(2),
+                                due_date: d.toISOString().slice(0, 10),
+                                method: p.method,
+                              };
+                            }));
+                          }}
+                        >50/50</Button>
+                        <Button
+                          type="button" variant="outline" size="sm" className="h-8 text-xs"
+                          onClick={() => {
+                            const today = new Date();
+                            const presets = [
+                              { title: 'Entrada', pct: 30, days: 0 },
+                              { title: 'Início', pct: 30, days: 15 },
+                              { title: 'Montagem', pct: 20, days: 30 },
+                              { title: 'Entrega', pct: 20, days: 45 },
+                            ];
+                            setPaymentSchedule(presets.map(p => {
+                              const d = new Date(today); d.setDate(d.getDate() + p.days);
+                              return {
+                                title: p.title,
+                                amount: +(calc.finalPrice * p.pct / 100).toFixed(2),
+                                due_date: d.toISOString().slice(0, 10),
+                                method: 'pix',
+                              };
+                            }));
+                          }}
+                        >30/30/20/20</Button>
+                      </div>
+                    </div>
+
+                    {paymentSchedule.length === 0 ? (
+                      <Button
+                        type="button" variant="outline" className="w-full h-10 border-dashed"
+                        onClick={() => setPaymentSchedule([{
+                          title: 'Parcela 1', amount: calc.finalPrice,
+                          due_date: new Date().toISOString().slice(0, 10), method: 'pix',
+                        }])}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar parcela
+                      </Button>
+                    ) : (
+                      <div className="space-y-2">
+                        {paymentSchedule.map((p, idx) => (
+                          <div key={idx} className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-[10px] shrink-0">#{idx + 1}</Badge>
+                              <Input
+                                value={p.title}
+                                onChange={(e) => setPaymentSchedule(prev => prev.map((x, i) => i === idx ? { ...x, title: e.target.value } : x))}
+                                placeholder="Ex: Entrada"
+                                className="h-9 text-sm flex-1"
+                              />
+                              <Button
+                                type="button" variant="ghost" size="sm" className="h-9 w-9 p-0 text-destructive shrink-0"
+                                onClick={() => setPaymentSchedule(prev => prev.filter((_, i) => i !== idx))}
+                              ><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Valor</Label>
+                                <CurrencyInput
+                                  value={p.amount}
+                                  onChange={(v) => setPaymentSchedule(prev => prev.map((x, i) => i === idx ? { ...x, amount: v } : x))}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Vencimento</Label>
+                                <Input
+                                  type="date" value={p.due_date}
+                                  onChange={(e) => setPaymentSchedule(prev => prev.map((x, i) => i === idx ? { ...x, due_date: e.target.value } : x))}
+                                  className="h-10"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Forma</Label>
+                                <Select
+                                  value={p.method}
+                                  onValueChange={(v) => setPaymentSchedule(prev => prev.map((x, i) => i === idx ? { ...x, method: v } : x))}
+                                >
+                                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="pix">PIX</SelectItem>
+                                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                                    <SelectItem value="transferencia">Transferência</SelectItem>
+                                    <SelectItem value="boleto">Boleto</SelectItem>
+                                    <SelectItem value="credit">Cartão Crédito</SelectItem>
+                                    <SelectItem value="debit">Cartão Débito</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        <Button
+                          type="button" variant="ghost" size="sm"
+                          className="w-full h-9 border border-dashed border-border/60"
+                          onClick={() => {
+                            const last = paymentSchedule[paymentSchedule.length - 1];
+                            const next = new Date(last?.due_date || new Date().toISOString().slice(0, 10));
+                            next.setDate(next.getDate() + 30);
+                            setPaymentSchedule(prev => [...prev, {
+                              title: `Parcela ${prev.length + 1}`,
+                              amount: 0,
+                              due_date: next.toISOString().slice(0, 10),
+                              method: 'pix',
+                            }]);
+                          }}
+                        ><Plus className="h-3.5 w-3.5 mr-1" /> Adicionar parcela</Button>
+
+                        {(() => {
+                          const sum = paymentSchedule.reduce((s, p) => s + Number(p.amount || 0), 0);
+                          const diff = calc.finalPrice - sum;
+                          return (
+                            <div className="flex justify-between items-center px-2 text-xs">
+                              <span className="text-muted-foreground">Soma das parcelas</span>
+                              <span className={`tabular-nums font-semibold ${Math.abs(diff) < 0.01 ? 'text-success' : 'text-warning'}`}>
+                                {formatBRL(sum)} {Math.abs(diff) >= 0.01 && `(faltam ${formatBRL(diff)})`}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -1094,6 +1369,12 @@ export default function BudgetWizardDialog({
                         <CheckCircle className="h-4 w-4 mr-2" /> Salvar e Aprovar
                       </Button>
                     )}
+                  </div>
+                  <div className="rounded-lg border border-info/30 bg-info/5 p-3 text-[11px] text-muted-foreground space-y-1">
+                    <p className="font-semibold text-foreground">📊 O que acontece ao aprovar este orçamento:</p>
+                    <p>• Receitas: {paymentSchedule.length > 0 ? `${paymentSchedule.length} parcela(s)` : '1 conta a receber'} criada(s) no Financeiro vinculadas ao cliente.</p>
+                    <p>• Despesas previstas: materiais, custos extras, operacional e comissão lançados como pendentes.</p>
+                    <p>• Você acompanha o lucro real do cliente em <strong>Financeiro → Cliente</strong> (receitas − todos os custos).</p>
                   </div>
                   <p className="text-[11px] text-muted-foreground text-center">
                     Após salvar, gere PDFs (Cliente / Interno) pela lista de orçamentos.
