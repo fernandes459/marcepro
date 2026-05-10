@@ -92,6 +92,8 @@ export default function FinancePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [budgetsList, setBudgetsList] = useState<{ id: string; project_name: string | null; code: string; client_id: string | null }[]>([]);
+  const [pendingWorkLogsTotal, setPendingWorkLogsTotal] = useState(0);
   const [customCategories, setCustomCategories] = useState<FinancialCategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
