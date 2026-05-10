@@ -1,123 +1,102 @@
-# Plano: Engenharia por Cor, Ambientes Isolados, Parcelamento e Correções Financeiras
-
-Vou resolver 7 problemas reais que você levantou, em uma única entrega. Sem mudar o que já funciona.
+## Objetivo
+Transformar o módulo Financeiro em uma central executiva da marcenaria (saldo real, previsões, alertas e críticas inteligentes) e criar a aba **Colaboradores** para registrar horas/dias trabalhados, integrada às despesas com nome do colaborador como subcategoria.
 
 ---
 
-## 1. Paleta 3D = Cor real do material (não decorativa)
+## 1. Financeiro voltado para empresa
 
-**Hoje:** a paleta no 3D só muda visual, não impacta nada.
+### 1.1 Novos KPIs no topo (Home do Financeiro)
+- **Saldo Real** = soma `current_balance` de todas as contas bancárias (caixa atual disponível).
+- **Saldo Projetado (30 dias)** = Saldo Real + Receitas previstas (próximos 30 dias) − Despesas previstas (próximos 30 dias).
+- **Receitas Previstas** = total `pending`/`overdue` do tipo `income` com `due_date` nos próximos 30 dias.
+- **Despesas Previstas** = idem para `expense` (separa fixas vs. variáveis).
+- **Receitas Realizadas (mês)** e **Despesas Realizadas (mês)** — já existentes, manter.
+- **Burn Rate** = média mensal de despesas dos últimos 3 meses.
+- **Runway** = Saldo Real ÷ Burn Rate (meses de "fôlego").
 
-**Vai virar:** seletor de **chapa por componente** (Corpo, Frentes, Fundo) usando o catálogo real de chapas (Configurações → Engenharia). Cada módulo guarda qual chapa foi usada onde.
+### 1.2 Painel de Sugestões e Críticas (novo card destacado)
+Engine de regras que analisa as transações e gera alertas dinâmicos. Exemplos:
+- Despesas fixas > 60% das receitas → "Custos fixos altos demais."
+- Margem de lucro do mês < margem mínima (`company_settings.min_margin`) → "Lucro abaixo da meta."
+- Mais de X contas vencidas → "Você tem N contas vencidas totalizando R$..."
+- Categoria com aumento > 30% vs. mês anterior → "Gasto com 'Material' subiu X%."
+- Saldo projetado negativo → "Atenção: caixa pode ficar negativo em N dias."
+- Comissões pendentes não pagas há mais de 15 dias.
+- Cliente com saldo a receber vencido > 30 dias.
+- Cada alerta tem severidade (info/warning/danger), ícone e ação sugerida.
 
-**Resumo final mostrará:**
+### 1.3 Subcategoria nas despesas
+- Adicionar campo **Subcategoria** no `TransactionDialog` (já existe coluna `subcategory` no banco).
+- Para a categoria `Salários/Comissões/Mão de obra`, a subcategoria mostra dropdown com **nome do colaborador** (lista de `employees`).
+- Exibido nas listagens, gráficos e relatórios.
+
+---
+
+## 2. Aba Colaboradores (nova seção dentro do Financeiro)
+
+### 2.1 Tabela nova: `collaborator_work_logs`
+Registra horas/dias trabalhados por colaborador.
+
 ```
-Chapas necessárias por cor:
-- MDF 15mm Branco TX:  3 chapas (8,4 m²)
-- MDF 15mm Areia:      2 chapas (5,1 m²)
-- MDF 15mm Preto:      1 chapa  (2,8 m²)
-Total: 6 chapas
+- id, user_id, employee_id (uuid)
+- work_date (date)
+- hours_worked (numeric)         -- ex: 8.5
+- days_worked (numeric default 1)
+- hourly_rate (numeric)          -- snapshot do valor/hora no dia
+- daily_rate (numeric)           -- snapshot
+- total_amount (numeric generated) -- hours × rate OU days × daily
+- project_id / budget_id (uuid nullable)  -- vincular a obra
+- description (text)
+- status ('pending' | 'paid')
+- linked_transaction_id (uuid nullable) -- quando vira despesa
+- created_at, updated_at
 ```
+RLS: padrão `can_access_data(auth.uid(), user_id)`.
 
-Cálculo continua via `engineering-calc.ts` (decimal.js, sobra 20%), mas agora **agrupado por chapa** em vez de uma chapa só pro orçamento todo.
+Adicionar em `employees`: `hourly_rate numeric`, `daily_rate numeric` (opcionais).
 
----
+### 2.2 Interface da aba
+- Lista de colaboradores com totais do mês (horas, dias, valor a pagar).
+- Botão "Registrar Horas" → modal com colaborador, data, horas OU dias, valor calculado, obra vinculada.
+- Filtro por colaborador, mês, status.
+- Botão **"Gerar despesa"** em registros pendentes → cria `financial_transaction` (categoria mão-de-obra, subcategoria = nome do colaborador, valor = total) e marca `status=paid` no log.
+- Resumo: total a pagar do mês por colaborador, custo médio/hora real, ranking.
 
-## 2. Custo Operacional = Dias
-
-**Hoje:** valor fixo R$.
-
-**Vai virar:** campo "Dias de produção" + "Custo operacional / dia" (vem de Configurações). Sistema multiplica = custo operacional do orçamento. Mostra os 2 campos visíveis no breakdown.
-
----
-
-## 3. Ambientes isolados — bug de persistência
-
-**Hoje:** ao criar módulo via engenharia, ele cai num "balde global" e não fica preso ao ambiente selecionado.
-
-**Vai virar:** cada ambiente terá seu próprio array `modules: []` no JSON `meta.environments`. Adicionar/remover módulo só afeta o ambiente ativo. Ao recarregar o orçamento, cada ambiente reaparece com seus módulos.
+### 2.3 Integração
+- Card no Painel de Sugestões: "R$ X em horas de colaborador ainda não lançadas."
+- Aparece no DRE como linha de custo.
 
 ---
 
-## 4. Editor de módulo igual CorteCloud
+## 3. Detalhes técnicos
 
-Pelas suas screenshots, vou reorganizar o `ModuleConfigurator` em 3 abas:
+### Migrations
+1. `ALTER TABLE employees ADD COLUMN hourly_rate numeric DEFAULT 0, ADD COLUMN daily_rate numeric DEFAULT 0;`
+2. Criar tabela `collaborator_work_logs` + RLS + trigger updated_at.
 
-- **Geral:** Nome, Largura, Altura, Profundidade, Quantidade
-- **Opções:** Nº portas, Nº gavetas, Nº prateleiras, Lado da abertura (Esq/Dir/Dupla), Tipo de puxador, Tipo de corrediça (comum/telescópica/soft), Tipo de dobradiça, Pés/sapatas (sim/não), Fundo (3mm/6mm/MDF), Folga das frentes (mm)
-- **Materiais:** seletor de chapa por componente (Corpo / Frentes / Fundo / Gavetas) + fita de borda
+### Arquivos a criar
+- `src/components/finance/FinancialAdvisor.tsx` — engine de sugestões/críticas.
+- `src/components/finance/CollaboratorTab.tsx` — aba de horas trabalhadas.
+- `src/components/finance/WorkLogDialog.tsx` — modal de registro.
+- `src/hooks/useFinancialInsights.ts` — regras de análise.
 
-Cada campo tem ícone visual à esquerda (igual CorteCloud) e atualiza o 3D em tempo real.
+### Arquivos a editar
+- `src/pages/FinancePage.tsx` — novos KPIs, nova section `colaboradores`, integrar Advisor.
+- `src/components/finance/TransactionDialog.tsx` — campo subcategoria + dropdown colaborador para categorias de mão-de-obra.
+- `src/lib/finance-calc.ts` — funções `computeBurnRate`, `computeRunway`, `projectedBalance`.
 
----
-
-## 5. Aba "Pagamento" no orçamento (parcelamento real)
-
-Nova aba **Pagamento** entre Margem e Resumo:
-
-- Define **N parcelas** com: valor, data de vencimento, forma (Dinheiro/PIX/Boleto/Cartão/Transferência), conta de destino
-- Botões rápidos: "Entrada 30% + 2x", "3x iguais", "Sinal + Saldo na entrega"
-- Valida que soma das parcelas = valor total do orçamento
-- Salva em `meta.payment_schedule`
-
-**Ao aprovar o orçamento** (botão "Aprovar e Converter em Projeto"):
-- Cria N transações `income` em `transactions` com status `pending`
-- `due_date` = data da parcela
-- `account_id` = conta escolhida
-- `category` = "installment", `project_id` = projeto criado
-- Aparecem na aba Financeiro como "A Receber"
+### UX
+- Mantém estética luxury (Graphite/Gold, Playfair).
+- Cards de alerta com cores semânticas (warning/destructive/success).
+- Tudo realtime via Supabase channels.
 
 ---
 
-## 6. Financeiro: histórico contínuo + saldo anterior
+## Fluxo para o usuário
+1. Abre Financeiro → vê instantaneamente Saldo Real, Saldo Projetado, alertas críticos no topo.
+2. Lê críticas: "Sua margem está em 18% (mínimo 25%). Reveja preço dos últimos orçamentos."
+3. Vai na aba **Colaboradores** → registra "João trabalhou 8h hoje na obra do cliente Maria."
+4. Clica "Gerar despesa" → vira lançamento financeiro com subcategoria "João Silva".
+5. Volta no Financeiro → vê impacto real no caixa e no lucro do projeto.
 
-**Hoje:** o filtro de mês esconde valores em aberto antigos.
-
-**Vai virar:**
-- KPI "A Receber" e "A Pagar" sempre incluem **TODOS** os pendentes/vencidos, independente do filtro de período (não some quando troca o mês)
-- Adicionar card "Saldo do mês anterior" mostrando o caixa que veio do mês passado
-- Lista de transações ganha toggle "Mostrar pendentes anteriores" (default: ligado) que prepende todos os atrasados de meses anteriores no topo, destacados em vermelho
-
----
-
-## 7. Bug: lançamento não subtrai da conta PJ
-
-**Causa provável:** o saldo da conta é calculado a partir de `transactions.account_id`, mas o `TransactionDialog` ou não está salvando o `account_id`, ou o cálculo do saldo não está somando.
-
-**Vou:**
-1. Auditar `TransactionDialog.tsx` → garantir que `account_id` é gravado em todo INSERT
-2. Auditar `FinancePage.tsx` → recálculo de saldo por conta usa: `saldo_inicial + Σ(income.paid where account_id=X) − Σ(expense.paid where account_id=X)` com decimal.js
-3. Testar: criar despesa paga em conta PJ → saldo PJ deve cair imediatamente (realtime)
-
----
-
-## Arquivos afetados
-
-**Engenharia / Orçamento**
-- `src/components/budget/BudgetWizardDialog.tsx` — aba Pagamento, persistência por ambiente, custo operacional em dias
-- `src/components/budget/ModuleConfigurator.tsx` — reorganização em Geral/Opções/Materiais com ícones
-- `src/components/budget/Module3DViewer.tsx` — paleta vira seletor de chapa por componente
-- `src/lib/engineering-calc.ts` — agregação de chapas POR COR (novo `calcSheetsByColor`)
-- `src/components/budget/PricingPanel.tsx` — breakdown mostra chapas por cor + dias operacionais
-
-**Financeiro**
-- `src/components/finance/PaymentMilestones.tsx` (ou novo `BudgetPaymentSchedule.tsx`) — UI de parcelas
-- `src/pages/BudgetsPage.tsx` — ao aprovar, gera N transações pending
-- `src/pages/FinancePage.tsx` — KPIs sempre globais, card saldo mês anterior, toggle pendentes antigos
-- `src/components/finance/TransactionDialog.tsx` — garantir `account_id` salvo
-- Recálculo de saldo por conta com decimal.js
-
-**Sem migration de banco** — tudo cabe em colunas existentes + JSON `meta` do budget e `transactions` já tem `account_id`.
-
----
-
-## Ordem de execução
-
-1. Corrigir bug de saldo da conta (rápido, alto impacto)
-2. Persistência por ambiente (corrige perda de dados)
-3. Engenharia por cor + dias operacionais
-4. Reorganizar ModuleConfigurator
-5. Aba Pagamento + geração de transações
-6. Financeiro: KPIs globais + saldo anterior
-
-Posso começar?
+Posso prosseguir com essa implementação?
