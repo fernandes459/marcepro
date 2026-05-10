@@ -142,6 +142,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
     setDate(new Date().toISOString().slice(0, 10)); setDueDate(''); setStatus('pending');
     setIsFixed(false); setRecurrence('monthly'); setNotes(''); setClientId('');
     setOrderNumber(''); setBankAccountId(''); setUseSplitPayment(false);
+    setSubcategory('');
     setPayments([{ id: '1', method: 'pix', amount: 0, installments: 1, machineDiscount: 0 }]);
   }
 
