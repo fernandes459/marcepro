@@ -380,6 +380,13 @@ export default function FinancePage() {
   const overdueItems = globalPending.all.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
   const paidIncome = summary.income;
 
+  // Projected metrics + insights (executivo)
+  const metrics = useMemo(
+    () => computeFinancialMetrics({ transactions, bankAccounts, today }),
+    [transactions, bankAccounts, today]
+  );
+  const insights = useFinancialInsights({ transactions: transactions as any, bankAccounts, pendingWorkLogsTotal, today });
+
   const filtered = useMemo(() => {
     return periodTransactions.filter(t => {
       if (filterType !== 'all' && t.type !== filterType) return false;
