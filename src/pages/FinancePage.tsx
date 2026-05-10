@@ -179,6 +179,9 @@ export default function FinancePage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_transfers' }, () => {
         void fetchAll();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'collaborator_work_logs' }, () => {
+        void fetchAll();
+      })
       .subscribe();
 
     return () => {
