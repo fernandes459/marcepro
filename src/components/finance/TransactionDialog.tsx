@@ -206,6 +206,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
       payment_method: paymentMethod, recurrence: isFixed ? recurrence : 'none',
       notes: finalNotes || null, client_id: clientId || null,
       order_number: orderNumber || null, bank_account_id: bankAccountId || null,
+      subcategory: subcategory || null,
     };
 
     // Helper: signed contribution of a (paid) transaction to an account balance
