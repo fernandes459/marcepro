@@ -485,6 +485,16 @@ export default function FinancePage() {
       case 'relatorio': return renderRelatorio();
       case 'contas': return renderContas();
       case 'marcos': return <MilestoneReceivables />;
+      case 'colaboradores':
+        return (
+          <CollaboratorTab
+            userId={user!.id}
+            budgets={budgetsList}
+            clients={clients}
+            bankAccounts={bankAccounts as any}
+            onChange={fetchAll}
+          />
+        );
       default: return renderHome();
     }
   }
