@@ -55,7 +55,7 @@ export function useCompanyMinMargin() {
   return minMargin;
 }
 
-export function computeFinancialMetrics({ transactions, bankAccounts, today }: Params) {
+export function computeFinancialMetrics({ transactions, bankAccounts, pendingWorkLogsTotal = 0, today }: Params) {
   const realBalance = bankAccounts.reduce((s, a) => s + Number(a.current_balance || 0), 0);
 
   const next30 = daysFromNow(today, 30);
@@ -65,19 +65,21 @@ export function computeFinancialMetrics({ transactions, bankAccounts, today }: P
     .filter(t => t.due_date && t.due_date <= next30)
     .reduce((s, t) => s + Number(t.amount || 0), 0);
 
-  const projectedPayables = transactions
+  // Despesas previstas: lançamentos pendentes/vencidos + horas de colaborador ainda não viraram despesa
+  const projectedPayablesTx = transactions
     .filter(t => t.type === 'expense' && (t.status === 'pending' || t.status === 'overdue'))
     .filter(t => t.due_date && t.due_date <= next30)
     .reduce((s, t) => s + Number(t.amount || 0), 0);
+  const projectedPayables = projectedPayablesTx + Number(pendingWorkLogsTotal || 0);
 
   const projectedBalance = realBalance + projectedReceivables - projectedPayables;
 
-  // Burn rate: avg paid expenses last 3 months
+  // Burn rate: avg paid expenses last 3 months + custo médio mensal das horas pendentes
   const start3 = monthAgo(today, 3);
   const last3Expenses = transactions
     .filter(t => t.type === 'expense' && t.status === 'paid' && t.date >= start3 && t.date <= today)
     .reduce((s, t) => s + Number(t.amount || 0), 0);
-  const burnRate = last3Expenses / 3;
+  const burnRate = last3Expenses / 3 + Number(pendingWorkLogsTotal || 0) / 3;
   const runwayMonths = burnRate > 0 ? realBalance / burnRate : Infinity;
 
   return { realBalance, projectedReceivables, projectedPayables, projectedBalance, burnRate, runwayMonths };
@@ -88,7 +90,7 @@ export function useFinancialInsights({ transactions, bankAccounts, pendingWorkLo
 
   return useMemo(() => {
     const insights: FinancialInsight[] = [];
-    const metrics = computeFinancialMetrics({ transactions, bankAccounts, today });
+    const metrics = computeFinancialMetrics({ transactions, bankAccounts, pendingWorkLogsTotal, today });
 
     // Current month
     const monthStart = today.slice(0, 7) + '-01';
