@@ -124,6 +124,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
       setClientId(editTransaction.client_id || '');
       setOrderNumber(editTransaction.order_number || '');
       setBankAccountId(editTransaction.bank_account_id || '');
+      setSubcategory((editTransaction as any).subcategory || '');
       // Parse payment method
       if (editTransaction.payment_method && editTransaction.payment_method.includes('|')) {
         setUseSplitPayment(true);
