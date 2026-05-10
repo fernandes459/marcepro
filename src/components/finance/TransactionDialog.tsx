@@ -316,7 +316,32 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
             </div>
           </div>
 
-          {/* Amount + Date + Due */}
+          {/* Subcategory — collaborator name when category is labor/salary/commission */}
+          {type === 'expense' && (
+            <div className="space-y-2">
+              <Label>
+                Subcategoria
+                {LABOR_CATEGORIES.includes(category) && (
+                  <span className="text-[10px] text-muted-foreground ml-1.5">(colaborador)</span>
+                )}
+              </Label>
+              {LABOR_CATEGORIES.includes(category) ? (
+                <Select value={subcategory || 'none'} onValueChange={(v) => setSubcategory(v === 'none' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar colaborador" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {employees.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={subcategory}
+                  onChange={e => setSubcategory(e.target.value)}
+                  placeholder="Opcional — ex: Tinta branca, Frete cliente João..."
+                />
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Valor Total *</Label>
