@@ -4,7 +4,7 @@ import {
   DollarSign, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Plus, Search, Trash2, Building2, ArrowRightLeft, AlertTriangle, FileBarChart,
   Receipt, Wallet, PieChart as PieChartIcon, BarChart3, ChevronLeft,
-  CreditCard, Clock, CheckCircle2, X, Pencil, Milestone,
+  CreditCard, Clock, CheckCircle2, X, Pencil, Milestone, Users, Sparkles,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,9 @@ import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { TransactionDialog } from '@/components/finance/TransactionDialog';
 import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
+import CollaboratorTab from '@/components/finance/CollaboratorTab';
+import FinancialAdvisor from '@/components/finance/FinancialAdvisor';
+import { useFinancialInsights, computeFinancialMetrics } from '@/hooks/useFinancialInsights';
 import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories } from '@/lib/financial';
 import { summarizeFinance } from '@/lib/finance-calc';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -80,7 +83,7 @@ const EXPENSE_COLORS = ['hsl(28, 85%, 56%)', 'hsl(0, 72%, 51%)', 'hsl(38, 92%, 5
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.06 } } };
 const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } };
 
-type Section = 'home' | 'lancamentos' | 'dre' | 'vencer' | 'recebidos' | 'relatorio' | 'contas' | 'marcos';
+type Section = 'home' | 'lancamentos' | 'dre' | 'vencer' | 'recebidos' | 'relatorio' | 'contas' | 'marcos' | 'colaboradores';
 
 export default function FinancePage() {
   const { user } = useAuth();
@@ -89,6 +92,8 @@ export default function FinancePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [budgetsList, setBudgetsList] = useState<{ id: string; project_name: string | null; code: string; client_id: string | null }[]>([]);
+  const [pendingWorkLogsTotal, setPendingWorkLogsTotal] = useState(0);
   const [customCategories, setCustomCategories] = useState<FinancialCategoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -113,15 +118,22 @@ export default function FinancePage() {
   const fetchAll = useCallback(async () => {
     if (!user) return;
 
-    const [txRes, clientsRes, banksRes] = await Promise.all([
+    const [txRes, clientsRes, banksRes, budgetsRes, logsRes] = await Promise.all([
       supabase.from('financial_transactions').select('*').order('date', { ascending: false }),
       supabase.from('clients').select('id, name').order('name'),
       supabase.from('bank_accounts').select('*').order('is_main', { ascending: false }),
+      supabase.from('budgets').select('id, project_name, code, client_id').order('created_at', { ascending: false }),
+      supabase.from('collaborator_work_logs' as any).select('status, total_amount').eq('status', 'pending'),
     ]);
 
     if (txRes.data) setTransactions(txRes.data as Transaction[]);
     if (clientsRes.data) setClients(clientsRes.data);
     if (banksRes.data) setBankAccounts(banksRes.data as BankAccount[]);
+    if (budgetsRes.data) setBudgetsList(budgetsRes.data as any);
+    if (logsRes.data) {
+      const total = (logsRes.data as any[]).reduce((s, l) => s + Number(l.total_amount || 0), 0);
+      setPendingWorkLogsTotal(total);
+    }
     setLoading(false);
   }, [user]);
 
@@ -165,6 +177,9 @@ export default function FinancePage() {
         void fetchAll();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_transfers' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'collaborator_work_logs' }, () => {
         void fetchAll();
       })
       .subscribe();
@@ -368,6 +383,13 @@ export default function FinancePage() {
   const overdueItems = globalPending.all.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
   const paidIncome = summary.income;
 
+  // Projected metrics + insights (executivo)
+  const metrics = useMemo(
+    () => computeFinancialMetrics({ transactions, bankAccounts, today }),
+    [transactions, bankAccounts, today]
+  );
+  const insights = useFinancialInsights({ transactions: transactions as any, bankAccounts, pendingWorkLogsTotal, today });
+
   const filtered = useMemo(() => {
     return periodTransactions.filter(t => {
       if (filterType !== 'all' && t.type !== filterType) return false;
@@ -455,6 +477,7 @@ export default function FinancePage() {
     { id: 'relatorio' as Section, title: 'Relatório', icon: FileBarChart, value: String(clientProfitData.length), sub: 'clientes', color: 'text-info' },
     { id: 'contas' as Section, title: 'Contas', icon: Building2, value: formatBRL(totalBankBalance), sub: `${bankAccounts.length} conta(s)`, color: 'text-primary' },
     { id: 'marcos' as Section, title: 'Marcos', icon: Milestone, value: '—', sub: 'recebimentos', color: 'text-accent' },
+    { id: 'colaboradores' as Section, title: 'Colaboradores', icon: Users, value: formatBRL(pendingWorkLogsTotal), sub: 'horas a pagar', color: 'text-info' },
   ];
   function renderSection() {
     switch (activeSection) {
@@ -465,6 +488,16 @@ export default function FinancePage() {
       case 'relatorio': return renderRelatorio();
       case 'contas': return renderContas();
       case 'marcos': return <MilestoneReceivables />;
+      case 'colaboradores':
+        return (
+          <CollaboratorTab
+            userId={user!.id}
+            budgets={budgetsList}
+            clients={clients}
+            bankAccounts={bankAccounts as any}
+            onChange={fetchAll}
+          />
+        );
       default: return renderHome();
     }
   }
@@ -482,6 +515,7 @@ export default function FinancePage() {
       { id: 'dre', label: 'DRE', icon: BarChart3, onClick: () => setActiveSection('dre') },
       { id: 'relatorio', label: 'Relatório', icon: FileBarChart, onClick: () => setActiveSection('relatorio') },
       { id: 'marcos', label: 'Marcos', icon: Milestone, onClick: () => setActiveSection('marcos') },
+      { id: 'colaboradores', label: 'Colaboradores', icon: Users, onClick: () => setActiveSection('colaboradores') },
       { id: 'lancamentos', label: 'Histórico', icon: Receipt, onClick: () => setActiveSection('lancamentos') },
     ];
 
@@ -580,6 +614,91 @@ export default function FinancePage() {
               </button>
             ))}
           </div>
+        </motion.div>
+
+        {/* Executive KPIs — Saldo Real, Projetado, Receitas/Despesas Previstas, Burn, Runway */}
+        <motion.div variants={itemVariants}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <Card className="border-l-4 border-l-primary">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <Wallet className="h-3 w-3" /> Saldo Real
+                </p>
+                <p className="text-base sm:text-lg font-bold font-display text-primary tabular-nums mt-0.5">{formatBRL(metrics.realBalance)}</p>
+                <p className="text-[10px] text-muted-foreground">caixa disponível agora</p>
+              </CardContent>
+            </Card>
+            <Card className={`border-l-4 ${metrics.projectedBalance >= 0 ? 'border-l-success' : 'border-l-destructive'}`}>
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> Saldo Projetado (30d)
+                </p>
+                <p className={`text-base sm:text-lg font-bold font-display tabular-nums mt-0.5 ${metrics.projectedBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  {formatBRL(metrics.projectedBalance)}
+                </p>
+                <p className="text-[10px] text-muted-foreground">após pendências</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-success">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <ArrowUpRight className="h-3 w-3" /> Receitas Previstas
+                </p>
+                <p className="text-base sm:text-lg font-bold font-display text-success tabular-nums mt-0.5">{formatBRL(metrics.projectedReceivables)}</p>
+                <p className="text-[10px] text-muted-foreground">próximos 30 dias</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-destructive">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <ArrowDownRight className="h-3 w-3" /> Despesas Previstas
+                </p>
+                <p className="text-base sm:text-lg font-bold font-display text-destructive tabular-nums mt-0.5">{formatBRL(metrics.projectedPayables)}</p>
+                <p className="text-[10px] text-muted-foreground">próximos 30 dias</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-warning">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <TrendingDown className="h-3 w-3" /> Burn Rate
+                </p>
+                <p className="text-base sm:text-lg font-bold font-display text-warning tabular-nums mt-0.5">{formatBRL(metrics.burnRate)}</p>
+                <p className="text-[10px] text-muted-foreground">média/mês — últimos 3 meses</p>
+              </CardContent>
+            </Card>
+            <Card className={`border-l-4 ${metrics.runwayMonths < 2 ? 'border-l-destructive' : metrics.runwayMonths < 4 ? 'border-l-warning' : 'border-l-success'}`}>
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <Clock className="h-3 w-3" /> Fôlego (Runway)
+                </p>
+                <p className={`text-base sm:text-lg font-bold font-display tabular-nums mt-0.5 ${metrics.runwayMonths < 2 ? 'text-destructive' : metrics.runwayMonths < 4 ? 'text-warning' : 'text-success'}`}>
+                  {Number.isFinite(metrics.runwayMonths) ? `${metrics.runwayMonths.toFixed(1)} meses` : '∞'}
+                </p>
+                <p className="text-[10px] text-muted-foreground">caixa ÷ burn rate</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-info col-span-2">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <Users className="h-3 w-3" /> Horas de colaboradores pendentes
+                </p>
+                <p className="text-base sm:text-lg font-bold font-display text-info tabular-nums mt-0.5">{formatBRL(pendingWorkLogsTotal)}</p>
+                <p className="text-[10px] text-muted-foreground">ainda não viraram despesa</p>
+              </CardContent>
+            </Card>
+          </div>
+        </motion.div>
+
+        {/* Advisor — Sugestões e críticas */}
+        <motion.div variants={itemVariants}>
+          <FinancialAdvisor
+            insights={insights}
+            onAction={(ins) => {
+              if (ins.id === 'work-pending') setActiveSection('colaboradores');
+              else if (ins.id.startsWith('overdue') || ins.id === 'projected-negative') setActiveSection('vencer');
+              else if (ins.id === 'receivables-old') setActiveSection('vencer');
+            }}
+          />
         </motion.div>
 
         {/* ============ POWER BI ROW: Evolução Mensal (Bar) + Análise por Categoria (Donut) ============ */}

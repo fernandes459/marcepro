@@ -285,6 +285,63 @@ export type Database = {
         }
         Relationships: []
       }
+      collaborator_work_logs: {
+        Row: {
+          budget_id: string | null
+          client_id: string | null
+          created_at: string
+          daily_rate: number
+          days_worked: number
+          description: string | null
+          employee_id: string
+          hourly_rate: number
+          hours_worked: number
+          id: string
+          linked_transaction_id: string | null
+          status: string
+          total_amount: number
+          updated_at: string
+          user_id: string
+          work_date: string
+        }
+        Insert: {
+          budget_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          daily_rate?: number
+          days_worked?: number
+          description?: string | null
+          employee_id: string
+          hourly_rate?: number
+          hours_worked?: number
+          id?: string
+          linked_transaction_id?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string
+          user_id: string
+          work_date?: string
+        }
+        Update: {
+          budget_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          daily_rate?: number
+          days_worked?: number
+          description?: string | null
+          employee_id?: string
+          hourly_rate?: number
+          hours_worked?: number
+          id?: string
+          linked_transaction_id?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+          work_date?: string
+        }
+        Relationships: []
+      }
       company_settings: {
         Row: {
           address: string | null
@@ -409,8 +466,10 @@ export type Database = {
         Row: {
           cpf: string | null
           created_at: string
+          daily_rate: number
           email: string | null
           hire_date: string | null
+          hourly_rate: number
           id: string
           name: string
           notes: string | null
@@ -424,8 +483,10 @@ export type Database = {
         Insert: {
           cpf?: string | null
           created_at?: string
+          daily_rate?: number
           email?: string | null
           hire_date?: string | null
+          hourly_rate?: number
           id?: string
           name: string
           notes?: string | null
@@ -439,8 +500,10 @@ export type Database = {
         Update: {
           cpf?: string | null
           created_at?: string
+          daily_rate?: number
           email?: string | null
           hire_date?: string | null
+          hourly_rate?: number
           id?: string
           name?: string
           notes?: string | null

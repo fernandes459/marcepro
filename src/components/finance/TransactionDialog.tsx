@@ -19,6 +19,9 @@ import { FinancialCategoryOption, mergeFinancialCategories } from '@/lib/financi
 
 interface Client { id: string; name: string; }
 interface BankAccount { id: string; name: string; bank_name: string | null; current_balance: number; }
+interface EmployeeLite { id: string; name: string; }
+
+const LABOR_CATEGORIES = ['salary', 'labor', 'commission'];
 
 interface PaymentSplit {
   id: string;
@@ -68,6 +71,14 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
   const [clientId, setClientId] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
+  const [subcategory, setSubcategory] = useState('');
+  const [employees, setEmployees] = useState<EmployeeLite[]>([]);
+
+  useEffect(() => {
+    supabase.from('employees').select('id, name').eq('status', 'active').order('name').then(({ data }) => {
+      if (data) setEmployees(data as EmployeeLite[]);
+    });
+  }, []);
 
   // Split payments
   const [useSplitPayment, setUseSplitPayment] = useState(false);
@@ -113,6 +124,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
       setClientId(editTransaction.client_id || '');
       setOrderNumber(editTransaction.order_number || '');
       setBankAccountId(editTransaction.bank_account_id || '');
+      setSubcategory((editTransaction as any).subcategory || '');
       // Parse payment method
       if (editTransaction.payment_method && editTransaction.payment_method.includes('|')) {
         setUseSplitPayment(true);
@@ -130,6 +142,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
     setDate(new Date().toISOString().slice(0, 10)); setDueDate(''); setStatus('pending');
     setIsFixed(false); setRecurrence('monthly'); setNotes(''); setClientId('');
     setOrderNumber(''); setBankAccountId(''); setUseSplitPayment(false);
+    setSubcategory('');
     setPayments([{ id: '1', method: 'pix', amount: 0, installments: 1, machineDiscount: 0 }]);
   }
 
@@ -193,6 +206,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
       payment_method: paymentMethod, recurrence: isFixed ? recurrence : 'none',
       notes: finalNotes || null, client_id: clientId || null,
       order_number: orderNumber || null, bank_account_id: bankAccountId || null,
+      subcategory: subcategory || null,
     };
 
     // Helper: signed contribution of a (paid) transaction to an account balance
@@ -302,7 +316,32 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
             </div>
           </div>
 
-          {/* Amount + Date + Due */}
+          {/* Subcategory — collaborator name when category is labor/salary/commission */}
+          {type === 'expense' && (
+            <div className="space-y-2">
+              <Label>
+                Subcategoria
+                {LABOR_CATEGORIES.includes(category) && (
+                  <span className="text-[10px] text-muted-foreground ml-1.5">(colaborador)</span>
+                )}
+              </Label>
+              {LABOR_CATEGORIES.includes(category) ? (
+                <Select value={subcategory || 'none'} onValueChange={(v) => setSubcategory(v === 'none' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar colaborador" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {employees.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={subcategory}
+                  onChange={e => setSubcategory(e.target.value)}
+                  placeholder="Opcional — ex: Tinta branca, Frete cliente João..."
+                />
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Valor Total *</Label>
