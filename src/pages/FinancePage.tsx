@@ -512,6 +512,7 @@ export default function FinancePage() {
       { id: 'dre', label: 'DRE', icon: BarChart3, onClick: () => setActiveSection('dre') },
       { id: 'relatorio', label: 'Relatório', icon: FileBarChart, onClick: () => setActiveSection('relatorio') },
       { id: 'marcos', label: 'Marcos', icon: Milestone, onClick: () => setActiveSection('marcos') },
+      { id: 'colaboradores', label: 'Colaboradores', icon: Users, onClick: () => setActiveSection('colaboradores') },
       { id: 'lancamentos', label: 'Histórico', icon: Receipt, onClick: () => setActiveSection('lancamentos') },
     ];
 
