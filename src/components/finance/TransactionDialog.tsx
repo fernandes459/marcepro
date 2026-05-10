@@ -71,6 +71,14 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
   const [clientId, setClientId] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
+  const [subcategory, setSubcategory] = useState('');
+  const [employees, setEmployees] = useState<EmployeeLite[]>([]);
+
+  useEffect(() => {
+    supabase.from('employees').select('id, name').eq('status', 'active').order('name').then(({ data }) => {
+      if (data) setEmployees(data as EmployeeLite[]);
+    });
+  }, []);
 
   // Split payments
   const [useSplitPayment, setUseSplitPayment] = useState(false);
