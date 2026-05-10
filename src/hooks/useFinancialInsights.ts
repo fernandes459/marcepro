@@ -90,7 +90,7 @@ export function useFinancialInsights({ transactions, bankAccounts, pendingWorkLo
 
   return useMemo(() => {
     const insights: FinancialInsight[] = [];
-    const metrics = computeFinancialMetrics({ transactions, bankAccounts, today });
+    const metrics = computeFinancialMetrics({ transactions, bankAccounts, pendingWorkLogsTotal, today });
 
     // Current month
     const monthStart = today.slice(0, 7) + '-01';
