@@ -613,6 +613,91 @@ export default function FinancePage() {
           </div>
         </motion.div>
 
+        {/* Executive KPIs — Saldo Real, Projetado, Receitas/Despesas Previstas, Burn, Runway */}
+        <motion.div variants={itemVariants}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <Card className="border-l-4 border-l-primary">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <Wallet className="h-3 w-3" /> Saldo Real
+                </p>
+                <p className="text-base sm:text-lg font-bold font-display text-primary tabular-nums mt-0.5">{formatBRL(metrics.realBalance)}</p>
+                <p className="text-[10px] text-muted-foreground">caixa disponível agora</p>
+              </CardContent>
+            </Card>
+            <Card className={`border-l-4 ${metrics.projectedBalance >= 0 ? 'border-l-success' : 'border-l-destructive'}`}>
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> Saldo Projetado (30d)
+                </p>
+                <p className={`text-base sm:text-lg font-bold font-display tabular-nums mt-0.5 ${metrics.projectedBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  {formatBRL(metrics.projectedBalance)}
+                </p>
+                <p className="text-[10px] text-muted-foreground">após pendências</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-success">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <ArrowUpRight className="h-3 w-3" /> Receitas Previstas
+                </p>
+                <p className="text-base sm:text-lg font-bold font-display text-success tabular-nums mt-0.5">{formatBRL(metrics.projectedReceivables)}</p>
+                <p className="text-[10px] text-muted-foreground">próximos 30 dias</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-destructive">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <ArrowDownRight className="h-3 w-3" /> Despesas Previstas
+                </p>
+                <p className="text-base sm:text-lg font-bold font-display text-destructive tabular-nums mt-0.5">{formatBRL(metrics.projectedPayables)}</p>
+                <p className="text-[10px] text-muted-foreground">próximos 30 dias</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-warning">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <TrendingDown className="h-3 w-3" /> Burn Rate
+                </p>
+                <p className="text-base sm:text-lg font-bold font-display text-warning tabular-nums mt-0.5">{formatBRL(metrics.burnRate)}</p>
+                <p className="text-[10px] text-muted-foreground">média/mês — últimos 3 meses</p>
+              </CardContent>
+            </Card>
+            <Card className={`border-l-4 ${metrics.runwayMonths < 2 ? 'border-l-destructive' : metrics.runwayMonths < 4 ? 'border-l-warning' : 'border-l-success'}`}>
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <Clock className="h-3 w-3" /> Fôlego (Runway)
+                </p>
+                <p className={`text-base sm:text-lg font-bold font-display tabular-nums mt-0.5 ${metrics.runwayMonths < 2 ? 'text-destructive' : metrics.runwayMonths < 4 ? 'text-warning' : 'text-success'}`}>
+                  {Number.isFinite(metrics.runwayMonths) ? `${metrics.runwayMonths.toFixed(1)} meses` : '∞'}
+                </p>
+                <p className="text-[10px] text-muted-foreground">caixa ÷ burn rate</p>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-info col-span-2">
+              <CardContent className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                  <Users className="h-3 w-3" /> Horas de colaboradores pendentes
+                </p>
+                <p className="text-base sm:text-lg font-bold font-display text-info tabular-nums mt-0.5">{formatBRL(pendingWorkLogsTotal)}</p>
+                <p className="text-[10px] text-muted-foreground">ainda não viraram despesa</p>
+              </CardContent>
+            </Card>
+          </div>
+        </motion.div>
+
+        {/* Advisor — Sugestões e críticas */}
+        <motion.div variants={itemVariants}>
+          <FinancialAdvisor
+            insights={insights}
+            onAction={(ins) => {
+              if (ins.id === 'work-pending') setActiveSection('colaboradores');
+              else if (ins.id.startsWith('overdue') || ins.id === 'projected-negative') setActiveSection('vencer');
+              else if (ins.id === 'receivables-old') setActiveSection('vencer');
+            }}
+          />
+        </motion.div>
+
         {/* ============ POWER BI ROW: Evolução Mensal (Bar) + Análise por Categoria (Donut) ============ */}
         <div className="grid gap-4 lg:grid-cols-2">
           <motion.div variants={itemVariants}>
