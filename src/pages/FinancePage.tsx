@@ -380,10 +380,10 @@ export default function FinancePage() {
 
   // Projected metrics + insights (executivo)
   const metrics = useMemo(
-    () => computeFinancialMetrics({ transactions, bankAccounts, pendingWorkLogsTotal, today }),
-    [transactions, bankAccounts, pendingWorkLogsTotal, today]
+    () => computeFinancialMetrics({ transactions, bankAccounts: bankAccountsWithBalance, pendingWorkLogsTotal, today }),
+    [transactions, bankAccountsWithBalance, pendingWorkLogsTotal, today]
   );
-  const insights = useFinancialInsights({ transactions: transactions as any, bankAccounts, pendingWorkLogsTotal, today });
+  const insights = useFinancialInsights({ transactions: transactions as any, bankAccounts: bankAccountsWithBalance, pendingWorkLogsTotal, today });
 
   const filtered = useMemo(() => {
     return periodTransactions.filter(t => {
