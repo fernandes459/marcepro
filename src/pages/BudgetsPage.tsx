@@ -456,7 +456,21 @@ export default function BudgetsPage() {
         overheadPerProject={overheadPerProject}
         editingBudget={editingBudget}
         onClientCreated={(c) => setClients(prev => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)))}
-        onSaved={() => fetchData()}
+        onSaved={async (savedId) => {
+          // If editing an already-approved/in-production budget, regenerate financial entries
+          // to reflect new values (avoid stale or duplicated transactions).
+          const REGEN_STATUSES = ['approved', 'in_production', 'delivered', 'completed'];
+          const { data: fresh } = await supabase
+            .from('budgets')
+            .select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)')
+            .eq('id', savedId)
+            .maybeSingle();
+          if (fresh && REGEN_STATUSES.includes((fresh as any).status)) {
+            await generateReceivablesAndCommission(fresh as any);
+            toast.success('Lançamentos financeiros atualizados com os novos valores');
+          }
+          fetchData();
+        }}
         onApprove={async (id) => updateBudgetStatus(id, 'approved')}
       />
 

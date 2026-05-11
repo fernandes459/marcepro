@@ -482,6 +482,17 @@ export default function BudgetWizardDialog({
 
     // Sync payment_milestones from explicit paymentSchedule
     if (budgetId) {
+      // Delete linked financial transactions of existing milestones first to avoid duplicates
+      const { data: oldMs } = await supabase
+        .from('payment_milestones')
+        .select('linked_transaction_id')
+        .eq('budget_id', budgetId);
+      const oldLinkedIds = (oldMs || [])
+        .map((m: any) => m.linked_transaction_id)
+        .filter(Boolean);
+      if (oldLinkedIds.length > 0) {
+        await supabase.from('financial_transactions').delete().in('id', oldLinkedIds);
+      }
       await supabase.from('payment_milestones').delete().eq('budget_id', budgetId);
       if (paymentSchedule.length > 0) {
         const total = paymentSchedule.reduce((s, p) => s + Number(p.amount || 0), 0);
