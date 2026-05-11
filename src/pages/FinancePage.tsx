@@ -24,6 +24,7 @@ import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { TransactionDialog } from '@/components/finance/TransactionDialog';
 import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
+import ReceivableDetailDialog from '@/components/finance/ReceivableDetailDialog';
 import CollaboratorTab from '@/components/finance/CollaboratorTab';
 import FinancialAdvisor from '@/components/finance/FinancialAdvisor';
 import { useFinancialInsights, computeFinancialMetrics } from '@/hooks/useFinancialInsights';
@@ -114,6 +115,7 @@ export default function FinancePage() {
   
   // Edit transaction state - uses full TransactionDialog
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [detailTx, setDetailTx] = useState<Transaction | null>(null);
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
@@ -1145,7 +1147,11 @@ export default function FinancePage() {
                     ? Math.ceil((new Date(tx.due_date + 'T12:00:00').getTime() - new Date(today + 'T12:00:00').getTime()) / 86400000)
                     : null;
                   return (
-                    <li key={tx.id} className={`flex items-center gap-3 px-4 sm:px-6 py-3.5 hover:bg-accent/40 transition-colors ${isOverdue ? 'bg-destructive/5' : ''}`}>
+                    <li
+                      key={tx.id}
+                      onClick={() => setDetailTx(tx)}
+                      className={`flex items-center gap-3 px-4 sm:px-6 py-3.5 hover:bg-accent/40 transition-colors cursor-pointer ${isOverdue ? 'bg-destructive/5' : ''}`}
+                    >
                       <div className={`h-11 w-11 rounded-full flex items-center justify-center shrink-0 ${
                         isOverdue ? 'bg-destructive/10 text-destructive' :
                         isIncome ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
@@ -1177,7 +1183,7 @@ export default function FinancePage() {
                         className={`h-8 text-xs rounded-full ml-1 shrink-0 ${
                           isIncome ? 'bg-success hover:bg-success/90 text-success-foreground' : 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
                         }`}
-                        onClick={() => markPaid(tx.id)}
+                        onClick={(e) => { e.stopPropagation(); markPaid(tx.id); }}
                       >
                         {isIncome ? 'Receber' : 'Pagar'}
                       </Button>
@@ -1474,6 +1480,16 @@ export default function FinancePage() {
         bankAccounts={bankAccounts}
         onSaved={fetchAll}
         editTransaction={editingTransaction}
+      />
+
+      <ReceivableDetailDialog
+        open={!!detailTx}
+        onOpenChange={(o) => { if (!o) setDetailTx(null); }}
+        selectedTx={detailTx}
+        allTransactions={transactions}
+        clients={clients}
+        budgets={budgetsList}
+        onMarkPaid={(id) => { markPaid(id); setDetailTx(null); }}
       />
 
       <Dialog open={bankDialogOpen} onOpenChange={(o) => { setBankDialogOpen(o); if (!o) { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' }); } }}>
