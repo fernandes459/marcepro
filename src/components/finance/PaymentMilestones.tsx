@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
+import { syncMilestoneToTransaction, deleteLinkedTransaction } from '@/lib/milestone-sync';
 
 interface PaymentMilestone {
   id: string;
