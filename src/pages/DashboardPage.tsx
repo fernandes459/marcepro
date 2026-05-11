@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   TrendingUp, Target, Factory, AlertTriangle, Calendar as CalendarIcon,
   Wrench, Truck, Hammer, Clock, ArrowRight, CheckCircle2, Flame, Activity, BarChart3,
+  MapPin, Percent, Users,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -42,8 +43,9 @@ const eventColors: Record<string, string> = {
 };
 
 interface Tx { id: string; type: string; amount: number; date: string; due_date: string | null; status: string; }
-interface Budget { id: string; status: string; final_price: number; clients?: { name: string } | null; }
+interface Budget { id: string; status: string; final_price: number; created_at?: string; client_id?: string | null; clients?: { name: string } | null; }
 interface Task { id: string; stage: string; project_name: string; client_name: string; due_date: string | null; }
+interface ClientRow { id: string; name: string; city: string | null; state: string | null; total_spent: number | null; budgets_count: number | null; }
 
 type FilterMode = 'month' | 'custom';
 
@@ -81,6 +83,7 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<Tx[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [clientsList, setClientsList] = useState<ClientRow[]>([]);
   const [monthlyGoal, setMonthlyGoal] = useState(0);
   const [loading, setLoading] = useState(true);
   const today = useMemo(() => new Date(), []);
@@ -93,16 +96,18 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [txRes, budRes, taskRes, settingsRes] = await Promise.all([
+    const [txRes, budRes, taskRes, settingsRes, clientsRes] = await Promise.all([
       supabase.from('financial_transactions').select('id, type, amount, date, due_date, status'),
-      supabase.from('budgets').select('id, status, final_price, clients(name)').order('created_at', { ascending: false }),
+      supabase.from('budgets').select('id, status, final_price, created_at, client_id, clients(name)').order('created_at', { ascending: false }),
       supabase.from('production_tasks').select('id, stage, project_name, client_name, due_date'),
       supabase.from('company_settings').select('monthly_goal').maybeSingle(),
+      supabase.from('clients').select('id, name, city, state, total_spent, budgets_count'),
     ]);
     if (txRes.data) setTransactions(txRes.data as Tx[]);
     if (budRes.data) setBudgets(budRes.data as unknown as Budget[]);
     if (taskRes.data) setTasks(taskRes.data as Task[]);
     if (settingsRes.data) setMonthlyGoal(Number(settingsRes.data.monthly_goal) || 0);
+    if (clientsRes.data) setClientsList(clientsRes.data as ClientRow[]);
     setLoading(false);
   }, [user]);
 
@@ -116,6 +121,7 @@ export default function DashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => void fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => void fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'company_settings' }, () => void fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => void fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData, user]);
@@ -220,6 +226,37 @@ export default function DashboardPage() {
     () => filteredTransactions.filter(t => t.type === 'income' && t.status === 'pending' && t.due_date && t.due_date < todayISO),
     [filteredTransactions, todayISO]
   );
+
+  // ===== Taxa de Conversão (orçamentos do período) =====
+  const periodBudgets = useMemo(
+    () => budgets.filter(b => b.created_at && b.created_at.slice(0, 10) >= period.start && b.created_at.slice(0, 10) <= period.end),
+    [budgets, period.start, period.end]
+  );
+  const conversion = useMemo(() => {
+    const total = periodBudgets.length;
+    const won = periodBudgets.filter(b => ['approved', 'aprovado', 'won', 'closed', 'fechado'].includes((b.status || '').toLowerCase())).length;
+    const lost = periodBudgets.filter(b => ['lost', 'rejected', 'perdido', 'recusado'].includes((b.status || '').toLowerCase())).length;
+    const rate = total > 0 ? (won / total) * 100 : 0;
+    return { total, won, lost, rate };
+  }, [periodBudgets]);
+
+  // ===== Diagnóstico de Regiões =====
+  const regionStats = useMemo(() => {
+    const map = new Map<string, { region: string; clients: number; revenue: number; budgets: number }>();
+    clientsList.forEach(c => {
+      const city = (c.city || '').trim();
+      const uf = (c.state || '').trim().toUpperCase();
+      if (!city && !uf) return;
+      const key = city ? `${city}${uf ? ' - ' + uf : ''}` : uf;
+      const cur = map.get(key) || { region: key, clients: 0, revenue: 0, budgets: 0 };
+      cur.clients += 1;
+      cur.revenue += Number(c.total_spent || 0);
+      cur.budgets += Number(c.budgets_count || 0);
+      map.set(key, cur);
+    });
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue || b.clients - a.clients).slice(0, 6);
+  }, [clientsList]);
+  const totalClientsWithRegion = regionStats.reduce((s, r) => s + r.clients, 0);
 
   const hasCriticalAlerts = assistanceProjects.length > 0 || overdueProjects.length > 0 || overdueReceivables.length > 0;
 
@@ -452,6 +489,101 @@ export default function DashboardPage() {
           </Link>
         </motion.div>
       </div>
+
+      {/* ============ TAXA DE CONVERSÃO + REGIÕES ============ */}
+      <motion.div variants={itemVariants} className="grid gap-4 lg:grid-cols-3">
+        {/* Conversão */}
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-display flex items-center gap-2">
+              <Percent className="h-4 w-4 text-primary" />
+              Taxa de Conversão
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-4xl font-bold font-display tabular-nums text-foreground">
+                {conversion.rate.toFixed(1)}<span className="text-xl text-muted-foreground">%</span>
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {conversion.won} fechados de {conversion.total} orçamentos no período
+              </p>
+            </div>
+            <Progress value={conversion.rate} className="h-2" />
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg bg-muted/40 p-2">
+                <p className="text-[10px] text-muted-foreground uppercase">Total</p>
+                <p className="font-display font-semibold">{conversion.total}</p>
+              </div>
+              <div className="rounded-lg bg-success/10 p-2">
+                <p className="text-[10px] text-success uppercase">Ganhos</p>
+                <p className="font-display font-semibold text-success">{conversion.won}</p>
+              </div>
+              <div className="rounded-lg bg-destructive/10 p-2">
+                <p className="text-[10px] text-destructive uppercase">Perdidos</p>
+                <p className="font-display font-semibold text-destructive">{conversion.lost}</p>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {conversion.rate >= 50
+                ? '🎯 Excelente taxa de conversão.'
+                : conversion.rate >= 30
+                ? '👍 Boa conversão — busque atingir 50%+.'
+                : conversion.total === 0
+                ? 'Sem orçamentos no período.'
+                : '⚠️ Conversão baixa — revise preços e follow-ups.'}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Diagnóstico de Regiões */}
+        <Card className="overflow-hidden lg:col-span-2">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardTitle className="text-base font-display flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-primary" />
+                Diagnóstico de Regiões
+              </CardTitle>
+              <Link to="/clientes" className="text-[11px] text-primary hover:underline flex items-center gap-1">
+                Ver clientes <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {regionStats.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                <Users className="h-10 w-10 mb-2 opacity-30" />
+                <p className="text-sm">Cadastre cidade/UF nos clientes para ver o diagnóstico</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {regionStats.map((r, i) => {
+                  const pct = totalClientsWithRegion > 0 ? (r.clients / totalClientsWithRegion) * 100 : 0;
+                  return (
+                    <div key={r.region} className="rounded-xl border border-border/50 p-3 hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center justify-between gap-3 mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-bold text-muted-foreground tabular-nums w-5">#{i + 1}</span>
+                          <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <span className="text-sm font-semibold truncate">{r.region}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] shrink-0">
+                          <span className="text-muted-foreground">{r.clients} cliente(s)</span>
+                          <span className="font-semibold text-gold tabular-nums">{formatBRL(r.revenue)}</span>
+                        </div>
+                      </div>
+                      <Progress value={pct} className="h-1.5" />
+                    </div>
+                  );
+                })}
+                <p className="text-[11px] text-muted-foreground pt-2">
+                  💡 {regionStats[0].region} é sua região mais forte — concentre marketing e indicações por lá.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* ============ POWER BI: FLUXO FINANCEIRO ============ */}
       <motion.div variants={itemVariants}>

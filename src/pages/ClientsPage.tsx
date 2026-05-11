@@ -12,6 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -87,13 +88,34 @@ export default function ClientsPage() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  const filtered = clients.filter(
-    (c) =>
+  const [stateFilter, setStateFilter] = useState<string>('all');
+  const [cityFilter, setCityFilter] = useState<string>('all');
+
+  const stateOptions = useMemo(() => {
+    const set = new Set(clients.map(c => (c.state || '').trim().toUpperCase()).filter(Boolean));
+    return Array.from(set).sort();
+  }, [clients]);
+
+  const cityOptions = useMemo(() => {
+    const set = new Set(
+      clients
+        .filter(c => stateFilter === 'all' || (c.state || '').trim().toUpperCase() === stateFilter)
+        .map(c => (c.city || '').trim())
+        .filter(Boolean)
+    );
+    return Array.from(set).sort();
+  }, [clients, stateFilter]);
+
+  const filtered = clients.filter((c) => {
+    const matchesSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
       c.phone.includes(search) ||
-      (c.city || '').toLowerCase().includes(search.toLowerCase())
-  );
+      (c.city || '').toLowerCase().includes(search.toLowerCase());
+    const matchesState = stateFilter === 'all' || (c.state || '').trim().toUpperCase() === stateFilter;
+    const matchesCity = cityFilter === 'all' || (c.city || '').trim() === cityFilter;
+    return matchesSearch && matchesState && matchesCity;
+  });
 
   const kpis = useMemo(() => {
     const totalRevenue = clients.reduce((s, c) => s + Number(c.total_spent || 0), 0);
@@ -323,10 +345,24 @@ export default function ClientsPage() {
 
       <div className="flex flex-wrap gap-2 items-center">
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nome, telefone, email ou cidade..." className="flex-1 min-w-[220px] max-w-md" />
+        <Select value={stateFilter} onValueChange={(v) => { setStateFilter(v); setCityFilter('all'); }}>
+          <SelectTrigger className="h-9 w-[120px] rounded-full bg-muted/40 border-border/60"><SelectValue placeholder="UF" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas UFs</SelectItem>
+            {stateOptions.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={cityFilter} onValueChange={setCityFilter}>
+          <SelectTrigger className="h-9 w-[180px] rounded-full bg-muted/40 border-border/60"><SelectValue placeholder="Cidade" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as cidades</SelectItem>
+            {cityOptions.map(city => <SelectItem key={city} value={city}>{city}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Button variant="outline" size="sm" className="h-9 rounded-full border-border/60 bg-muted/40 gap-1.5" onClick={exportToExcel}>
           <FileSpreadsheet className="h-3.5 w-3.5 text-success" /> Excel
         </Button>
-        {search && <span className="text-xs text-muted-foreground ml-auto">{filtered.length} resultado(s)</span>}
+        {(search || stateFilter !== 'all' || cityFilter !== 'all') && <span className="text-xs text-muted-foreground ml-auto">{filtered.length} resultado(s)</span>}
       </div>
 
       {loading ? (
