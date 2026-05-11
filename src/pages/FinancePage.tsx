@@ -1482,6 +1482,16 @@ export default function FinancePage() {
         editTransaction={editingTransaction}
       />
 
+      <ReceivableDetailDialog
+        open={!!detailTx}
+        onOpenChange={(o) => { if (!o) setDetailTx(null); }}
+        selectedTx={detailTx}
+        allTransactions={transactions}
+        clients={clients}
+        budgets={budgetsList}
+        onMarkPaid={(id) => { markPaid(id); setDetailTx(null); }}
+      />
+
       <Dialog open={bankDialogOpen} onOpenChange={(o) => { setBankDialogOpen(o); if (!o) { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' }); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="font-display">{editingBankId ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</DialogTitle></DialogHeader>
