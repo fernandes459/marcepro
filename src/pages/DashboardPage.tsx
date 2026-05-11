@@ -226,6 +226,37 @@ export default function DashboardPage() {
     [filteredTransactions, todayISO]
   );
 
+  // ===== Taxa de Conversão (orçamentos do período) =====
+  const periodBudgets = useMemo(
+    () => budgets.filter(b => b.created_at && b.created_at.slice(0, 10) >= period.start && b.created_at.slice(0, 10) <= period.end),
+    [budgets, period.start, period.end]
+  );
+  const conversion = useMemo(() => {
+    const total = periodBudgets.length;
+    const won = periodBudgets.filter(b => ['approved', 'aprovado', 'won', 'closed', 'fechado'].includes((b.status || '').toLowerCase())).length;
+    const lost = periodBudgets.filter(b => ['lost', 'rejected', 'perdido', 'recusado'].includes((b.status || '').toLowerCase())).length;
+    const rate = total > 0 ? (won / total) * 100 : 0;
+    return { total, won, lost, rate };
+  }, [periodBudgets]);
+
+  // ===== Diagnóstico de Regiões =====
+  const regionStats = useMemo(() => {
+    const map = new Map<string, { region: string; clients: number; revenue: number; budgets: number }>();
+    clientsList.forEach(c => {
+      const city = (c.city || '').trim();
+      const uf = (c.state || '').trim().toUpperCase();
+      if (!city && !uf) return;
+      const key = city ? `${city}${uf ? ' - ' + uf : ''}` : uf;
+      const cur = map.get(key) || { region: key, clients: 0, revenue: 0, budgets: 0 };
+      cur.clients += 1;
+      cur.revenue += Number(c.total_spent || 0);
+      cur.budgets += Number(c.budgets_count || 0);
+      map.set(key, cur);
+    });
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue || b.clients - a.clients).slice(0, 6);
+  }, [clientsList]);
+  const totalClientsWithRegion = regionStats.reduce((s, r) => s + r.clients, 0);
+
   const hasCriticalAlerts = assistanceProjects.length > 0 || overdueProjects.length > 0 || overdueReceivables.length > 0;
 
   if (loading) {
