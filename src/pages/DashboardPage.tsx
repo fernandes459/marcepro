@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   TrendingUp, Target, Factory, AlertTriangle, Calendar as CalendarIcon,
   Wrench, Truck, Hammer, Clock, ArrowRight, CheckCircle2, Flame, Activity, BarChart3,
+  MapPin, Percent, Users,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
