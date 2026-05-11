@@ -29,7 +29,7 @@ import CollaboratorTab from '@/components/finance/CollaboratorTab';
 import FinancialAdvisor from '@/components/finance/FinancialAdvisor';
 import { useFinancialInsights, computeFinancialMetrics } from '@/hooks/useFinancialInsights';
 import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories } from '@/lib/financial';
-import { summarizeFinance } from '@/lib/finance-calc';
+import { calculateAccountBalances, calculateAvailableBalance, summarizeFinance } from '@/lib/finance-calc';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 interface Transaction {
@@ -47,6 +47,7 @@ interface BankAccount {
   current_balance: number; color: string; is_main: boolean;
   agency: string | null; account_number: string | null; initial_balance: number;
 }
+interface BankTransfer { from_account_id: string; to_account_id: string; amount: number; }
 
 type PeriodFilterMode = 'month' | 'custom';
 
@@ -93,6 +94,7 @@ export default function FinancePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [bankTransfers, setBankTransfers] = useState<BankTransfer[]>([]);
   const [budgetsList, setBudgetsList] = useState<{ id: string; project_name: string | null; code: string; client_id: string | null }[]>([]);
   const [pendingWorkLogsTotal, setPendingWorkLogsTotal] = useState(0);
   const [customCategories, setCustomCategories] = useState<FinancialCategoryOption[]>([]);
@@ -120,10 +122,11 @@ export default function FinancePage() {
   const fetchAll = useCallback(async () => {
     if (!user) return;
 
-    const [txRes, clientsRes, banksRes, budgetsRes, logsRes] = await Promise.all([
+    const [txRes, clientsRes, banksRes, transfersRes, budgetsRes, logsRes] = await Promise.all([
       supabase.from('financial_transactions').select('*').order('date', { ascending: false }),
       supabase.from('clients').select('id, name').order('name'),
       supabase.from('bank_accounts').select('*').order('is_main', { ascending: false }),
+      supabase.from('bank_transfers').select('from_account_id, to_account_id, amount'),
       supabase.from('budgets').select('id, project_name, code, client_id').order('created_at', { ascending: false }),
       supabase.from('collaborator_work_logs' as any).select('status, total_amount').eq('status', 'pending'),
     ]);
@@ -131,6 +134,7 @@ export default function FinancePage() {
     if (txRes.data) setTransactions(txRes.data as Transaction[]);
     if (clientsRes.data) setClients(clientsRes.data);
     if (banksRes.data) setBankAccounts(banksRes.data as BankAccount[]);
+    if (transfersRes.data) setBankTransfers(transfersRes.data as BankTransfer[]);
     if (budgetsRes.data) setBudgetsList(budgetsRes.data as any);
     if (logsRes.data) {
       const total = (logsRes.data as any[]).reduce((s, l) => s + Number(l.total_amount || 0), 0);
@@ -225,7 +229,7 @@ export default function FinancePage() {
         account_type: bankForm.account_type, agency: bankForm.agency || null,
         account_number: bankForm.account_number || null,
         initial_balance: bankForm.initial_balance,
-        current_balance: bankForm.current_balance,
+        current_balance: bankForm.initial_balance,
         color: bankForm.color,
       } as any).eq('id', editingBankId);
       if (error) { toast.error('Erro ao atualizar conta'); return; }
@@ -286,10 +290,6 @@ export default function FinancePage() {
       date: transferForm.date,
     } as any);
     if (error) { toast.error('Erro na transferência'); return; }
-    await Promise.all([
-      supabase.from('bank_accounts').update({ current_balance: fromAcc.current_balance - transferForm.amount } as any).eq('id', fromAcc.id),
-      supabase.from('bank_accounts').update({ current_balance: toAcc.current_balance + transferForm.amount } as any).eq('id', toAcc.id),
-    ]);
     toast.success('Transferência realizada!');
     setTransferDialogOpen(false);
     setTransferForm({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
@@ -297,33 +297,12 @@ export default function FinancePage() {
   }
 
   async function markPaid(id: string) {
-    const tx = transactions.find(t => t.id === id);
     await supabase.from('financial_transactions').update({ status: 'paid', paid_date: new Date().toISOString().slice(0, 10) } as any).eq('id', id);
-    // Update bank balance when marking as paid
-    if (tx && tx.bank_account_id) {
-      const acc = bankAccounts.find(a => a.id === tx.bank_account_id);
-      if (acc) {
-        const newBalance = tx.type === 'income'
-          ? acc.current_balance + Number(tx.amount)
-          : acc.current_balance - Number(tx.amount);
-        await supabase.from('bank_accounts').update({ current_balance: newBalance } as any).eq('id', acc.id);
-      }
-    }
     toast.success('Marcado como pago');
     fetchAll();
   }
 
   async function deleteTransaction(id: string) {
-    const tx = transactions.find(t => t.id === id);
-    if (tx && tx.status === 'paid' && tx.bank_account_id) {
-      const acc = bankAccounts.find(a => a.id === tx.bank_account_id);
-      if (acc) {
-        const adjustment = tx.type === 'income'
-          ? acc.current_balance - Number(tx.amount)
-          : acc.current_balance + Number(tx.amount);
-        await supabase.from('bank_accounts').update({ current_balance: adjustment } as any).eq('id', acc.id);
-      }
-    }
     await supabase.from('financial_transactions').delete().eq('id', id);
     toast.success('Lançamento removido');
     fetchAll();
@@ -379,7 +358,21 @@ export default function FinancePage() {
   const totalIncome = summary.income;       // Entradas recebidas no período
   const totalExpense = summary.expense;     // Saídas pagas no período
   const profit = summary.profit;            // Resultado
-  const totalBankBalance = bankAccounts.reduce((s, a) => s + Number(a.current_balance), 0);
+  const accountBalances = useMemo(
+    () => calculateAccountBalances(transactions, bankAccounts, bankTransfers),
+    [transactions, bankAccounts, bankTransfers],
+  );
+  const bankAccountsWithBalance = useMemo(
+    () => bankAccounts.map((account) => ({
+      ...account,
+      current_balance: accountBalances[account.id] ?? Number(account.initial_balance || 0),
+    })),
+    [accountBalances, bankAccounts],
+  );
+  const totalBankBalance = useMemo(
+    () => calculateAvailableBalance(transactions, bankAccounts),
+    [transactions, bankAccounts],
+  );
   const pendingReceivable = globalPending.receivable;
   const pendingPayable = globalPending.payable;
   const overdueItems = globalPending.all.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
@@ -387,10 +380,10 @@ export default function FinancePage() {
 
   // Projected metrics + insights (executivo)
   const metrics = useMemo(
-    () => computeFinancialMetrics({ transactions, bankAccounts, pendingWorkLogsTotal, today }),
-    [transactions, bankAccounts, pendingWorkLogsTotal, today]
+    () => computeFinancialMetrics({ transactions, bankAccounts: bankAccountsWithBalance, pendingWorkLogsTotal, today }),
+    [transactions, bankAccountsWithBalance, pendingWorkLogsTotal, today]
   );
-  const insights = useFinancialInsights({ transactions: transactions as any, bankAccounts, pendingWorkLogsTotal, today });
+  const insights = useFinancialInsights({ transactions: transactions as any, bankAccounts: bankAccountsWithBalance, pendingWorkLogsTotal, today });
 
   const filtered = useMemo(() => {
     return periodTransactions.filter(t => {
@@ -496,7 +489,7 @@ export default function FinancePage() {
             userId={user!.id}
             budgets={budgetsList}
             clients={clients}
-            bankAccounts={bankAccounts as any}
+            bankAccounts={bankAccountsWithBalance as any}
             onChange={fetchAll}
           />
         );
@@ -783,7 +776,7 @@ export default function FinancePage() {
               </button>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide snap-x">
-              {bankAccounts.slice(0, 6).map(acc => (
+              {bankAccountsWithBalance.slice(0, 6).map(acc => (
                 <Card
                   key={acc.id}
                   onClick={() => setActiveSection('contas')}
@@ -1331,7 +1324,7 @@ export default function FinancePage() {
           </Button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {bankAccounts.map(acc => (
+          {bankAccountsWithBalance.map(acc => (
             <Card key={acc.id} className="border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: acc.color }}>
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
@@ -1477,7 +1470,7 @@ export default function FinancePage() {
         onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditingTransaction(null); }}
         userId={user!.id}
         clients={clients}
-        bankAccounts={bankAccounts}
+        bankAccounts={bankAccountsWithBalance}
         onSaved={fetchAll}
         editTransaction={editingTransaction}
       />
@@ -1520,9 +1513,12 @@ export default function FinancePage() {
               <div className="space-y-2"><Label>Cor</Label><Input type="color" value={bankForm.color} onChange={e => setBankForm({ ...bankForm, color: e.target.value })} className="h-10" /></div>
             </div>
             {editingBankId && (
-              <div className="space-y-2">
-                <Label>Saldo Atual <span className="text-[10px] text-muted-foreground">(ajuste direto se necessário)</span></Label>
-                <CurrencyInput value={bankForm.current_balance} onChange={v => setBankForm({ ...bankForm, current_balance: v })} />
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <Label>Saldo calculado em tempo real</Label>
+                <p className="text-xl font-bold font-display text-gold tabular-nums mt-1">
+                  {formatBRL(accountBalances[editingBankId] ?? bankForm.initial_balance)}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1">Saldo inicial + entradas pagas − saídas pagas.</p>
               </div>
             )}
             <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleSaveBank}>
@@ -1539,13 +1535,13 @@ export default function FinancePage() {
             <div className="space-y-2"><Label>Conta de Origem</Label>
               <Select value={transferForm.from_account_id} onValueChange={v => setTransferForm({ ...transferForm, from_account_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {formatBRL(a.current_balance)}</SelectItem>)}</SelectContent>
+                <SelectContent>{bankAccountsWithBalance.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {formatBRL(a.current_balance)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Conta de Destino</Label>
               <Select value={transferForm.to_account_id} onValueChange={v => setTransferForm({ ...transferForm, to_account_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {formatBRL(a.current_balance)}</SelectItem>)}</SelectContent>
+                <SelectContent>{bankAccountsWithBalance.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {formatBRL(a.current_balance)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Valor</Label><CurrencyInput value={transferForm.amount} onChange={v => setTransferForm({ ...transferForm, amount: v })} /></div>

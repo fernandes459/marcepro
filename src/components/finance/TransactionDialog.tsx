@@ -209,52 +209,13 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
       subcategory: subcategory || null,
     };
 
-    // Helper: signed contribution of a (paid) transaction to an account balance
-    const contribution = (t: { type: string; status: string; amount: number; bank_account_id: string | null }) => {
-      if (t.status !== 'paid' || !t.bank_account_id) return { acc: null as string | null, delta: 0 };
-      const sign = t.type === 'income' ? 1 : -1;
-      return { acc: t.bank_account_id, delta: sign * Number(t.amount || 0) };
-    };
-
     let error;
     if (editTransaction?.id) {
       const res = await supabase.from('financial_transactions').update(payload as any).eq('id', editTransaction.id);
       error = res.error;
-      if (!error) {
-        // Reverse old contribution, apply new one
-        const oldC = contribution({
-          type: editTransaction.type, status: editTransaction.status,
-          amount: editTransaction.amount, bank_account_id: editTransaction.bank_account_id,
-        });
-        const newC = contribution({ type, status, amount: totalAmount, bank_account_id: bankAccountId || null });
-        // Group deltas by account
-        const deltas = new Map<string, number>();
-        if (oldC.acc) deltas.set(oldC.acc, (deltas.get(oldC.acc) || 0) - oldC.delta);
-        if (newC.acc) deltas.set(newC.acc, (deltas.get(newC.acc) || 0) + newC.delta);
-        for (const [accId, delta] of deltas) {
-          if (Math.abs(delta) < 0.001) continue;
-          const { data: acc } = await supabase.from('bank_accounts').select('current_balance').eq('id', accId).maybeSingle();
-          if (acc) {
-            await supabase.from('bank_accounts').update({
-              current_balance: Number(acc.current_balance) + delta,
-            } as any).eq('id', accId);
-          }
-        }
-      }
     } else {
       const res = await supabase.from('financial_transactions').insert(payload as any);
       error = res.error;
-      if (!error) {
-        const c = contribution({ type, status, amount: totalAmount, bank_account_id: bankAccountId || null });
-        if (c.acc && Math.abs(c.delta) > 0.001) {
-          const { data: acc } = await supabase.from('bank_accounts').select('current_balance').eq('id', c.acc).maybeSingle();
-          if (acc) {
-            await supabase.from('bank_accounts').update({
-              current_balance: Number(acc.current_balance) + c.delta,
-            } as any).eq('id', c.acc);
-          }
-        }
-      }
     }
 
     if (error) { toast.error('Erro ao salvar'); console.error(error); return; }

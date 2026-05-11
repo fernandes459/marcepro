@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatBRL } from '@/lib/format';
+import { calculateAvailableBalance } from '@/lib/finance-calc';
 
 export type InsightSeverity = 'info' | 'warning' | 'danger' | 'success';
 
@@ -24,7 +25,7 @@ interface Tx {
   client_id: string | null;
 }
 
-interface BankAcc { current_balance: number }
+interface BankAcc { current_balance: number; initial_balance?: number | string | null }
 
 interface Params {
   transactions: Tx[];
@@ -56,7 +57,7 @@ export function useCompanyMinMargin() {
 }
 
 export function computeFinancialMetrics({ transactions, bankAccounts, pendingWorkLogsTotal = 0, today }: Params) {
-  const realBalance = bankAccounts.reduce((s, a) => s + Number(a.current_balance || 0), 0);
+  const realBalance = calculateAvailableBalance(transactions, bankAccounts);
 
   const next30 = daysFromNow(today, 30);
 
