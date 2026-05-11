@@ -358,7 +358,21 @@ export default function FinancePage() {
   const totalIncome = summary.income;       // Entradas recebidas no período
   const totalExpense = summary.expense;     // Saídas pagas no período
   const profit = summary.profit;            // Resultado
-  const totalBankBalance = bankAccounts.reduce((s, a) => s + Number(a.current_balance), 0);
+  const accountBalances = useMemo(
+    () => calculateAccountBalances(transactions, bankAccounts, bankTransfers),
+    [transactions, bankAccounts, bankTransfers],
+  );
+  const bankAccountsWithBalance = useMemo(
+    () => bankAccounts.map((account) => ({
+      ...account,
+      current_balance: accountBalances[account.id] ?? Number(account.initial_balance || 0),
+    })),
+    [accountBalances, bankAccounts],
+  );
+  const totalBankBalance = useMemo(
+    () => calculateAvailableBalance(transactions, bankAccounts),
+    [transactions, bankAccounts],
+  );
   const pendingReceivable = globalPending.receivable;
   const pendingPayable = globalPending.payable;
   const overdueItems = globalPending.all.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
