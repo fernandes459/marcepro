@@ -25,6 +25,7 @@ interface PaymentMilestone {
   due_date: string | null;
   paid_date: string | null;
   sort_order: number;
+  linked_transaction_id?: string | null;
 }
 
 interface Props {
