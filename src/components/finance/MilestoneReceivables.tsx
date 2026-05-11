@@ -26,6 +26,7 @@ interface MilestoneWithBudget {
   budget_project: string | null;
   client_name: string | null;
   client_id: string | null;
+  linked_transaction_id: string | null;
 }
 
 interface Client {
