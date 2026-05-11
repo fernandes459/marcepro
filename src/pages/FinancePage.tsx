@@ -489,7 +489,7 @@ export default function FinancePage() {
             userId={user!.id}
             budgets={budgetsList}
             clients={clients}
-            bankAccounts={bankAccounts as any}
+            bankAccounts={bankAccountsWithBalance as any}
             onChange={fetchAll}
           />
         );
@@ -776,7 +776,7 @@ export default function FinancePage() {
               </button>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide snap-x">
-              {bankAccounts.slice(0, 6).map(acc => (
+              {bankAccountsWithBalance.slice(0, 6).map(acc => (
                 <Card
                   key={acc.id}
                   onClick={() => setActiveSection('contas')}
@@ -1324,7 +1324,7 @@ export default function FinancePage() {
           </Button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {bankAccounts.map(acc => (
+          {bankAccountsWithBalance.map(acc => (
             <Card key={acc.id} className="border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: acc.color }}>
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
@@ -1470,7 +1470,7 @@ export default function FinancePage() {
         onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditingTransaction(null); }}
         userId={user!.id}
         clients={clients}
-        bankAccounts={bankAccounts}
+        bankAccounts={bankAccountsWithBalance}
         onSaved={fetchAll}
         editTransaction={editingTransaction}
       />
@@ -1532,13 +1532,13 @@ export default function FinancePage() {
             <div className="space-y-2"><Label>Conta de Origem</Label>
               <Select value={transferForm.from_account_id} onValueChange={v => setTransferForm({ ...transferForm, from_account_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {formatBRL(a.current_balance)}</SelectItem>)}</SelectContent>
+                <SelectContent>{bankAccountsWithBalance.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {formatBRL(a.current_balance)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Conta de Destino</Label>
               <Select value={transferForm.to_account_id} onValueChange={v => setTransferForm({ ...transferForm, to_account_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {formatBRL(a.current_balance)}</SelectItem>)}</SelectContent>
+                <SelectContent>{bankAccountsWithBalance.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {formatBRL(a.current_balance)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Valor</Label><CurrencyInput value={transferForm.amount} onChange={v => setTransferForm({ ...transferForm, amount: v })} /></div>
