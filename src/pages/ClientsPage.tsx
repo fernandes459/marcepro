@@ -88,13 +88,34 @@ export default function ClientsPage() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  const filtered = clients.filter(
-    (c) =>
+  const [stateFilter, setStateFilter] = useState<string>('all');
+  const [cityFilter, setCityFilter] = useState<string>('all');
+
+  const stateOptions = useMemo(() => {
+    const set = new Set(clients.map(c => (c.state || '').trim().toUpperCase()).filter(Boolean));
+    return Array.from(set).sort();
+  }, [clients]);
+
+  const cityOptions = useMemo(() => {
+    const set = new Set(
+      clients
+        .filter(c => stateFilter === 'all' || (c.state || '').trim().toUpperCase() === stateFilter)
+        .map(c => (c.city || '').trim())
+        .filter(Boolean)
+    );
+    return Array.from(set).sort();
+  }, [clients, stateFilter]);
+
+  const filtered = clients.filter((c) => {
+    const matchesSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
       c.phone.includes(search) ||
-      (c.city || '').toLowerCase().includes(search.toLowerCase())
-  );
+      (c.city || '').toLowerCase().includes(search.toLowerCase());
+    const matchesState = stateFilter === 'all' || (c.state || '').trim().toUpperCase() === stateFilter;
+    const matchesCity = cityFilter === 'all' || (c.city || '').trim() === cityFilter;
+    return matchesSearch && matchesState && matchesCity;
+  });
 
   const kpis = useMemo(() => {
     const totalRevenue = clients.reduce((s, c) => s + Number(c.total_spent || 0), 0);
