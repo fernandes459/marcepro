@@ -121,6 +121,7 @@ export default function DashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => void fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => void fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'company_settings' }, () => void fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => void fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData, user]);
