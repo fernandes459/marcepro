@@ -29,7 +29,7 @@ import CollaboratorTab from '@/components/finance/CollaboratorTab';
 import FinancialAdvisor from '@/components/finance/FinancialAdvisor';
 import { useFinancialInsights, computeFinancialMetrics } from '@/hooks/useFinancialInsights';
 import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories } from '@/lib/financial';
-import { summarizeFinance } from '@/lib/finance-calc';
+import { calculateAccountBalances, calculateAvailableBalance, summarizeFinance } from '@/lib/finance-calc';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 interface Transaction {
@@ -47,6 +47,7 @@ interface BankAccount {
   current_balance: number; color: string; is_main: boolean;
   agency: string | null; account_number: string | null; initial_balance: number;
 }
+interface BankTransfer { from_account_id: string; to_account_id: string; amount: number; }
 
 type PeriodFilterMode = 'month' | 'custom';
 
@@ -93,6 +94,7 @@ export default function FinancePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [bankTransfers, setBankTransfers] = useState<BankTransfer[]>([]);
   const [budgetsList, setBudgetsList] = useState<{ id: string; project_name: string | null; code: string; client_id: string | null }[]>([]);
   const [pendingWorkLogsTotal, setPendingWorkLogsTotal] = useState(0);
   const [customCategories, setCustomCategories] = useState<FinancialCategoryOption[]>([]);
@@ -120,10 +122,11 @@ export default function FinancePage() {
   const fetchAll = useCallback(async () => {
     if (!user) return;
 
-    const [txRes, clientsRes, banksRes, budgetsRes, logsRes] = await Promise.all([
+    const [txRes, clientsRes, banksRes, transfersRes, budgetsRes, logsRes] = await Promise.all([
       supabase.from('financial_transactions').select('*').order('date', { ascending: false }),
       supabase.from('clients').select('id, name').order('name'),
       supabase.from('bank_accounts').select('*').order('is_main', { ascending: false }),
+      supabase.from('bank_transfers').select('from_account_id, to_account_id, amount'),
       supabase.from('budgets').select('id, project_name, code, client_id').order('created_at', { ascending: false }),
       supabase.from('collaborator_work_logs' as any).select('status, total_amount').eq('status', 'pending'),
     ]);
@@ -131,6 +134,7 @@ export default function FinancePage() {
     if (txRes.data) setTransactions(txRes.data as Transaction[]);
     if (clientsRes.data) setClients(clientsRes.data);
     if (banksRes.data) setBankAccounts(banksRes.data as BankAccount[]);
+    if (transfersRes.data) setBankTransfers(transfersRes.data as BankTransfer[]);
     if (budgetsRes.data) setBudgetsList(budgetsRes.data as any);
     if (logsRes.data) {
       const total = (logsRes.data as any[]).reduce((s, l) => s + Number(l.total_amount || 0), 0);
