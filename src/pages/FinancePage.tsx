@@ -1183,7 +1183,7 @@ export default function FinancePage() {
                         className={`h-8 text-xs rounded-full ml-1 shrink-0 ${
                           isIncome ? 'bg-success hover:bg-success/90 text-success-foreground' : 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
                         }`}
-                        onClick={() => markPaid(tx.id)}
+                        onClick={(e) => { e.stopPropagation(); markPaid(tx.id); }}
                       >
                         {isIncome ? 'Receber' : 'Pagar'}
                       </Button>
