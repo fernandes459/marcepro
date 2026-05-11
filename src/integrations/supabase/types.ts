@@ -788,6 +788,7 @@ export type Database = {
           created_at: string
           due_date: string | null
           id: string
+          linked_transaction_id: string | null
           notes: string | null
           paid_date: string | null
           percentage: number
@@ -804,6 +805,7 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          linked_transaction_id?: string | null
           notes?: string | null
           paid_date?: string | null
           percentage?: number
@@ -820,6 +822,7 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          linked_transaction_id?: string | null
           notes?: string | null
           paid_date?: string | null
           percentage?: number
