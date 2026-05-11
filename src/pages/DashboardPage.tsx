@@ -43,8 +43,9 @@ const eventColors: Record<string, string> = {
 };
 
 interface Tx { id: string; type: string; amount: number; date: string; due_date: string | null; status: string; }
-interface Budget { id: string; status: string; final_price: number; clients?: { name: string } | null; }
+interface Budget { id: string; status: string; final_price: number; created_at?: string; client_id?: string | null; clients?: { name: string } | null; }
 interface Task { id: string; stage: string; project_name: string; client_name: string; due_date: string | null; }
+interface ClientRow { id: string; name: string; city: string | null; state: string | null; total_spent: number | null; budgets_count: number | null; }
 
 type FilterMode = 'month' | 'custom';
 
