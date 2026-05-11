@@ -77,6 +77,7 @@ export default function MilestoneReceivables() {
           budget_project: m.budgets?.project_name,
           client_name: m.budgets?.clients?.name || null,
           client_id: m.budgets?.client_id || null,
+          linked_transaction_id: m.linked_transaction_id || null,
         }));
       setMilestones(mapped);
     }
