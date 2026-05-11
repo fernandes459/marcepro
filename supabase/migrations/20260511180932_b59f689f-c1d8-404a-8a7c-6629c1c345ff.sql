@@ -1,0 +1,1 @@
+ALTER TABLE public.payment_milestones ADD COLUMN IF NOT EXISTS linked_transaction_id uuid;
