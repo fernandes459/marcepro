@@ -101,7 +101,6 @@ export default function MilestoneReceivables() {
   async function markAsPaid(ms: MilestoneWithBudget) {
     const today = new Date().toISOString().slice(0, 10);
 
-    // Update milestone
     const { error: msError } = await supabase
       .from('payment_milestones')
       .update({ status: 'paid', paid_date: today } as any)
@@ -109,21 +108,20 @@ export default function MilestoneReceivables() {
 
     if (msError) { toast.error('Erro ao atualizar marco'); return; }
 
-    // Create income transaction for cash flow
-    await supabase.from('financial_transactions').insert({
-      user_id: user!.id,
-      type: 'income',
-      category: 'installment',
-      description: `${ms.budget_code} - ${ms.title}`,
-      amount: ms.amount,
-      date: today,
-      paid_date: today,
-      status: 'paid',
+    // Atualiza (ou cria) o lançamento vinculado, evitando duplicidade
+    await syncMilestoneToTransaction({
+      id: ms.id,
       budget_id: ms.budget_id,
-      client_id: ms.client_id,
-    } as any);
+      title: ms.title,
+      amount: Number(ms.amount),
+      due_date: ms.due_date,
+      status: 'paid',
+      paid_date: today,
+      linked_transaction_id: ms.linked_transaction_id,
+      user_id: user!.id,
+    });
 
-    toast.success(`Marco "${ms.title}" marcado como pago — receita lançada no fluxo de caixa`);
+    toast.success(`Marco "${ms.title}" marcado como pago — receita confirmada no financeiro`);
     fetchData();
   }
 
