@@ -345,10 +345,24 @@ export default function ClientsPage() {
 
       <div className="flex flex-wrap gap-2 items-center">
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nome, telefone, email ou cidade..." className="flex-1 min-w-[220px] max-w-md" />
+        <Select value={stateFilter} onValueChange={(v) => { setStateFilter(v); setCityFilter('all'); }}>
+          <SelectTrigger className="h-9 w-[120px] rounded-full bg-muted/40 border-border/60"><SelectValue placeholder="UF" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas UFs</SelectItem>
+            {stateOptions.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={cityFilter} onValueChange={setCityFilter}>
+          <SelectTrigger className="h-9 w-[180px] rounded-full bg-muted/40 border-border/60"><SelectValue placeholder="Cidade" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as cidades</SelectItem>
+            {cityOptions.map(city => <SelectItem key={city} value={city}>{city}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Button variant="outline" size="sm" className="h-9 rounded-full border-border/60 bg-muted/40 gap-1.5" onClick={exportToExcel}>
           <FileSpreadsheet className="h-3.5 w-3.5 text-success" /> Excel
         </Button>
-        {search && <span className="text-xs text-muted-foreground ml-auto">{filtered.length} resultado(s)</span>}
+        {(search || stateFilter !== 'all' || cityFilter !== 'all') && <span className="text-xs text-muted-foreground ml-auto">{filtered.length} resultado(s)</span>}
       </div>
 
       {loading ? (
