@@ -71,9 +71,18 @@ export default function PaymentMilestones({ budgetId, finalPrice, onMilestonesCh
 
   async function applyPreset(preset: typeof PRESETS[0]) {
     if (!user) return;
-    // Delete existing
+    // Delete linked transactions of existing milestones
+    const { data: existing } = await supabase
+      .from('payment_milestones')
+      .select('linked_transaction_id')
+      .eq('budget_id', budgetId);
+    if (existing) {
+      await Promise.all(
+        existing.map((m: any) => deleteLinkedTransaction(m.linked_transaction_id)),
+      );
+    }
     await supabase.from('payment_milestones').delete().eq('budget_id', budgetId);
-    // Insert new
+
     const inserts = preset.milestones.map((m, i) => ({
       budget_id: budgetId,
       user_id: user.id,
@@ -83,16 +92,30 @@ export default function PaymentMilestones({ budgetId, finalPrice, onMilestonesCh
       sort_order: i,
       status: 'pending',
     }));
-    const { error } = await supabase.from('payment_milestones').insert(inserts as any);
+    const { data: created, error } = await supabase
+      .from('payment_milestones')
+      .insert(inserts as any)
+      .select('*');
     if (error) { toast.error('Erro ao criar marcos'); return; }
-    toast.success(`Marcos ${preset.label} aplicados`);
+
+    // Sync each milestone as pending income transaction
+    if (created) {
+      await Promise.all(
+        (created as any[]).map(m => syncMilestoneToTransaction({
+          id: m.id, budget_id: m.budget_id, title: m.title, amount: Number(m.amount),
+          due_date: m.due_date, status: m.status, paid_date: m.paid_date,
+          linked_transaction_id: null, user_id: user.id,
+        })),
+      );
+    }
+    toast.success(`Marcos ${preset.label} aplicados — lançamentos previstos criados no financeiro`);
     fetchMilestones();
     onMilestonesChange?.();
   }
 
   async function addCustomMilestone() {
     if (!user) return;
-    const { error } = await supabase.from('payment_milestones').insert({
+    const { data, error } = await supabase.from('payment_milestones').insert({
       budget_id: budgetId,
       user_id: user.id,
       title: `Marco ${milestones.length + 1}`,
@@ -100,29 +123,56 @@ export default function PaymentMilestones({ budgetId, finalPrice, onMilestonesCh
       amount: 0,
       sort_order: milestones.length,
       status: 'pending',
-    } as any);
-    if (error) { toast.error('Erro ao adicionar'); return; }
+    } as any).select('*').single();
+    if (error || !data) { toast.error('Erro ao adicionar'); return; }
+    await syncMilestoneToTransaction({
+      id: (data as any).id, budget_id: budgetId, title: (data as any).title,
+      amount: Number((data as any).amount), due_date: (data as any).due_date,
+      status: (data as any).status, paid_date: (data as any).paid_date,
+      linked_transaction_id: null, user_id: user.id,
+    });
     fetchMilestones();
+    onMilestonesChange?.();
   }
 
   async function updateMilestone(id: string, updates: Partial<PaymentMilestone>) {
     await supabase.from('payment_milestones').update(updates as any).eq('id', id);
+    const ms = milestones.find(m => m.id === id);
+    if (ms && user) {
+      const merged = { ...ms, ...updates } as PaymentMilestone;
+      await syncMilestoneToTransaction({
+        id: merged.id, budget_id: merged.budget_id, title: merged.title,
+        amount: Number(merged.amount), due_date: merged.due_date,
+        status: merged.status, paid_date: merged.paid_date,
+        linked_transaction_id: merged.linked_transaction_id, user_id: user.id,
+      });
+    }
     fetchMilestones();
     onMilestonesChange?.();
   }
 
   async function deleteMilestone(id: string) {
+    const ms = milestones.find(m => m.id === id);
+    await deleteLinkedTransaction(ms?.linked_transaction_id);
     await supabase.from('payment_milestones').delete().eq('id', id);
     fetchMilestones();
     onMilestonesChange?.();
   }
 
   async function markPaid(id: string) {
+    const today = new Date().toISOString().slice(0, 10);
     await supabase.from('payment_milestones').update({
-      status: 'paid',
-      paid_date: new Date().toISOString().slice(0, 10),
+      status: 'paid', paid_date: today,
     } as any).eq('id', id);
-    toast.success('Marco marcado como pago');
+    const ms = milestones.find(m => m.id === id);
+    if (ms && user) {
+      await syncMilestoneToTransaction({
+        id: ms.id, budget_id: ms.budget_id, title: ms.title, amount: Number(ms.amount),
+        due_date: ms.due_date, status: 'paid', paid_date: today,
+        linked_transaction_id: ms.linked_transaction_id, user_id: user.id,
+      });
+    }
+    toast.success('Marco marcado como pago — receita confirmada no financeiro');
     fetchMilestones();
     onMilestonesChange?.();
   }
