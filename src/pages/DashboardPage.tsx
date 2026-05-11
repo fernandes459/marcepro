@@ -83,6 +83,7 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<Tx[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [clientsList, setClientsList] = useState<ClientRow[]>([]);
   const [monthlyGoal, setMonthlyGoal] = useState(0);
   const [loading, setLoading] = useState(true);
   const today = useMemo(() => new Date(), []);
@@ -95,16 +96,18 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [txRes, budRes, taskRes, settingsRes] = await Promise.all([
+    const [txRes, budRes, taskRes, settingsRes, clientsRes] = await Promise.all([
       supabase.from('financial_transactions').select('id, type, amount, date, due_date, status'),
-      supabase.from('budgets').select('id, status, final_price, clients(name)').order('created_at', { ascending: false }),
+      supabase.from('budgets').select('id, status, final_price, created_at, client_id, clients(name)').order('created_at', { ascending: false }),
       supabase.from('production_tasks').select('id, stage, project_name, client_name, due_date'),
       supabase.from('company_settings').select('monthly_goal').maybeSingle(),
+      supabase.from('clients').select('id, name, city, state, total_spent, budgets_count'),
     ]);
     if (txRes.data) setTransactions(txRes.data as Tx[]);
     if (budRes.data) setBudgets(budRes.data as unknown as Budget[]);
     if (taskRes.data) setTasks(taskRes.data as Task[]);
     if (settingsRes.data) setMonthlyGoal(Number(settingsRes.data.monthly_goal) || 0);
+    if (clientsRes.data) setClientsList(clientsRes.data as ClientRow[]);
     setLoading(false);
   }, [user]);
 
