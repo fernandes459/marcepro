@@ -290,10 +290,6 @@ export default function FinancePage() {
       date: transferForm.date,
     } as any);
     if (error) { toast.error('Erro na transferência'); return; }
-    await Promise.all([
-      supabase.from('bank_accounts').update({ current_balance: fromAcc.current_balance - transferForm.amount } as any).eq('id', fromAcc.id),
-      supabase.from('bank_accounts').update({ current_balance: toAcc.current_balance + transferForm.amount } as any).eq('id', toAcc.id),
-    ]);
     toast.success('Transferência realizada!');
     setTransferDialogOpen(false);
     setTransferForm({ from_account_id: '', to_account_id: '', amount: 0, description: '', date: new Date().toISOString().slice(0, 10) });
@@ -301,33 +297,12 @@ export default function FinancePage() {
   }
 
   async function markPaid(id: string) {
-    const tx = transactions.find(t => t.id === id);
     await supabase.from('financial_transactions').update({ status: 'paid', paid_date: new Date().toISOString().slice(0, 10) } as any).eq('id', id);
-    // Update bank balance when marking as paid
-    if (tx && tx.bank_account_id) {
-      const acc = bankAccounts.find(a => a.id === tx.bank_account_id);
-      if (acc) {
-        const newBalance = tx.type === 'income'
-          ? acc.current_balance + Number(tx.amount)
-          : acc.current_balance - Number(tx.amount);
-        await supabase.from('bank_accounts').update({ current_balance: newBalance } as any).eq('id', acc.id);
-      }
-    }
     toast.success('Marcado como pago');
     fetchAll();
   }
 
   async function deleteTransaction(id: string) {
-    const tx = transactions.find(t => t.id === id);
-    if (tx && tx.status === 'paid' && tx.bank_account_id) {
-      const acc = bankAccounts.find(a => a.id === tx.bank_account_id);
-      if (acc) {
-        const adjustment = tx.type === 'income'
-          ? acc.current_balance - Number(tx.amount)
-          : acc.current_balance + Number(tx.amount);
-        await supabase.from('bank_accounts').update({ current_balance: adjustment } as any).eq('id', acc.id);
-      }
-    }
     await supabase.from('financial_transactions').delete().eq('id', id);
     toast.success('Lançamento removido');
     fetchAll();
