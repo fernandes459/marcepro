@@ -24,6 +24,19 @@ export interface FinanceTx {
   date?: string | null;
   due_date?: string | null;
   paid_date?: string | null;
+  bank_account_id?: string | null;
+}
+
+export interface FinanceAccount {
+  id?: string;
+  initial_balance?: number | string | null;
+  current_balance?: number | string | null;
+}
+
+export interface FinanceTransfer {
+  from_account_id?: string | null;
+  to_account_id?: string | null;
+  amount: number | string;
 }
 
 const PENDING_STATUSES = new Set(['pending', 'overdue']);
@@ -80,6 +93,53 @@ export function summarizeFinance(txs: FinanceTx[], todayISO?: string): FinanceSu
     overdueCount: overdue.length,
     overdueAmount,
   };
+}
+
+export function calculateAvailableBalance(txs: FinanceTx[], accounts: FinanceAccount[] = []): number {
+  const initialBalance = accounts.reduce(
+    (acc, account) => acc.plus(new Decimal(account.initial_balance || 0)),
+    new Decimal(0),
+  );
+
+  return txs
+    .filter((t) => t.status === 'paid' && (t.type === 'income' || t.type === 'expense'))
+    .reduce((acc, t) => {
+      const amount = new Decimal(t.amount || 0);
+      return t.type === 'income' ? acc.plus(amount) : acc.minus(amount);
+    }, initialBalance)
+    .toNumber();
+}
+
+export function calculateAccountBalances(
+  txs: FinanceTx[],
+  accounts: FinanceAccount[] = [],
+  transfers: FinanceTransfer[] = [],
+): Record<string, number> {
+  const balances = new Map<string, Decimal>();
+
+  accounts.forEach((account) => {
+    if (!account.id) return;
+    balances.set(account.id, new Decimal(account.initial_balance || 0));
+  });
+
+  txs.forEach((t) => {
+    if (t.status !== 'paid' || !t.bank_account_id || !balances.has(t.bank_account_id)) return;
+    const current = balances.get(t.bank_account_id)!;
+    const amount = new Decimal(t.amount || 0);
+    balances.set(t.bank_account_id, t.type === 'income' ? current.plus(amount) : current.minus(amount));
+  });
+
+  transfers.forEach((transfer) => {
+    const amount = new Decimal(transfer.amount || 0);
+    if (transfer.from_account_id && balances.has(transfer.from_account_id)) {
+      balances.set(transfer.from_account_id, balances.get(transfer.from_account_id)!.minus(amount));
+    }
+    if (transfer.to_account_id && balances.has(transfer.to_account_id)) {
+      balances.set(transfer.to_account_id, balances.get(transfer.to_account_id)!.plus(amount));
+    }
+  });
+
+  return Object.fromEntries(Array.from(balances.entries()).map(([id, balance]) => [id, balance.toNumber()]));
 }
 
 /**
