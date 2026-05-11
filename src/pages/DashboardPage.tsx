@@ -490,6 +490,101 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
+      {/* ============ TAXA DE CONVERSÃO + REGIÕES ============ */}
+      <motion.div variants={itemVariants} className="grid gap-4 lg:grid-cols-3">
+        {/* Conversão */}
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-display flex items-center gap-2">
+              <Percent className="h-4 w-4 text-primary" />
+              Taxa de Conversão
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-4xl font-bold font-display tabular-nums text-foreground">
+                {conversion.rate.toFixed(1)}<span className="text-xl text-muted-foreground">%</span>
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {conversion.won} fechados de {conversion.total} orçamentos no período
+              </p>
+            </div>
+            <Progress value={conversion.rate} className="h-2" />
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg bg-muted/40 p-2">
+                <p className="text-[10px] text-muted-foreground uppercase">Total</p>
+                <p className="font-display font-semibold">{conversion.total}</p>
+              </div>
+              <div className="rounded-lg bg-success/10 p-2">
+                <p className="text-[10px] text-success uppercase">Ganhos</p>
+                <p className="font-display font-semibold text-success">{conversion.won}</p>
+              </div>
+              <div className="rounded-lg bg-destructive/10 p-2">
+                <p className="text-[10px] text-destructive uppercase">Perdidos</p>
+                <p className="font-display font-semibold text-destructive">{conversion.lost}</p>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {conversion.rate >= 50
+                ? '🎯 Excelente taxa de conversão.'
+                : conversion.rate >= 30
+                ? '👍 Boa conversão — busque atingir 50%+.'
+                : conversion.total === 0
+                ? 'Sem orçamentos no período.'
+                : '⚠️ Conversão baixa — revise preços e follow-ups.'}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Diagnóstico de Regiões */}
+        <Card className="overflow-hidden lg:col-span-2">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardTitle className="text-base font-display flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-primary" />
+                Diagnóstico de Regiões
+              </CardTitle>
+              <Link to="/clientes" className="text-[11px] text-primary hover:underline flex items-center gap-1">
+                Ver clientes <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {regionStats.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                <Users className="h-10 w-10 mb-2 opacity-30" />
+                <p className="text-sm">Cadastre cidade/UF nos clientes para ver o diagnóstico</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {regionStats.map((r, i) => {
+                  const pct = totalClientsWithRegion > 0 ? (r.clients / totalClientsWithRegion) * 100 : 0;
+                  return (
+                    <div key={r.region} className="rounded-xl border border-border/50 p-3 hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center justify-between gap-3 mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-bold text-muted-foreground tabular-nums w-5">#{i + 1}</span>
+                          <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <span className="text-sm font-semibold truncate">{r.region}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] shrink-0">
+                          <span className="text-muted-foreground">{r.clients} cliente(s)</span>
+                          <span className="font-semibold text-gold tabular-nums">{formatBRL(r.revenue)}</span>
+                        </div>
+                      </div>
+                      <Progress value={pct} className="h-1.5" />
+                    </div>
+                  );
+                })}
+                <p className="text-[11px] text-muted-foreground pt-2">
+                  💡 {regionStats[0].region} é sua região mais forte — concentre marketing e indicações por lá.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
       {/* ============ POWER BI: FLUXO FINANCEIRO ============ */}
       <motion.div variants={itemVariants}>
         <Card className="overflow-hidden">
