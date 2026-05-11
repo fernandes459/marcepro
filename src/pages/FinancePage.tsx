@@ -229,7 +229,7 @@ export default function FinancePage() {
         account_type: bankForm.account_type, agency: bankForm.agency || null,
         account_number: bankForm.account_number || null,
         initial_balance: bankForm.initial_balance,
-        current_balance: bankForm.current_balance,
+        current_balance: bankForm.initial_balance,
         color: bankForm.color,
       } as any).eq('id', editingBankId);
       if (error) { toast.error('Erro ao atualizar conta'); return; }
@@ -1513,9 +1513,12 @@ export default function FinancePage() {
               <div className="space-y-2"><Label>Cor</Label><Input type="color" value={bankForm.color} onChange={e => setBankForm({ ...bankForm, color: e.target.value })} className="h-10" /></div>
             </div>
             {editingBankId && (
-              <div className="space-y-2">
-                <Label>Saldo Atual <span className="text-[10px] text-muted-foreground">(ajuste direto se necessário)</span></Label>
-                <CurrencyInput value={bankForm.current_balance} onChange={v => setBankForm({ ...bankForm, current_balance: v })} />
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <Label>Saldo calculado em tempo real</Label>
+                <p className="text-xl font-bold font-display text-gold tabular-nums mt-1">
+                  {formatBRL(accountBalances[editingBankId] ?? bankForm.initial_balance)}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1">Saldo inicial + entradas pagas − saídas pagas.</p>
               </div>
             )}
             <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleSaveBank}>
