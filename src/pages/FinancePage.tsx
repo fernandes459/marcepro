@@ -1147,7 +1147,11 @@ export default function FinancePage() {
                     ? Math.ceil((new Date(tx.due_date + 'T12:00:00').getTime() - new Date(today + 'T12:00:00').getTime()) / 86400000)
                     : null;
                   return (
-                    <li key={tx.id} className={`flex items-center gap-3 px-4 sm:px-6 py-3.5 hover:bg-accent/40 transition-colors ${isOverdue ? 'bg-destructive/5' : ''}`}>
+                    <li
+                      key={tx.id}
+                      onClick={() => setDetailTx(tx)}
+                      className={`flex items-center gap-3 px-4 sm:px-6 py-3.5 hover:bg-accent/40 transition-colors cursor-pointer ${isOverdue ? 'bg-destructive/5' : ''}`}
+                    >
                       <div className={`h-11 w-11 rounded-full flex items-center justify-center shrink-0 ${
                         isOverdue ? 'bg-destructive/10 text-destructive' :
                         isIncome ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
