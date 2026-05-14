@@ -28,7 +28,7 @@ import ReceivableDetailDialog from '@/components/finance/ReceivableDetailDialog'
 import CollaboratorTab from '@/components/finance/CollaboratorTab';
 import FinancialAdvisor from '@/components/finance/FinancialAdvisor';
 import { useFinancialInsights, computeFinancialMetrics } from '@/hooks/useFinancialInsights';
-import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories } from '@/lib/financial';
+import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories, isFixedExpense } from '@/lib/financial';
 import { calculateAccountBalances, calculateAvailableBalance, summarizeFinance } from '@/lib/finance-calc';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
@@ -408,36 +408,55 @@ export default function FinancePage() {
   }, [periodTransactions]);
 
   const clientProfitData = useMemo(() => {
-    const map: Record<string, { name: string; income: number; material: number; fuel: number; food: number; transport: number; other: number }> = {};
+    const map: Record<string, { name: string; income: number; material: number; labor: number; fuel: number; food: number; transport: number; other: number; linkedBudget: boolean }> = {};
+
+    function resolveClientId(t: Transaction): string | null {
+      if (t.client_id) return t.client_id;
+      if (t.budget_id) {
+        const b = budgetsList.find(b => b.id === t.budget_id);
+        return b?.client_id || null;
+      }
+      return null;
+    }
+
     periodTransactions.forEach(t => {
-      if (!t.client_id) return;
-      const client = clients.find(c => c.id === t.client_id);
+      const cid = resolveClientId(t);
+      if (!cid) return;
+      const client = clients.find(c => c.id === cid);
       if (!client) return;
-      if (!map[t.client_id]) map[t.client_id] = { name: client.name, income: 0, material: 0, fuel: 0, food: 0, transport: 0, other: 0 };
-      if (t.type === 'income') map[t.client_id].income += Number(t.amount);
+      if (!map[cid]) map[cid] = { name: client.name, income: 0, material: 0, labor: 0, fuel: 0, food: 0, transport: 0, other: 0, linkedBudget: false };
+      if (t.budget_id) map[cid].linkedBudget = true;
+      if (t.type === 'income') map[cid].income += Number(t.amount);
       else {
-        if (t.category === 'material') map[t.client_id].material += Number(t.amount);
-        else if (t.category === 'fuel') map[t.client_id].fuel += Number(t.amount);
-        else if (t.category === 'food') map[t.client_id].food += Number(t.amount);
-        else if (t.category === 'transport') map[t.client_id].transport += Number(t.amount);
-        else map[t.client_id].other += Number(t.amount);
+        if (t.category === 'material') map[cid].material += Number(t.amount);
+        else if (t.category === 'labor' || t.category === 'commission') map[cid].labor += Number(t.amount);
+        else if (t.category === 'fuel') map[cid].fuel += Number(t.amount);
+        else if (t.category === 'food') map[cid].food += Number(t.amount);
+        else if (t.category === 'transport') map[cid].transport += Number(t.amount);
+        else map[cid].other += Number(t.amount);
       }
     });
-    return Object.values(map).map(c => ({
-      ...c,
-      totalExpense: c.material + c.fuel + c.food + c.transport + c.other,
-      profit: c.income - (c.material + c.fuel + c.food + c.transport + c.other),
-      margin: c.income > 0 ? ((c.income - (c.material + c.fuel + c.food + c.transport + c.other)) / c.income * 100) : 0,
-    })).sort((a, b) => b.profit - a.profit);
-  }, [periodTransactions, clients]);
+    return Object.values(map).map(c => {
+      const totalExpense = c.material + c.labor + c.fuel + c.food + c.transport + c.other;
+      const profit = c.income - totalExpense;
+      return {
+        ...c,
+        totalExpense,
+        profit,
+        margin: c.income > 0 ? (profit / c.income * 100) : 0,
+        noCostsLinked: c.income > 0 && totalExpense === 0,
+      };
+    }).sort((a, b) => b.profit - a.profit);
+  }, [periodTransactions, clients, budgetsList]);
 
   const dreData = useMemo(() => {
     const monthTx = periodTransactions;
     const revenue = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
-    const fixedExp = monthTx.filter(t => t.type === 'expense' && t.is_fixed).reduce((s, t) => s + Number(t.amount), 0);
-    const varExp = monthTx.filter(t => t.type === 'expense' && !t.is_fixed).reduce((s, t) => s + Number(t.amount), 0);
+    const expenses = monthTx.filter(t => t.type === 'expense');
+    const fixedExp = expenses.filter(t => isFixedExpense(t.category, t.is_fixed)).reduce((s, t) => s + Number(t.amount), 0);
+    const varExp = expenses.filter(t => !isFixedExpense(t.category, t.is_fixed)).reduce((s, t) => s + Number(t.amount), 0);
     const byCategory: Record<string, number> = {};
-    monthTx.filter(t => t.type === 'expense').forEach(t => {
+    expenses.forEach(t => {
       byCategory[t.category] = (byCategory[t.category] || 0) + Number(t.amount);
     });
     return { revenue, fixedExp, varExp, totalExp: fixedExp + varExp, profit: revenue - fixedExp - varExp, byCategory };
@@ -540,7 +559,7 @@ export default function FinancePage() {
               </div>
 
               {/* 3 KPIs — Entradas / Saídas / Resultado */}
-              <div className="grid grid-cols-3 gap-4 pt-5 border-t border-white/10">
+              <div className="grid grid-cols-3 gap-5 sm:gap-8 pt-5 border-t border-white/10">
                 <div>
                   <div className="flex items-center gap-1.5 text-success text-[10px] uppercase tracking-[0.18em] font-bold">
                     <ArrowUpRight className="h-3.5 w-3.5" /> Entradas
@@ -1022,10 +1041,12 @@ export default function FinancePage() {
                 <span className="text-sm text-muted-foreground">(-) Despesas Fixas</span>
                 <span className="text-sm text-destructive">{formatBRL(dreData.fixedExp)}</span>
               </div>
+              <p className="text-[10px] text-muted-foreground pl-4 -mt-2">Aluguel, Salários, Água/Luz/Internet, Manutenção</p>
               <div className="flex justify-between py-2 pl-4">
                 <span className="text-sm text-muted-foreground">(-) Despesas Variáveis</span>
                 <span className="text-sm text-destructive">{formatBRL(dreData.varExp)}</span>
               </div>
+              <p className="text-[10px] text-muted-foreground pl-4 -mt-2">Materiais, Impostos, Comissões, Fretes, Mão de obra extra</p>
               {Object.entries(dreData.byCategory).length > 0 && (
                 <div className="pl-8 space-y-1 border-l-2 border-muted ml-4">
                   {Object.entries(dreData.byCategory).map(([cat, val]) => (
@@ -1282,9 +1303,9 @@ export default function FinancePage() {
                       <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Cliente</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">Receita</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden sm:table-cell">Material</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden md:table-cell">Combustível</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden md:table-cell">Alimentação</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden md:table-cell">Mão de obra</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden lg:table-cell">Frete</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden lg:table-cell">Outros</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">Lucro</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">Margem</th>
                     </tr>
@@ -1295,11 +1316,20 @@ export default function FinancePage() {
                         <td className="px-3 py-2 text-sm font-medium">{c.name}</td>
                         <td className="px-3 py-2 text-sm text-right text-success">{formatBRL(c.income)}</td>
                         <td className="px-3 py-2 text-sm text-right text-destructive hidden sm:table-cell">{formatBRL(c.material)}</td>
-                        <td className="px-3 py-2 text-sm text-right text-destructive hidden md:table-cell">{formatBRL(c.fuel)}</td>
-                        <td className="px-3 py-2 text-sm text-right text-destructive hidden md:table-cell">{formatBRL(c.food)}</td>
+                        <td className="px-3 py-2 text-sm text-right text-destructive hidden md:table-cell">{formatBRL(c.labor)}</td>
                         <td className="px-3 py-2 text-sm text-right text-destructive hidden lg:table-cell">{formatBRL(c.transport)}</td>
+                        <td className="px-3 py-2 text-sm text-right text-destructive hidden lg:table-cell">{formatBRL(c.fuel + c.food + c.other)}</td>
                         <td className={`px-3 py-2 text-sm text-right font-bold ${c.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatBRL(c.profit)}</td>
-                        <td className="px-3 py-2 text-sm text-right">{c.margin.toFixed(1)}%</td>
+                        <td className="px-3 py-2 text-sm text-right">
+                          <div className="inline-flex items-center gap-1 justify-end">
+                            <span>{c.margin.toFixed(1)}%</span>
+                            {c.noCostsLinked && (
+                              <span title="Não há custos de materiais ou mão de obra vinculados a este projeto. Vincule despesas no lançamento para refletir a margem real.">
+                                <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                              </span>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1471,6 +1501,7 @@ export default function FinancePage() {
         userId={user!.id}
         clients={clients}
         bankAccounts={bankAccountsWithBalance}
+        budgets={budgetsList}
         onSaved={fetchAll}
         editTransaction={editingTransaction}
       />

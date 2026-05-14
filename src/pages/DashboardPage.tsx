@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
 import { summarizeFinance } from '@/lib/finance-calc';
+import { isFixedExpense } from '@/lib/financial';
 
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
@@ -42,7 +43,7 @@ const eventColors: Record<string, string> = {
   producao: 'text-primary bg-primary/10 border-primary/20',
 };
 
-interface Tx { id: string; type: string; amount: number; date: string; due_date: string | null; status: string; }
+interface Tx { id: string; type: string; amount: number; date: string; due_date: string | null; status: string; category: string; is_fixed: boolean; }
 interface Budget { id: string; status: string; final_price: number; created_at?: string; client_id?: string | null; clients?: { name: string } | null; }
 interface Task { id: string; stage: string; project_name: string; client_name: string; due_date: string | null; }
 interface ClientRow { id: string; name: string; city: string | null; state: string | null; total_spent: number | null; budgets_count: number | null; }
@@ -97,7 +98,7 @@ export default function DashboardPage() {
   const fetchData = useCallback(async () => {
     if (!user) return;
     const [txRes, budRes, taskRes, settingsRes, clientsRes] = await Promise.all([
-      supabase.from('financial_transactions').select('id, type, amount, date, due_date, status'),
+      supabase.from('financial_transactions').select('id, type, amount, date, due_date, status, category, is_fixed'),
       supabase.from('budgets').select('id, status, final_price, created_at, client_id, clients(name)').order('created_at', { ascending: false }),
       supabase.from('production_tasks').select('id, stage, project_name, client_name, due_date'),
       supabase.from('company_settings').select('monthly_goal').maybeSingle(),
@@ -168,6 +169,23 @@ export default function DashboardPage() {
   const margin = summary.margin;
   const goalProgress = monthlyGoal > 0 ? Math.min(100, (monthIncome / monthlyGoal) * 100) : 0;
   const goalRemaining = Math.max(0, monthlyGoal - monthIncome);
+
+  // ===== Ponto de Equilíbrio (Break-Even) =====
+  const breakEven = useMemo(() => {
+    const paid = filteredTransactions.filter(t => t.status === 'paid');
+    const revenue = paid.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
+    const fixed = paid
+      .filter(t => t.type === 'expense' && isFixedExpense(t.category, t.is_fixed))
+      .reduce((s, t) => s + Number(t.amount), 0);
+    const variable = paid
+      .filter(t => t.type === 'expense' && !isFixedExpense(t.category, t.is_fixed))
+      .reduce((s, t) => s + Number(t.amount), 0);
+    // Margem de Contribuição = (Receita - Custos Variáveis) / Receita
+    const contributionMargin = revenue > 0 ? (revenue - variable) / revenue : 0;
+    const point = contributionMargin > 0 ? fixed / contributionMargin : 0;
+    const coverage = point > 0 ? Math.min(100, (revenue / point) * 100) : (fixed === 0 ? 100 : 0);
+    return { fixed, variable, revenue, contributionMargin, point, coverage };
+  }, [filteredTransactions]);
 
   // ===== Projetos =====
   const activeProjects = useMemo(() => filteredTasks.filter(t => t.stage !== 'entregue'), [filteredTasks]);
@@ -400,7 +418,7 @@ export default function DashboardPage() {
       )}
 
       {/* ============ 4 KPIs EXECUTIVOS ============ */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 sm:gap-6 grid-cols-2 lg:grid-cols-4">
         {/* Faturamento */}
         <motion.div variants={itemVariants}>
           <Card className="overflow-hidden hover:shadow-soft transition-all">
@@ -490,6 +508,52 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
+      {/* ============ PONTO DE EQUILÍBRIO ============ */}
+      <motion.div variants={itemVariants}>
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-display flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              Ponto de Equilíbrio
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Custos Fixos</p>
+                <p className="text-xl font-bold font-display tabular-nums mt-1">{formatBRL(breakEven.fixed)}</p>
+                <p className="text-[10px] text-muted-foreground">Aluguel, salários, água/luz…</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Margem de Contribuição</p>
+                <p className="text-xl font-bold font-display tabular-nums mt-1">{(breakEven.contributionMargin * 100).toFixed(1)}%</p>
+                <p className="text-[10px] text-muted-foreground">(Receita − Variáveis) / Receita</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Faturar para empatar</p>
+                <p className="text-xl font-bold font-display tabular-nums mt-1 text-primary">{breakEven.point > 0 ? formatBRL(breakEven.point) : '—'}</p>
+                <p className="text-[10px] text-muted-foreground">No período selecionado</p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Cobertura dos custos fixos</span>
+                <span className={`font-semibold ${breakEven.coverage >= 100 ? 'text-success' : breakEven.coverage >= 70 ? 'text-warning' : 'text-destructive'}`}>
+                  {breakEven.coverage.toFixed(0)}%
+                </span>
+              </div>
+              <Progress value={breakEven.coverage} className="h-2" />
+              <p className="text-[11px] text-muted-foreground">
+                {breakEven.coverage >= 100
+                  ? '🎯 Você já cobriu todos os custos fixos. Cada real a mais é lucro.'
+                  : breakEven.point > 0
+                  ? `Você já cobriu ${breakEven.coverage.toFixed(0)}% dos seus custos fixos. Faltam ${formatBRL(Math.max(0, breakEven.point - breakEven.revenue))} para empatar.`
+                  : 'Sem dados suficientes — registre receitas e despesas no período.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
       {/* ============ TAXA DE CONVERSÃO + REGIÕES ============ */}
       <motion.div variants={itemVariants} className="grid gap-4 lg:grid-cols-3">
         {/* Conversão */}

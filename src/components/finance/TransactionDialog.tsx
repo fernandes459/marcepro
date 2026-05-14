@@ -19,6 +19,7 @@ import { FinancialCategoryOption, mergeFinancialCategories } from '@/lib/financi
 
 interface Client { id: string; name: string; }
 interface BankAccount { id: string; name: string; bank_name: string | null; current_balance: number; }
+interface BudgetLite { id: string; project_name: string | null; code: string; client_id: string | null; }
 interface EmployeeLite { id: string; name: string; }
 
 const LABOR_CATEGORIES = ['salary', 'labor', 'commission'];
@@ -47,6 +48,7 @@ interface TransactionDialogProps {
   userId: string;
   clients: Client[];
   bankAccounts: BankAccount[];
+  budgets?: BudgetLite[];
   onSaved: () => void;
   editTransaction?: {
     id: string; type: string; category: string; description: string;
@@ -54,10 +56,11 @@ interface TransactionDialogProps {
     is_fixed: boolean; recurrence: string; notes: string | null;
     client_id: string | null; order_number: string | null;
     bank_account_id: string | null; payment_method: string | null;
+    budget_id?: string | null;
   } | null;
 }
 
-export function TransactionDialog({ open, onOpenChange, userId, clients, bankAccounts, onSaved, editTransaction }: TransactionDialogProps) {
+export function TransactionDialog({ open, onOpenChange, userId, clients, bankAccounts, budgets = [], onSaved, editTransaction }: TransactionDialogProps) {
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -69,6 +72,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
   const [recurrence, setRecurrence] = useState('monthly');
   const [notes, setNotes] = useState('');
   const [clientId, setClientId] = useState('');
+  const [budgetId, setBudgetId] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
   const [subcategory, setSubcategory] = useState('');
@@ -122,6 +126,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
       setRecurrence(editTransaction.recurrence || 'monthly');
       setNotes(editTransaction.notes || '');
       setClientId(editTransaction.client_id || '');
+      setBudgetId(editTransaction.budget_id || '');
       setOrderNumber(editTransaction.order_number || '');
       setBankAccountId(editTransaction.bank_account_id || '');
       setSubcategory((editTransaction as any).subcategory || '');
@@ -140,7 +145,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
   function resetForm() {
     setType('expense'); setCategory(''); setDescription(''); setTotalAmount(0);
     setDate(new Date().toISOString().slice(0, 10)); setDueDate(''); setStatus('pending');
-    setIsFixed(false); setRecurrence('monthly'); setNotes(''); setClientId('');
+    setIsFixed(false); setRecurrence('monthly'); setNotes(''); setClientId(''); setBudgetId('');
     setOrderNumber(''); setBankAccountId(''); setUseSplitPayment(false);
     setSubcategory('');
     setPayments([{ id: '1', method: 'pix', amount: 0, installments: 1, machineDiscount: 0 }]);
@@ -205,6 +210,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
       date, due_date: dueDate || null, status, is_fixed: isFixed,
       payment_method: paymentMethod, recurrence: isFixed ? recurrence : 'none',
       notes: finalNotes || null, client_id: clientId || null,
+      budget_id: budgetId || null,
       order_number: orderNumber || null, bank_account_id: bankAccountId || null,
       subcategory: subcategory || null,
     };
@@ -246,7 +252,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Select value={clientId || 'none'} onValueChange={v => setClientId(v === 'none' ? '' : v)}>
+              <Select value={clientId || 'none'} onValueChange={v => { setClientId(v === 'none' ? '' : v); setBudgetId(''); }}>
                 <SelectTrigger><SelectValue placeholder="Vincular cliente" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
@@ -259,6 +265,35 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
               <Input value={orderNumber} onChange={e => setOrderNumber(e.target.value)} placeholder="Ex: OS-001" />
             </div>
           </div>
+
+          {/* Vincular ao Projeto/Orçamento (alimenta Lucro por Cliente) */}
+          {budgets.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                Vincular ao Projeto / Orçamento
+                <span className="text-[10px] text-muted-foreground font-normal">(opcional — alimenta o Lucro por Cliente)</span>
+              </Label>
+              <Select value={budgetId || 'none'} onValueChange={v => {
+                if (v === 'none') { setBudgetId(''); return; }
+                setBudgetId(v);
+                const b = budgets.find(x => x.id === v);
+                if (b?.client_id && !clientId) setClientId(b.client_id);
+              }}>
+                <SelectTrigger><SelectValue placeholder="Selecionar projeto" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {(clientId
+                    ? budgets.filter(b => b.client_id === clientId)
+                    : budgets
+                  ).slice(0, 60).map(b => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.code}{b.project_name ? ` — ${b.project_name}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Category + Description */}
           <div className="grid grid-cols-2 gap-4">

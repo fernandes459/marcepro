@@ -24,6 +24,31 @@ export const DEFAULT_EXPENSE_CATEGORIES: FinancialCategoryOption[] = [
   { value: 'other_expense', label: 'Outras Despesas', type: 'expense', isSystem: true, color: 'hsl(var(--muted-foreground))', sortOrder: 14 },
 ];
 
+// Categorias estruturalmente fixas (independente do flag is_fixed do lançamento).
+// Usadas no DRE e no cálculo de Ponto de Equilíbrio.
+export const FIXED_EXPENSE_CATEGORIES = new Set<string>([
+  'rent',        // Aluguel
+  'salary',      // Salários / Funcionários fixos
+  'utilities',   // Água / Luz / Internet
+  'maintenance', // Manutenção recorrente da oficina
+]);
+
+// Categorias variáveis: variam diretamente com o volume de produção/projetos.
+export const VARIABLE_EXPENSE_CATEGORIES = new Set<string>([
+  'material',    // Materiais
+  'taxes',       // Impostos sobre venda
+  'commission',  // Comissões
+  'transport',   // Fretes
+  'labor',       // Mão de obra extra por projeto
+  'fuel',        // Combustível por entrega
+]);
+
+export function isFixedExpense(category: string, isFixedFlag?: boolean) {
+  if (FIXED_EXPENSE_CATEGORIES.has(category)) return true;
+  if (VARIABLE_EXPENSE_CATEGORIES.has(category)) return false;
+  return Boolean(isFixedFlag);
+}
+
 export const DEFAULT_INCOME_CATEGORIES: FinancialCategoryOption[] = [
   { value: 'project', label: 'Projeto / Orçamento', type: 'income', isSystem: true, color: 'hsl(var(--success))', sortOrder: 1 },
   { value: 'installment', label: 'Parcela de Projeto', type: 'income', isSystem: true, color: 'hsl(var(--primary))', sortOrder: 2 },
