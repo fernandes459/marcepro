@@ -48,6 +48,7 @@ interface TransactionDialogProps {
   userId: string;
   clients: Client[];
   bankAccounts: BankAccount[];
+  budgets?: BudgetLite[];
   onSaved: () => void;
   editTransaction?: {
     id: string; type: string; category: string; description: string;
@@ -55,6 +56,7 @@ interface TransactionDialogProps {
     is_fixed: boolean; recurrence: string; notes: string | null;
     client_id: string | null; order_number: string | null;
     bank_account_id: string | null; payment_method: string | null;
+    budget_id?: string | null;
   } | null;
 }
 
