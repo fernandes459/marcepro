@@ -60,7 +60,7 @@ interface TransactionDialogProps {
   } | null;
 }
 
-export function TransactionDialog({ open, onOpenChange, userId, clients, bankAccounts, onSaved, editTransaction }: TransactionDialogProps) {
+export function TransactionDialog({ open, onOpenChange, userId, clients, bankAccounts, budgets = [], onSaved, editTransaction }: TransactionDialogProps) {
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -72,6 +72,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
   const [recurrence, setRecurrence] = useState('monthly');
   const [notes, setNotes] = useState('');
   const [clientId, setClientId] = useState('');
+  const [budgetId, setBudgetId] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
   const [subcategory, setSubcategory] = useState('');
