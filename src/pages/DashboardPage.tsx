@@ -418,7 +418,7 @@ export default function DashboardPage() {
       )}
 
       {/* ============ 4 KPIs EXECUTIVOS ============ */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 sm:gap-6 grid-cols-2 lg:grid-cols-4">
         {/* Faturamento */}
         <motion.div variants={itemVariants}>
           <Card className="overflow-hidden hover:shadow-soft transition-all">
