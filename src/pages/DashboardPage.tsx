@@ -508,6 +508,52 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
+      {/* ============ PONTO DE EQUILÍBRIO ============ */}
+      <motion.div variants={itemVariants}>
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-display flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              Ponto de Equilíbrio
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Custos Fixos</p>
+                <p className="text-xl font-bold font-display tabular-nums mt-1">{formatBRL(breakEven.fixed)}</p>
+                <p className="text-[10px] text-muted-foreground">Aluguel, salários, água/luz…</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Margem de Contribuição</p>
+                <p className="text-xl font-bold font-display tabular-nums mt-1">{(breakEven.contributionMargin * 100).toFixed(1)}%</p>
+                <p className="text-[10px] text-muted-foreground">(Receita − Variáveis) / Receita</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Faturar para empatar</p>
+                <p className="text-xl font-bold font-display tabular-nums mt-1 text-primary">{breakEven.point > 0 ? formatBRL(breakEven.point) : '—'}</p>
+                <p className="text-[10px] text-muted-foreground">No período selecionado</p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Cobertura dos custos fixos</span>
+                <span className={`font-semibold ${breakEven.coverage >= 100 ? 'text-success' : breakEven.coverage >= 70 ? 'text-warning' : 'text-destructive'}`}>
+                  {breakEven.coverage.toFixed(0)}%
+                </span>
+              </div>
+              <Progress value={breakEven.coverage} className="h-2" />
+              <p className="text-[11px] text-muted-foreground">
+                {breakEven.coverage >= 100
+                  ? '🎯 Você já cobriu todos os custos fixos. Cada real a mais é lucro.'
+                  : breakEven.point > 0
+                  ? `Você já cobriu ${breakEven.coverage.toFixed(0)}% dos seus custos fixos. Faltam ${formatBRL(Math.max(0, breakEven.point - breakEven.revenue))} para empatar.`
+                  : 'Sem dados suficientes — registre receitas e despesas no período.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
       {/* ============ TAXA DE CONVERSÃO + REGIÕES ============ */}
       <motion.div variants={itemVariants} className="grid gap-4 lg:grid-cols-3">
         {/* Conversão */}
