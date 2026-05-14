@@ -28,7 +28,7 @@ import ReceivableDetailDialog from '@/components/finance/ReceivableDetailDialog'
 import CollaboratorTab from '@/components/finance/CollaboratorTab';
 import FinancialAdvisor from '@/components/finance/FinancialAdvisor';
 import { useFinancialInsights, computeFinancialMetrics } from '@/hooks/useFinancialInsights';
-import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories } from '@/lib/financial';
+import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories, isFixedExpense } from '@/lib/financial';
 import { calculateAccountBalances, calculateAvailableBalance, summarizeFinance } from '@/lib/finance-calc';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
