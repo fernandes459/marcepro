@@ -98,7 +98,7 @@ export default function DashboardPage() {
   const fetchData = useCallback(async () => {
     if (!user) return;
     const [txRes, budRes, taskRes, settingsRes, clientsRes] = await Promise.all([
-      supabase.from('financial_transactions').select('id, type, amount, date, due_date, status'),
+      supabase.from('financial_transactions').select('id, type, amount, date, due_date, status, category, is_fixed'),
       supabase.from('budgets').select('id, status, final_price, created_at, client_id, clients(name)').order('created_at', { ascending: false }),
       supabase.from('production_tasks').select('id, stage, project_name, client_name, due_date'),
       supabase.from('company_settings').select('monthly_goal').maybeSingle(),
