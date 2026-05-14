@@ -408,36 +408,55 @@ export default function FinancePage() {
   }, [periodTransactions]);
 
   const clientProfitData = useMemo(() => {
-    const map: Record<string, { name: string; income: number; material: number; fuel: number; food: number; transport: number; other: number }> = {};
+    const map: Record<string, { name: string; income: number; material: number; labor: number; fuel: number; food: number; transport: number; other: number; linkedBudget: boolean }> = {};
+
+    function resolveClientId(t: Transaction): string | null {
+      if (t.client_id) return t.client_id;
+      if (t.budget_id) {
+        const b = budgetsList.find(b => b.id === t.budget_id);
+        return b?.client_id || null;
+      }
+      return null;
+    }
+
     periodTransactions.forEach(t => {
-      if (!t.client_id) return;
-      const client = clients.find(c => c.id === t.client_id);
+      const cid = resolveClientId(t);
+      if (!cid) return;
+      const client = clients.find(c => c.id === cid);
       if (!client) return;
-      if (!map[t.client_id]) map[t.client_id] = { name: client.name, income: 0, material: 0, fuel: 0, food: 0, transport: 0, other: 0 };
-      if (t.type === 'income') map[t.client_id].income += Number(t.amount);
+      if (!map[cid]) map[cid] = { name: client.name, income: 0, material: 0, labor: 0, fuel: 0, food: 0, transport: 0, other: 0, linkedBudget: false };
+      if (t.budget_id) map[cid].linkedBudget = true;
+      if (t.type === 'income') map[cid].income += Number(t.amount);
       else {
-        if (t.category === 'material') map[t.client_id].material += Number(t.amount);
-        else if (t.category === 'fuel') map[t.client_id].fuel += Number(t.amount);
-        else if (t.category === 'food') map[t.client_id].food += Number(t.amount);
-        else if (t.category === 'transport') map[t.client_id].transport += Number(t.amount);
-        else map[t.client_id].other += Number(t.amount);
+        if (t.category === 'material') map[cid].material += Number(t.amount);
+        else if (t.category === 'labor' || t.category === 'commission') map[cid].labor += Number(t.amount);
+        else if (t.category === 'fuel') map[cid].fuel += Number(t.amount);
+        else if (t.category === 'food') map[cid].food += Number(t.amount);
+        else if (t.category === 'transport') map[cid].transport += Number(t.amount);
+        else map[cid].other += Number(t.amount);
       }
     });
-    return Object.values(map).map(c => ({
-      ...c,
-      totalExpense: c.material + c.fuel + c.food + c.transport + c.other,
-      profit: c.income - (c.material + c.fuel + c.food + c.transport + c.other),
-      margin: c.income > 0 ? ((c.income - (c.material + c.fuel + c.food + c.transport + c.other)) / c.income * 100) : 0,
-    })).sort((a, b) => b.profit - a.profit);
-  }, [periodTransactions, clients]);
+    return Object.values(map).map(c => {
+      const totalExpense = c.material + c.labor + c.fuel + c.food + c.transport + c.other;
+      const profit = c.income - totalExpense;
+      return {
+        ...c,
+        totalExpense,
+        profit,
+        margin: c.income > 0 ? (profit / c.income * 100) : 0,
+        noCostsLinked: c.income > 0 && totalExpense === 0,
+      };
+    }).sort((a, b) => b.profit - a.profit);
+  }, [periodTransactions, clients, budgetsList]);
 
   const dreData = useMemo(() => {
     const monthTx = periodTransactions;
     const revenue = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
-    const fixedExp = monthTx.filter(t => t.type === 'expense' && t.is_fixed).reduce((s, t) => s + Number(t.amount), 0);
-    const varExp = monthTx.filter(t => t.type === 'expense' && !t.is_fixed).reduce((s, t) => s + Number(t.amount), 0);
+    const expenses = monthTx.filter(t => t.type === 'expense');
+    const fixedExp = expenses.filter(t => isFixedExpense(t.category, t.is_fixed)).reduce((s, t) => s + Number(t.amount), 0);
+    const varExp = expenses.filter(t => !isFixedExpense(t.category, t.is_fixed)).reduce((s, t) => s + Number(t.amount), 0);
     const byCategory: Record<string, number> = {};
-    monthTx.filter(t => t.type === 'expense').forEach(t => {
+    expenses.forEach(t => {
       byCategory[t.category] = (byCategory[t.category] || 0) + Number(t.amount);
     });
     return { revenue, fixedExp, varExp, totalExp: fixedExp + varExp, profit: revenue - fixedExp - varExp, byCategory };
