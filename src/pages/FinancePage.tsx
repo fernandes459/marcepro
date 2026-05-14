@@ -1501,6 +1501,7 @@ export default function FinancePage() {
         userId={user!.id}
         clients={clients}
         bankAccounts={bankAccountsWithBalance}
+        budgets={budgetsList}
         onSaved={fetchAll}
         editTransaction={editingTransaction}
       />
