@@ -210,6 +210,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
       date, due_date: dueDate || null, status, is_fixed: isFixed,
       payment_method: paymentMethod, recurrence: isFixed ? recurrence : 'none',
       notes: finalNotes || null, client_id: clientId || null,
+      budget_id: budgetId || null,
       order_number: orderNumber || null, bank_account_id: bankAccountId || null,
       subcategory: subcategory || null,
     };
