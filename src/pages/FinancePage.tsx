@@ -1041,10 +1041,12 @@ export default function FinancePage() {
                 <span className="text-sm text-muted-foreground">(-) Despesas Fixas</span>
                 <span className="text-sm text-destructive">{formatBRL(dreData.fixedExp)}</span>
               </div>
+              <p className="text-[10px] text-muted-foreground pl-4 -mt-2">Aluguel, Salários, Água/Luz/Internet, Manutenção</p>
               <div className="flex justify-between py-2 pl-4">
                 <span className="text-sm text-muted-foreground">(-) Despesas Variáveis</span>
                 <span className="text-sm text-destructive">{formatBRL(dreData.varExp)}</span>
               </div>
+              <p className="text-[10px] text-muted-foreground pl-4 -mt-2">Materiais, Impostos, Comissões, Fretes, Mão de obra extra</p>
               {Object.entries(dreData.byCategory).length > 0 && (
                 <div className="pl-8 space-y-1 border-l-2 border-muted ml-4">
                   {Object.entries(dreData.byCategory).map(([cat, val]) => (
