@@ -186,9 +186,21 @@ export default function CollaboratorTab({ userId, budgets, clients, bankAccounts
         </Card>
         <Card className="border-l-4 border-l-info">
           <CardContent className="p-4">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Colaboradores ativos</p>
-            <p className="text-xl font-bold font-display text-info mt-1 tabular-nums">{employees.length}</p>
-            <p className="text-[10px] text-muted-foreground">cadastrados</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Capacidade Operacional</p>
+            {(() => {
+              const monthlyCapacity = employees.length * 176; // 8h × 22 dias úteis
+              const used = totals.hours + totals.days * 8;
+              const pct = monthlyCapacity > 0 ? Math.min(150, (used / monthlyCapacity) * 100) : 0;
+              const label = pct >= 95 ? 'Sobrecarga' : pct >= 70 ? 'Saudável' : pct > 0 ? 'Ociosa' : '—';
+              const color = pct >= 95 ? 'text-destructive' : pct >= 70 ? 'text-success' : pct > 0 ? 'text-warning' : 'text-muted-foreground';
+              return (
+                <>
+                  <p className={`text-xl font-bold font-display tabular-nums mt-1 ${color}`}>{pct.toFixed(0)}%</p>
+                  <p className="text-[10px] text-muted-foreground">{used.toFixed(0)}h de {monthlyCapacity}h • {label}</p>
+                  <p className="text-[10px] text-muted-foreground">{employees.length} colab. ativos</p>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
