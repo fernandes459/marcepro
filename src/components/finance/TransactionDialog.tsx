@@ -252,7 +252,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Select value={clientId || 'none'} onValueChange={v => setClientId(v === 'none' ? '' : v)}>
+              <Select value={clientId || 'none'} onValueChange={v => { setClientId(v === 'none' ? '' : v); setBudgetId(''); }}>
                 <SelectTrigger><SelectValue placeholder="Vincular cliente" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
@@ -265,6 +265,35 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
               <Input value={orderNumber} onChange={e => setOrderNumber(e.target.value)} placeholder="Ex: OS-001" />
             </div>
           </div>
+
+          {/* Vincular ao Projeto/Orçamento (alimenta Lucro por Cliente) */}
+          {budgets.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                Vincular ao Projeto / Orçamento
+                <span className="text-[10px] text-muted-foreground font-normal">(opcional — alimenta o Lucro por Cliente)</span>
+              </Label>
+              <Select value={budgetId || 'none'} onValueChange={v => {
+                if (v === 'none') { setBudgetId(''); return; }
+                setBudgetId(v);
+                const b = budgets.find(x => x.id === v);
+                if (b?.client_id && !clientId) setClientId(b.client_id);
+              }}>
+                <SelectTrigger><SelectValue placeholder="Selecionar projeto" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {(clientId
+                    ? budgets.filter(b => b.client_id === clientId)
+                    : budgets
+                  ).slice(0, 60).map(b => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.code}{b.project_name ? ` — ${b.project_name}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Category + Description */}
           <div className="grid grid-cols-2 gap-4">
