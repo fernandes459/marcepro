@@ -19,6 +19,7 @@ import { FinancialCategoryOption, mergeFinancialCategories } from '@/lib/financi
 
 interface Client { id: string; name: string; }
 interface BankAccount { id: string; name: string; bank_name: string | null; current_balance: number; }
+interface BudgetLite { id: string; project_name: string | null; code: string; client_id: string | null; }
 interface EmployeeLite { id: string; name: string; }
 
 const LABOR_CATEGORIES = ['salary', 'labor', 'commission'];
