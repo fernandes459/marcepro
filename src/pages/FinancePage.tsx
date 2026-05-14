@@ -1303,9 +1303,9 @@ export default function FinancePage() {
                       <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Cliente</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">Receita</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden sm:table-cell">Material</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden md:table-cell">Combustível</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden md:table-cell">Alimentação</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden md:table-cell">Mão de obra</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden lg:table-cell">Frete</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground hidden lg:table-cell">Outros</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">Lucro</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">Margem</th>
                     </tr>
@@ -1316,11 +1316,20 @@ export default function FinancePage() {
                         <td className="px-3 py-2 text-sm font-medium">{c.name}</td>
                         <td className="px-3 py-2 text-sm text-right text-success">{formatBRL(c.income)}</td>
                         <td className="px-3 py-2 text-sm text-right text-destructive hidden sm:table-cell">{formatBRL(c.material)}</td>
-                        <td className="px-3 py-2 text-sm text-right text-destructive hidden md:table-cell">{formatBRL(c.fuel)}</td>
-                        <td className="px-3 py-2 text-sm text-right text-destructive hidden md:table-cell">{formatBRL(c.food)}</td>
+                        <td className="px-3 py-2 text-sm text-right text-destructive hidden md:table-cell">{formatBRL(c.labor)}</td>
                         <td className="px-3 py-2 text-sm text-right text-destructive hidden lg:table-cell">{formatBRL(c.transport)}</td>
+                        <td className="px-3 py-2 text-sm text-right text-destructive hidden lg:table-cell">{formatBRL(c.fuel + c.food + c.other)}</td>
                         <td className={`px-3 py-2 text-sm text-right font-bold ${c.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatBRL(c.profit)}</td>
-                        <td className="px-3 py-2 text-sm text-right">{c.margin.toFixed(1)}%</td>
+                        <td className="px-3 py-2 text-sm text-right">
+                          <div className="inline-flex items-center gap-1 justify-end">
+                            <span>{c.margin.toFixed(1)}%</span>
+                            {c.noCostsLinked && (
+                              <span title="Não há custos de materiais ou mão de obra vinculados a este projeto. Vincule despesas no lançamento para refletir a margem real.">
+                                <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                              </span>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
