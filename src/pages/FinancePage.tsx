@@ -559,7 +559,7 @@ export default function FinancePage() {
               </div>
 
               {/* 3 KPIs — Entradas / Saídas / Resultado */}
-              <div className="grid grid-cols-3 gap-4 pt-5 border-t border-white/10">
+              <div className="grid grid-cols-3 gap-5 sm:gap-8 pt-5 border-t border-white/10">
                 <div>
                   <div className="flex items-center gap-1.5 text-success text-[10px] uppercase tracking-[0.18em] font-bold">
                     <ArrowUpRight className="h-3.5 w-3.5" /> Entradas
