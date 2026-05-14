@@ -145,7 +145,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
   function resetForm() {
     setType('expense'); setCategory(''); setDescription(''); setTotalAmount(0);
     setDate(new Date().toISOString().slice(0, 10)); setDueDate(''); setStatus('pending');
-    setIsFixed(false); setRecurrence('monthly'); setNotes(''); setClientId('');
+    setIsFixed(false); setRecurrence('monthly'); setNotes(''); setClientId(''); setBudgetId('');
     setOrderNumber(''); setBankAccountId(''); setUseSplitPayment(false);
     setSubcategory('');
     setPayments([{ id: '1', method: 'pix', amount: 0, installments: 1, machineDiscount: 0 }]);
