@@ -170,6 +170,23 @@ export default function DashboardPage() {
   const goalProgress = monthlyGoal > 0 ? Math.min(100, (monthIncome / monthlyGoal) * 100) : 0;
   const goalRemaining = Math.max(0, monthlyGoal - monthIncome);
 
+  // ===== Ponto de Equilíbrio (Break-Even) =====
+  const breakEven = useMemo(() => {
+    const paid = filteredTransactions.filter(t => t.status === 'paid');
+    const revenue = paid.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
+    const fixed = paid
+      .filter(t => t.type === 'expense' && isFixedExpense(t.category, t.is_fixed))
+      .reduce((s, t) => s + Number(t.amount), 0);
+    const variable = paid
+      .filter(t => t.type === 'expense' && !isFixedExpense(t.category, t.is_fixed))
+      .reduce((s, t) => s + Number(t.amount), 0);
+    // Margem de Contribuição = (Receita - Custos Variáveis) / Receita
+    const contributionMargin = revenue > 0 ? (revenue - variable) / revenue : 0;
+    const point = contributionMargin > 0 ? fixed / contributionMargin : 0;
+    const coverage = point > 0 ? Math.min(100, (revenue / point) * 100) : (fixed === 0 ? 100 : 0);
+    return { fixed, variable, revenue, contributionMargin, point, coverage };
+  }, [filteredTransactions]);
+
   // ===== Projetos =====
   const activeProjects = useMemo(() => filteredTasks.filter(t => t.stage !== 'entregue'), [filteredTasks]);
   const overdueProjects = useMemo(
