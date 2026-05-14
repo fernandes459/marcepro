@@ -126,6 +126,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
       setRecurrence(editTransaction.recurrence || 'monthly');
       setNotes(editTransaction.notes || '');
       setClientId(editTransaction.client_id || '');
+      setBudgetId(editTransaction.budget_id || '');
       setOrderNumber(editTransaction.order_number || '');
       setBankAccountId(editTransaction.bank_account_id || '');
       setSubcategory((editTransaction as any).subcategory || '');
