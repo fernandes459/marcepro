@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
 import { summarizeFinance } from '@/lib/finance-calc';
 import { isFixedExpense } from '@/lib/financial';
+import ExecutiveAIPanel, { type ExecutiveMetrics } from '@/components/dashboard/ExecutiveAIPanel';
 
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
