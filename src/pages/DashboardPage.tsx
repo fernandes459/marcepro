@@ -247,6 +247,43 @@ export default function DashboardPage() {
     [filteredTransactions, todayISO]
   );
 
+  // ===== Métricas executivas (alimenta IA) =====
+  const executiveMetrics = useMemo<ExecutiveMetrics>(() => {
+    const overdueAmount = overdueReceivables.reduce((s, r) => s + Number(r.amount || 0), 0);
+    const expenseByCat = new Map<string, number>();
+    filteredTransactions.filter(t => t.type === 'expense').forEach(t => {
+      expenseByCat.set(t.category, (expenseByCat.get(t.category) ?? 0) + Number(t.amount || 0));
+    });
+    const topExpenseCategories = Array.from(expenseByCat.entries())
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount).slice(0, 3);
+    const topClients = [...clientsList]
+      .sort((a, b) => Number(b.total_spent || 0) - Number(a.total_spent || 0))
+      .slice(0, 3)
+      .map(c => ({ name: c.name, revenue: Number(c.total_spent || 0) }));
+    const margin = monthIncome > 0 ? (monthProfit / monthIncome) * 100 : 0;
+
+    return {
+      period_label: periodLabel,
+      revenue: monthIncome,
+      fixed_expenses: breakEven.fixed,
+      variable_expenses: breakEven.variable,
+      total_expenses: monthExpense,
+      profit: monthProfit,
+      margin_percent: margin,
+      cash_balance: 0,
+      overdue_receivables: overdueAmount,
+      overdue_count: overdueReceivables.length,
+      active_projects: activeProjects.length,
+      delivered_projects: deliveredProjects.length,
+      pending_assistance: assistanceProjects.length,
+      break_even: breakEven.point,
+      monthly_goal: monthlyGoal,
+      top_clients: topClients,
+      top_expense_categories: topExpenseCategories,
+    };
+  }, [periodLabel, monthIncome, monthExpense, monthProfit, breakEven, activeProjects.length, assistanceProjects.length, deliveredProjects.length, monthlyGoal, filteredTransactions, overdueReceivables, clientsList]);
+
   // ===== Taxa de Conversão (orçamentos do período) =====
   const periodBudgets = useMemo(
     () => budgets.filter(b => b.created_at && b.created_at.slice(0, 10) >= period.start && b.created_at.slice(0, 10) <= period.end),
