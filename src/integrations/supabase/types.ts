@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_insights: {
+        Row: {
+          alerts: Json
+          company_id: string | null
+          created_at: string
+          health_label: string | null
+          id: string
+          insights: Json
+          metrics_snapshot: Json
+          model: string | null
+          recommendations: Json
+          scope: string
+          score: number
+          summary: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alerts?: Json
+          company_id?: string | null
+          created_at?: string
+          health_label?: string | null
+          id?: string
+          insights?: Json
+          metrics_snapshot?: Json
+          model?: string | null
+          recommendations?: Json
+          scope?: string
+          score?: number
+          summary?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alerts?: Json
+          company_id?: string | null
+          created_at?: string
+          health_label?: string | null
+          id?: string
+          insights?: Json
+          metrics_snapshot?: Json
+          model?: string | null
+          recommendations?: Json
+          scope?: string
+          score?: number
+          summary?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bank_accounts: {
         Row: {
           account_number: string | null
