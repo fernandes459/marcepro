@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
 import { summarizeFinance } from '@/lib/finance-calc';
 import { isFixedExpense } from '@/lib/financial';
+import ExecutiveAIPanel, { type ExecutiveMetrics } from '@/components/dashboard/ExecutiveAIPanel';
 
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
@@ -194,6 +195,7 @@ export default function DashboardPage() {
     [activeProjects, todayISO]
   );
   const assistanceProjects = useMemo(() => filteredTasks.filter(t => t.stage === 'assistencia'), [filteredTasks]);
+  const deliveredProjects = useMemo(() => filteredTasks.filter(t => t.stage === 'entregue'), [filteredTasks]);
 
   // ===== Agenda da semana =====
   const weekEvents = useMemo(() => {
@@ -244,6 +246,43 @@ export default function DashboardPage() {
     () => filteredTransactions.filter(t => t.type === 'income' && t.status === 'pending' && t.due_date && t.due_date < todayISO),
     [filteredTransactions, todayISO]
   );
+
+  // ===== Métricas executivas (alimenta IA) =====
+  const executiveMetrics = useMemo<ExecutiveMetrics>(() => {
+    const overdueAmount = overdueReceivables.reduce((s, r) => s + Number(r.amount || 0), 0);
+    const expenseByCat = new Map<string, number>();
+    filteredTransactions.filter(t => t.type === 'expense').forEach(t => {
+      expenseByCat.set(t.category, (expenseByCat.get(t.category) ?? 0) + Number(t.amount || 0));
+    });
+    const topExpenseCategories = Array.from(expenseByCat.entries())
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount).slice(0, 3);
+    const topClients = [...clientsList]
+      .sort((a, b) => Number(b.total_spent || 0) - Number(a.total_spent || 0))
+      .slice(0, 3)
+      .map(c => ({ name: c.name, revenue: Number(c.total_spent || 0) }));
+    const margin = monthIncome > 0 ? (monthProfit / monthIncome) * 100 : 0;
+
+    return {
+      period_label: periodLabel,
+      revenue: monthIncome,
+      fixed_expenses: breakEven.fixed,
+      variable_expenses: breakEven.variable,
+      total_expenses: monthExpense,
+      profit: monthProfit,
+      margin_percent: margin,
+      cash_balance: 0,
+      overdue_receivables: overdueAmount,
+      overdue_count: overdueReceivables.length,
+      active_projects: activeProjects.length,
+      delivered_projects: deliveredProjects.length,
+      pending_assistance: assistanceProjects.length,
+      break_even: breakEven.point,
+      monthly_goal: monthlyGoal,
+      top_clients: topClients,
+      top_expense_categories: topExpenseCategories,
+    };
+  }, [periodLabel, monthIncome, monthExpense, monthProfit, breakEven, activeProjects.length, assistanceProjects.length, deliveredProjects.length, monthlyGoal, filteredTransactions, overdueReceivables, clientsList]);
 
   // ===== Taxa de Conversão (orçamentos do período) =====
   const periodBudgets = useMemo(
@@ -554,6 +593,12 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* ============ CONSULTOR EXECUTIVO IA ============ */}
+      <motion.div variants={itemVariants}>
+        <ExecutiveAIPanel metrics={executiveMetrics} />
+      </motion.div>
+
       {/* ============ TAXA DE CONVERSÃO + REGIÕES ============ */}
       <motion.div variants={itemVariants} className="grid gap-4 lg:grid-cols-3">
         {/* Conversão */}

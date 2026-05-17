@@ -1,1 +1,4 @@
 project_id = "vmaicitkrqvpvvicisdb"
+
+[functions.ai-executive-advisor]
+verify_jwt = false
