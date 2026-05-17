@@ -593,6 +593,12 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* ============ CONSULTOR EXECUTIVO IA ============ */}
+      <motion.div variants={itemVariants}>
+        <ExecutiveAIPanel metrics={executiveMetrics} />
+      </motion.div>
+
       {/* ============ TAXA DE CONVERSÃO + REGIÕES ============ */}
       <motion.div variants={itemVariants} className="grid gap-4 lg:grid-cols-3">
         {/* Conversão */}
