@@ -60,7 +60,7 @@ export function useCurrentCompany(): State {
         .eq('owner_id', ownerId)
         .maybeSingle();
 
-      setCompany((companyData as Company | null) ?? null);
+      setCompany((companyData as unknown as Company | null) ?? null);
       setRoles((rolesData ?? []).map((r: any) => r.role as AppRole));
     } catch (err) {
       console.error('useCurrentCompany error:', err);
