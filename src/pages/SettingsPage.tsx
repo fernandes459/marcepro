@@ -455,6 +455,7 @@ export default function SettingsPage() {
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-1" /> Equipe</TabsTrigger>
           <TabsTrigger value="access"><Shield className="h-4 w-4 mr-1" /> Acessos</TabsTrigger>
           <TabsTrigger value="profile"><User className="h-4 w-4 mr-1" /> Perfil</TabsTrigger>
+          <TabsTrigger value="audit"><Activity className="h-4 w-4 mr-1" /> Auditoria</TabsTrigger>
         </TabsList>
 
         {/* Company */}
