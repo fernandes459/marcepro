@@ -917,6 +917,10 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="audit">
+          <AuditLogPanel />
+        </TabsContent>
       </Tabs>
 
       {/* Employee Dialog */}
