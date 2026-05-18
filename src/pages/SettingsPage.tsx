@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard, Package2, Upload, Download, Wallet, Receipt, Calculator, Wrench } from 'lucide-react';
+import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard, Package2, Upload, Download, Wallet, Receipt, Calculator, Wrench, Activity } from 'lucide-react';
 import EngineeringCatalogSettings from '@/components/settings/EngineeringCatalogSettings';
+import AuditLogPanel from '@/components/settings/AuditLogPanel';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -454,6 +455,7 @@ export default function SettingsPage() {
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-1" /> Equipe</TabsTrigger>
           <TabsTrigger value="access"><Shield className="h-4 w-4 mr-1" /> Acessos</TabsTrigger>
           <TabsTrigger value="profile"><User className="h-4 w-4 mr-1" /> Perfil</TabsTrigger>
+          <TabsTrigger value="audit"><Activity className="h-4 w-4 mr-1" /> Auditoria</TabsTrigger>
         </TabsList>
 
         {/* Company */}
@@ -914,6 +916,10 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">Seu email é vinculado à conta de autenticação e não pode ser alterado aqui.</p>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="audit">
+          <AuditLogPanel />
         </TabsContent>
       </Tabs>
 
