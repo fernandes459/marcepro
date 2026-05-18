@@ -124,7 +124,7 @@ export default function CrmPage() {
   }
 
   async function moveStage(id: string, newStage: string) {
-    const patch: Record<string, unknown> = { stage: newStage };
+    const patch: { stage: string; won_at?: string; lost_at?: string } = { stage: newStage };
     if (newStage === 'ganho') patch.won_at = new Date().toISOString();
     if (newStage === 'perdido') patch.lost_at = new Date().toISOString();
     await supabase.from('leads').update(patch).eq('id', id);
