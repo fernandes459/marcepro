@@ -895,6 +895,108 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_interactions: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          description: string
+          id: string
+          kind: string
+          lead_id: string
+          occurred_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          kind?: string
+          lead_id: string
+          occurred_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          kind?: string
+          lead_id?: string
+          occurred_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          assignee: string | null
+          budget_id: string | null
+          client_id: string | null
+          company_id: string | null
+          created_at: string
+          email: string | null
+          estimated_value: number
+          id: string
+          lost_at: string | null
+          lost_reason: string | null
+          name: string
+          next_contact_at: string | null
+          notes: string | null
+          phone: string | null
+          probability: number
+          source: string | null
+          stage: string
+          updated_at: string
+          user_id: string
+          won_at: string | null
+        }
+        Insert: {
+          assignee?: string | null
+          budget_id?: string | null
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          email?: string | null
+          estimated_value?: number
+          id?: string
+          lost_at?: string | null
+          lost_reason?: string | null
+          name: string
+          next_contact_at?: string | null
+          notes?: string | null
+          phone?: string | null
+          probability?: number
+          source?: string | null
+          stage?: string
+          updated_at?: string
+          user_id: string
+          won_at?: string | null
+        }
+        Update: {
+          assignee?: string | null
+          budget_id?: string | null
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          email?: string | null
+          estimated_value?: number
+          id?: string
+          lost_at?: string | null
+          lost_reason?: string | null
+          name?: string
+          next_contact_at?: string | null
+          notes?: string | null
+          phone?: string | null
+          probability?: number
+          source?: string | null
+          stage?: string
+          updated_at?: string
+          user_id?: string
+          won_at?: string | null
+        }
+        Relationships: []
+      }
       material_catalog: {
         Row: {
           company_id: string | null
@@ -939,6 +1041,51 @@ export type Database = {
           unit?: string
           unit_cost?: number
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          company_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          kind: string
+          link: string | null
+          read_at: string | null
+          severity: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          company_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          kind: string
+          link?: string | null
+          read_at?: string | null
+          severity?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          company_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          kind?: string
+          link?: string | null
+          read_at?: string | null
+          severity?: string
+          title?: string
           user_id?: string
         }
         Relationships: []
@@ -1047,6 +1194,42 @@ export type Database = {
           },
         ]
       }
+      production_capacity: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          hours_per_day: number
+          id: string
+          notes: string | null
+          parallel_tasks: number
+          stage: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          hours_per_day?: number
+          id?: string
+          notes?: string | null
+          parallel_tasks?: number
+          stage: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          hours_per_day?: number
+          id?: string
+          notes?: string | null
+          parallel_tasks?: number
+          stage?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       production_tasks: {
         Row: {
           assembly_checklist: Json | null
@@ -1058,6 +1241,7 @@ export type Database = {
           company_id: string | null
           created_at: string
           due_date: string | null
+          estimated_hours: number | null
           has_pending_issues: boolean
           id: string
           notes: string | null
@@ -1077,6 +1261,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           due_date?: string | null
+          estimated_hours?: number | null
           has_pending_issues?: boolean
           id?: string
           notes?: string | null
@@ -1096,6 +1281,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           due_date?: string | null
+          estimated_hours?: number | null
           has_pending_issues?: boolean
           id?: string
           notes?: string | null

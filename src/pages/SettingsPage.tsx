@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard, Package2, Upload, Download, Wallet, Receipt, Calculator, Wrench, Activity } from 'lucide-react';
+import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard, Package2, Upload, Download, Wallet, Receipt, Calculator, Wrench, Activity, Factory } from 'lucide-react';
 import EngineeringCatalogSettings from '@/components/settings/EngineeringCatalogSettings';
 import AuditLogPanel from '@/components/settings/AuditLogPanel';
+import CapacitySettings from '@/components/settings/CapacitySettings';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -452,11 +453,15 @@ export default function SettingsPage() {
           <TabsTrigger value="fees"><CreditCard className="h-4 w-4 mr-1" /> Taxas</TabsTrigger>
           <TabsTrigger value="materials"><Package2 className="h-4 w-4 mr-1" /> Materiais</TabsTrigger>
           <TabsTrigger value="engineering"><Wrench className="h-4 w-4 mr-1" /> Engenharia</TabsTrigger>
+          <TabsTrigger value="capacity"><Factory className="h-4 w-4 mr-1" /> Capacidade</TabsTrigger>
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-1" /> Equipe</TabsTrigger>
           <TabsTrigger value="access"><Shield className="h-4 w-4 mr-1" /> Acessos</TabsTrigger>
           <TabsTrigger value="profile"><User className="h-4 w-4 mr-1" /> Perfil</TabsTrigger>
           <TabsTrigger value="audit"><Activity className="h-4 w-4 mr-1" /> Auditoria</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="capacity"><CapacitySettings /></TabsContent>
+
 
         {/* Company */}
         <TabsContent value="company">

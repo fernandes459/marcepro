@@ -12,10 +12,12 @@ import {
   Menu,
   LogOut,
   Package,
+  Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
+import NotificationBell from '@/components/NotificationBell';
 
 type NavGroup = {
   label: string;
@@ -24,9 +26,10 @@ type NavGroup = {
 
 const navGroups: NavGroup[] = [
   {
-    label: 'Principal',
+    label: 'Comercial',
     items: [
       { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { path: '/crm', label: 'Funil CRM', icon: Target },
       { path: '/clientes', label: 'Clientes', icon: Users },
       { path: '/orcamentos', label: 'Orçamentos', icon: FileText },
     ],
@@ -206,6 +209,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {pageTitle}
             </h2>
             <div className="flex-1" />
+            <NotificationBell />
             <div className="h-9 w-9 rounded-full gradient-gold flex items-center justify-center text-sm font-bold text-primary-foreground shadow-primary">
               {initial}
             </div>
