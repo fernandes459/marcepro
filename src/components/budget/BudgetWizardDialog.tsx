@@ -945,7 +945,25 @@ export default function BudgetWizardDialog({
                   <SectionTitle icon={Percent} title="Margem e Precificação" subtitle="Defina margem, acabamento, complexidade e condições de pagamento" />
 
                   <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Material x1 / x2 / x3 — multiplicador regional */}
+                    <div className="space-y-2">
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">Multiplicador de Material (Região)</Label>
+                      <Tabs value={String(materialMultiplier)} onValueChange={(v) => setMaterialMultiplier(Number(v))} className="w-full">
+                        <TabsList className="grid grid-cols-3 w-full h-11">
+                          <TabsTrigger value="1">Material (1×)</TabsTrigger>
+                          <TabsTrigger value="2">Material 2×</TabsTrigger>
+                          <TabsTrigger value="3">Material 3×</TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                      <p className="text-[10px] text-muted-foreground">
+                        Aplica o multiplicador sobre o custo total de material (itens + paramétrico). Use 2× ou 3× para regiões mais caras / acabamento premium importado.
+                        {materialMultiplier > 1 && (
+                          <span className="ml-1 text-warning font-semibold">Material atual: {formatBRL(calc.totalMaterial)}</span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-border/60 pt-4">
                       <div className="space-y-1.5">
                         <Label className="text-xs uppercase tracking-wider text-muted-foreground">Complexidade</Label>
                         <Select value={complexityFactor} onValueChange={setComplexityFactor}>
