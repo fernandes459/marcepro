@@ -140,6 +140,7 @@ export default function BudgetWizardDialog({
   const [margin, setMargin] = useState(40);
   const [discountPct, setDiscountPct] = useState(0);
   const [complexityFactor, setComplexityFactor] = useState('1.0');
+  const [materialMultiplier, setMaterialMultiplier] = useState<number>(1);
   const [finishType, setFinishType] = useState('branco');
   // Pagamento
   const [useAdvancedPayment, setUseAdvancedPayment] = useState(false);
@@ -184,7 +185,7 @@ export default function BudgetWizardDialog({
     setIncludeOverhead(true); setExtraTaxes(0); setExtraFreight(0); setExtraOther(0);
     setProductionDays(0); setCommissionPctOverride(null); setPaymentSchedule([]);
     setMargin(Number(companySettings?.default_margin ?? 40));
-    setDiscountPct(0); setComplexityFactor('1.0'); setFinishType('branco');
+    setDiscountPct(0); setComplexityFactor('1.0'); setFinishType('branco'); setMaterialMultiplier(1);
     setUseAdvancedPayment(false); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT);
     setDownPayment(0); setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
     setClientDescription('');
@@ -197,6 +198,7 @@ export default function BudgetWizardDialog({
     setProjectType(b.project_type || '');
     setBudgetMode((b.budget_mode as any) || 'completo');
     setComplexityFactor(String(b.complexity_factor || '1.0'));
+    setMaterialMultiplier(Number((b as any).material_multiplier) || 1);
     setFinishType(b.finish_type || 'branco');
     setMargin(Number(b.profit_margin) || 40);
     setClientDescription(b.client_description || '');
@@ -260,15 +262,19 @@ export default function BudgetWizardDialog({
   // ========= CALCULATIONS (decimal.js) =========
   const calc = useMemo(() => {
     const D = (n: number | string) => new Decimal(n || 0);
+    const matMul = D(materialMultiplier || 1);
     let totalMaterial = D(0), totalLabor = D(0);
     items.forEach(i => {
       totalMaterial = totalMaterial.plus(D(i.materialCost).times(i.quantity));
       totalLabor = totalLabor.plus(D(i.laborCost).times(i.quantity));
     });
-    const itemsCost = totalMaterial.plus(totalLabor);
-    const parametricCost = useParametric && moduleResult
+    // Aplica multiplicador regional sobre todo o material (itens + paramétrico)
+    const totalMaterialAdj = totalMaterial.times(matMul);
+    const itemsCost = totalMaterialAdj.plus(totalLabor);
+    const parametricBase = useParametric && moduleResult
       ? D(moduleResult.materialCost).plus(moduleResult.edgeTapeCost).plus(moduleResult.hardwareCost ?? 0)
       : D(0);
+    const parametricCost = parametricBase.times(matMul);
     const baseCost = itemsCost.plus(parametricCost).plus(extraTaxes).plus(extraFreight).plus(extraOther);
     const cMul = D(COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.multiplier || 1);
     const fMul = D(FINISH_OPTIONS.find(f => f.value === finishType)?.multiplier || 1);
@@ -281,7 +287,7 @@ export default function BudgetWizardDialog({
     const realMarginPct = totalCost.gt(0) ? realProfit.div(totalCost).times(100) : D(0);
     const minMargin = Number(companySettings?.min_margin ?? 20);
     return {
-      totalMaterial: totalMaterial.toNumber(),
+      totalMaterial: totalMaterialAdj.toNumber(),
       totalLabor: totalLabor.toNumber(),
       itemsCost: itemsCost.toNumber(),
       parametricCost: parametricCost.toNumber(),
@@ -298,7 +304,7 @@ export default function BudgetWizardDialog({
     };
   }, [items, useParametric, moduleResult, extraTaxes, extraFreight, extraOther,
       complexityFactor, finishType, includeOverhead, overheadPerProject,
-      margin, discountPct, companySettings]);
+      margin, discountPct, companySettings, materialMultiplier]);
 
   // payment per environment (rateado)
   const envSubtotals = useMemo(() => {
@@ -450,6 +456,7 @@ export default function BudgetWizardDialog({
       seller_id: sellerId || null,
       project_type: projectType || null,
       budget_mode: budgetMode,
+      material_multiplier: materialMultiplier || 1,
     };
 
     if (editingBudget) {
@@ -938,7 +945,25 @@ export default function BudgetWizardDialog({
                   <SectionTitle icon={Percent} title="Margem e Precificação" subtitle="Defina margem, acabamento, complexidade e condições de pagamento" />
 
                   <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Material x1 / x2 / x3 — multiplicador regional */}
+                    <div className="space-y-2">
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">Multiplicador de Material (Região)</Label>
+                      <Tabs value={String(materialMultiplier)} onValueChange={(v) => setMaterialMultiplier(Number(v))} className="w-full">
+                        <TabsList className="grid grid-cols-3 w-full h-11">
+                          <TabsTrigger value="1">Material (1×)</TabsTrigger>
+                          <TabsTrigger value="2">Material 2×</TabsTrigger>
+                          <TabsTrigger value="3">Material 3×</TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                      <p className="text-[10px] text-muted-foreground">
+                        Aplica o multiplicador sobre o custo total de material (itens + paramétrico). Use 2× ou 3× para regiões mais caras / acabamento premium importado.
+                        {materialMultiplier > 1 && (
+                          <span className="ml-1 text-warning font-semibold">Material atual: {formatBRL(calc.totalMaterial)}</span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-border/60 pt-4">
                       <div className="space-y-1.5">
                         <Label className="text-xs uppercase tracking-wider text-muted-foreground">Complexidade</Label>
                         <Select value={complexityFactor} onValueChange={setComplexityFactor}>

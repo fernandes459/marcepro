@@ -153,12 +153,24 @@ export default function BudgetsPage() {
     const pending = budgets.filter(b => b.status === 'pending' || b.status === 'draft');
     const approved = budgets.filter(b => b.status === 'approved');
     const inProd = budgets.filter(b => b.status === 'in_production');
+    const rejected = budgets.filter(b => b.status === 'rejected');
+    const won = approved.length + inProd.length;
+    const closedTotal = won + rejected.length;
+    const winRate = closedTotal > 0 ? (won / closedTotal) * 100 : 0;
+    const total = budgets.length || 1;
     return {
       total: budgets.length,
       pending: pending.length,
       approved: approved.length,
       inProduction: inProd.length,
+      rejected: rejected.length,
       revenueApproved: sum(approved) + sum(inProd),
+      revenuePending: sum(pending),
+      revenueLost: sum(rejected),
+      winRate,
+      pctApproved: ((approved.length + inProd.length) / total) * 100,
+      pctPending: (pending.length / total) * 100,
+      pctRejected: (rejected.length / total) * 100,
     };
   }, [budgets]);
 
@@ -292,7 +304,8 @@ export default function BudgetsPage() {
     try {
       const { data: bItems } = await supabase
         .from('budget_items').select('material_cost, labor_cost, quantity').eq('budget_id', budget.id);
-      const totalMaterial = (bItems || []).reduce((s: number, i: any) => s + Number(i.material_cost || 0) * Number(i.quantity || 1), 0);
+      const matMul = Number((budget as any).material_multiplier) || 1;
+      const totalMaterial = (bItems || []).reduce((s: number, i: any) => s + Number(i.material_cost || 0) * Number(i.quantity || 1), 0) * matMul;
       const laborTotal = (bItems || []).reduce((s: number, i: any) => s + Number(i.labor_cost || 0) * Number(i.quantity || 1), 0);
       const dueIn7 = addBusinessDays(new Date(), 7).toISOString().slice(0, 10);
       const costInserts: any[] = [];
@@ -494,6 +507,39 @@ export default function BudgetsPage() {
             </div>
           );
         })}
+      </div>
+
+      {/* CRM Diagnostic — funil embutido */}
+      <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-gold" />
+            <h3 className="font-display text-sm font-semibold">Funil de Vendas</h3>
+          </div>
+          <span className="text-[11px] text-muted-foreground">
+            Taxa de conversão: <span className="font-bold text-success">{kpis.winRate.toFixed(0)}%</span> · {kpis.approved + kpis.inProduction} ganhos / {kpis.rejected} perdidos
+          </span>
+        </div>
+        {/* Barra de proporção */}
+        <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+          <div className="bg-success transition-all" style={{ width: `${kpis.pctApproved}%` }} title={`Fechados: ${kpis.pctApproved.toFixed(0)}%`} />
+          <div className="bg-warning transition-all" style={{ width: `${kpis.pctPending}%` }} title={`Abertos: ${kpis.pctPending.toFixed(0)}%`} />
+          <div className="bg-destructive transition-all" style={{ width: `${kpis.pctRejected}%` }} title={`Recusados: ${kpis.pctRejected.toFixed(0)}%`} />
+        </div>
+        <div className="grid grid-cols-3 gap-3 text-xs">
+          <div>
+            <p className="text-muted-foreground flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-success" /> Fechados</p>
+            <p className="font-semibold text-success tabular-nums">{formatBRL(kpis.revenueApproved)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-warning" /> Abertos</p>
+            <p className="font-semibold text-warning tabular-nums">{formatBRL(kpis.revenuePending)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-destructive" /> Recusados</p>
+            <p className="font-semibold text-destructive tabular-nums">{formatBRL(kpis.revenueLost)}</p>
+          </div>
+        </div>
       </div>
 
       {/* Filtros */}

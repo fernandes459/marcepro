@@ -53,12 +53,25 @@ export default function ClientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form state
-  const [form, setForm] = useState({
+  const emptyForm = {
     name: '', phone: '', cpf_cnpj: '', email: '', cep: '',
     address: '', address_number: '', complement: '', neighborhood: '', city: '', state: '',
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
+
+  const openEditDialog = (c: Client) => {
+    setEditingId(c.id);
+    setForm({
+      name: c.name || '', phone: c.phone || '', cpf_cnpj: c.cpf_cnpj || '',
+      email: c.email || '', cep: c.cep || '', address: c.address || '',
+      address_number: c.address_number || '', complement: c.complement || '',
+      neighborhood: c.neighborhood || '', city: c.city || '', state: c.state || '',
+    });
+    setDialogOpen(true);
+  };
 
   const fetchClients = async () => {
     const { data, error } = await supabase
@@ -177,12 +190,11 @@ export default function ClientsPage() {
     setCepLoading(false);
   };
 
-  const handleCreateClient = async (e: React.FormEvent) => {
+  const handleSaveClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase.from('clients').insert({
-      user_id: user.id,
+    const payload = {
       name: form.name,
       phone: form.phone,
       cpf_cnpj: form.cpf_cnpj || null,
@@ -194,14 +206,18 @@ export default function ClientsPage() {
       neighborhood: form.neighborhood || null,
       city: form.city || null,
       state: form.state || null,
-    } as any);
+    };
+    const { error } = editingId
+      ? await supabase.from('clients').update(payload as any).eq('id', editingId)
+      : await supabase.from('clients').insert({ ...payload, user_id: user.id } as any);
     setSaving(false);
     if (error) {
-      toast.error('Erro ao cadastrar cliente');
+      toast.error(editingId ? 'Erro ao atualizar cliente' : 'Erro ao cadastrar cliente');
       console.error(error);
     } else {
-      toast.success('Cliente cadastrado com sucesso!');
-      setForm({ name: '', phone: '', cpf_cnpj: '', email: '', cep: '', address: '', address_number: '', complement: '', neighborhood: '', city: '', state: '' });
+      toast.success(editingId ? 'Cliente atualizado!' : 'Cliente cadastrado com sucesso!');
+      setForm(emptyForm);
+      setEditingId(null);
       setDialogOpen(false);
       fetchClients();
     }
@@ -236,18 +252,18 @@ export default function ClientsPage() {
           <h1 className="text-3xl font-bold font-display tracking-tight">Clientes</h1>
           <p className="text-muted-foreground text-sm mt-1">Carteira ativa e relacionamento</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) { setEditingId(null); setForm(emptyForm); } }}>
           <DialogTrigger asChild>
-            <Button className="gradient-primary shadow-primary border-0">
+            <Button className="gradient-primary shadow-primary border-0" onClick={() => { setEditingId(null); setForm(emptyForm); }}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Cliente
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="font-display">Novo Cliente</DialogTitle>
+              <DialogTitle className="font-display">{editingId ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleCreateClient} className="space-y-4">
+            <form onSubmit={handleSaveClient} className="space-y-4">
               <div className="space-y-2">
                 <Label>Nome *</Label>
                 <Input placeholder="Nome completo" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -316,7 +332,7 @@ export default function ClientsPage() {
 
               <Button type="submit" className="w-full gradient-primary shadow-primary border-0" disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Cadastrar Cliente
+                {editingId ? 'Salvar Alterações' : 'Cadastrar Cliente'}
               </Button>
             </form>
           </DialogContent>
@@ -390,13 +406,22 @@ export default function ClientsPage() {
                         <p className="text-[11px] text-muted-foreground">{client.cpf_cnpj || '—'}</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteClient(client.id)}
-                      className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"
-                      title="Excluir"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openEditDialog(client)}
+                        className="p-1.5 rounded-md hover:bg-primary/10 transition-colors"
+                        title="Editar"
+                      >
+                        <Edit className="h-4 w-4 text-primary/70 hover:text-primary" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClient(client.id)}
+                        className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5 text-xs text-muted-foreground">

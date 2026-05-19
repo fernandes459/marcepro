@@ -271,6 +271,7 @@ export type Database = {
           final_price: number
           finish_type: string | null
           id: string
+          material_multiplier: number
           notes: string | null
           payment_method: string | null
           profit_margin: number
@@ -293,6 +294,7 @@ export type Database = {
           final_price?: number
           finish_type?: string | null
           id?: string
+          material_multiplier?: number
           notes?: string | null
           payment_method?: string | null
           profit_margin?: number
@@ -315,6 +317,7 @@ export type Database = {
           final_price?: number
           finish_type?: string | null
           id?: string
+          material_multiplier?: number
           notes?: string | null
           payment_method?: string | null
           profit_margin?: number
@@ -1300,6 +1303,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      region_pricing: {
+        Row: {
+          active: boolean
+          company_id: string | null
+          created_at: string
+          id: string
+          multiplier: number
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          multiplier?: number
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          multiplier?: number
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       sheet_materials: {
         Row: {
