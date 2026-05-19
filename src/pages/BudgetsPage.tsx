@@ -153,12 +153,24 @@ export default function BudgetsPage() {
     const pending = budgets.filter(b => b.status === 'pending' || b.status === 'draft');
     const approved = budgets.filter(b => b.status === 'approved');
     const inProd = budgets.filter(b => b.status === 'in_production');
+    const rejected = budgets.filter(b => b.status === 'rejected');
+    const won = approved.length + inProd.length;
+    const closedTotal = won + rejected.length;
+    const winRate = closedTotal > 0 ? (won / closedTotal) * 100 : 0;
+    const total = budgets.length || 1;
     return {
       total: budgets.length,
       pending: pending.length,
       approved: approved.length,
       inProduction: inProd.length,
+      rejected: rejected.length,
       revenueApproved: sum(approved) + sum(inProd),
+      revenuePending: sum(pending),
+      revenueLost: sum(rejected),
+      winRate,
+      pctApproved: ((approved.length + inProd.length) / total) * 100,
+      pctPending: (pending.length / total) * 100,
+      pctRejected: (rejected.length / total) * 100,
     };
   }, [budgets]);
 
