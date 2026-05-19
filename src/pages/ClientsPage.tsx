@@ -190,12 +190,11 @@ export default function ClientsPage() {
     setCepLoading(false);
   };
 
-  const handleCreateClient = async (e: React.FormEvent) => {
+  const handleSaveClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase.from('clients').insert({
-      user_id: user.id,
+    const payload = {
       name: form.name,
       phone: form.phone,
       cpf_cnpj: form.cpf_cnpj || null,
@@ -207,14 +206,18 @@ export default function ClientsPage() {
       neighborhood: form.neighborhood || null,
       city: form.city || null,
       state: form.state || null,
-    } as any);
+    };
+    const { error } = editingId
+      ? await supabase.from('clients').update(payload as any).eq('id', editingId)
+      : await supabase.from('clients').insert({ ...payload, user_id: user.id } as any);
     setSaving(false);
     if (error) {
-      toast.error('Erro ao cadastrar cliente');
+      toast.error(editingId ? 'Erro ao atualizar cliente' : 'Erro ao cadastrar cliente');
       console.error(error);
     } else {
-      toast.success('Cliente cadastrado com sucesso!');
-      setForm({ name: '', phone: '', cpf_cnpj: '', email: '', cep: '', address: '', address_number: '', complement: '', neighborhood: '', city: '', state: '' });
+      toast.success(editingId ? 'Cliente atualizado!' : 'Cliente cadastrado com sucesso!');
+      setForm(emptyForm);
+      setEditingId(null);
       setDialogOpen(false);
       fetchClients();
     }
