@@ -304,7 +304,8 @@ export default function BudgetsPage() {
     try {
       const { data: bItems } = await supabase
         .from('budget_items').select('material_cost, labor_cost, quantity').eq('budget_id', budget.id);
-      const totalMaterial = (bItems || []).reduce((s: number, i: any) => s + Number(i.material_cost || 0) * Number(i.quantity || 1), 0);
+      const matMul = Number((budget as any).material_multiplier) || 1;
+      const totalMaterial = (bItems || []).reduce((s: number, i: any) => s + Number(i.material_cost || 0) * Number(i.quantity || 1), 0) * matMul;
       const laborTotal = (bItems || []).reduce((s: number, i: any) => s + Number(i.labor_cost || 0) * Number(i.quantity || 1), 0);
       const dueIn7 = addBusinessDays(new Date(), 7).toISOString().slice(0, 10);
       const costInserts: any[] = [];
