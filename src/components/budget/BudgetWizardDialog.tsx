@@ -140,6 +140,7 @@ export default function BudgetWizardDialog({
   const [margin, setMargin] = useState(40);
   const [discountPct, setDiscountPct] = useState(0);
   const [complexityFactor, setComplexityFactor] = useState('1.0');
+  const [materialMultiplier, setMaterialMultiplier] = useState<number>(1);
   const [finishType, setFinishType] = useState('branco');
   // Pagamento
   const [useAdvancedPayment, setUseAdvancedPayment] = useState(false);
