@@ -198,6 +198,7 @@ export default function BudgetWizardDialog({
     setProjectType(b.project_type || '');
     setBudgetMode((b.budget_mode as any) || 'completo');
     setComplexityFactor(String(b.complexity_factor || '1.0'));
+    setMaterialMultiplier(Number((b as any).material_multiplier) || 1);
     setFinishType(b.finish_type || 'branco');
     setMargin(Number(b.profit_margin) || 40);
     setClientDescription(b.client_description || '');
