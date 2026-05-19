@@ -509,6 +509,39 @@ export default function BudgetsPage() {
         })}
       </div>
 
+      {/* CRM Diagnostic — funil embutido */}
+      <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-gold" />
+            <h3 className="font-display text-sm font-semibold">Funil de Vendas</h3>
+          </div>
+          <span className="text-[11px] text-muted-foreground">
+            Taxa de conversão: <span className="font-bold text-success">{kpis.winRate.toFixed(0)}%</span> · {kpis.approved + kpis.inProduction} ganhos / {kpis.rejected} perdidos
+          </span>
+        </div>
+        {/* Barra de proporção */}
+        <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+          <div className="bg-success transition-all" style={{ width: `${kpis.pctApproved}%` }} title={`Fechados: ${kpis.pctApproved.toFixed(0)}%`} />
+          <div className="bg-warning transition-all" style={{ width: `${kpis.pctPending}%` }} title={`Abertos: ${kpis.pctPending.toFixed(0)}%`} />
+          <div className="bg-destructive transition-all" style={{ width: `${kpis.pctRejected}%` }} title={`Recusados: ${kpis.pctRejected.toFixed(0)}%`} />
+        </div>
+        <div className="grid grid-cols-3 gap-3 text-xs">
+          <div>
+            <p className="text-muted-foreground flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-success" /> Fechados</p>
+            <p className="font-semibold text-success tabular-nums">{formatBRL(kpis.revenueApproved)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-warning" /> Abertos</p>
+            <p className="font-semibold text-warning tabular-nums">{formatBRL(kpis.revenuePending)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-destructive" /> Recusados</p>
+            <p className="font-semibold text-destructive tabular-nums">{formatBRL(kpis.revenueLost)}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Filtros */}
       <div className="flex flex-wrap gap-2 items-center">
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar por código, projeto ou cliente..." className="flex-1 min-w-[220px] max-w-md" />
