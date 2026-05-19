@@ -332,7 +332,7 @@ export default function ClientsPage() {
 
               <Button type="submit" className="w-full gradient-primary shadow-primary border-0" disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Cadastrar Cliente
+                {editingId ? 'Salvar Alterações' : 'Cadastrar Cliente'}
               </Button>
             </form>
           </DialogContent>
