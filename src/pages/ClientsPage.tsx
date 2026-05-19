@@ -252,18 +252,18 @@ export default function ClientsPage() {
           <h1 className="text-3xl font-bold font-display tracking-tight">Clientes</h1>
           <p className="text-muted-foreground text-sm mt-1">Carteira ativa e relacionamento</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) { setEditingId(null); setForm(emptyForm); } }}>
           <DialogTrigger asChild>
-            <Button className="gradient-primary shadow-primary border-0">
+            <Button className="gradient-primary shadow-primary border-0" onClick={() => { setEditingId(null); setForm(emptyForm); }}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Cliente
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="font-display">Novo Cliente</DialogTitle>
+              <DialogTitle className="font-display">{editingId ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleCreateClient} className="space-y-4">
+            <form onSubmit={handleSaveClient} className="space-y-4">
               <div className="space-y-2">
                 <Label>Nome *</Label>
                 <Input placeholder="Nome completo" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
