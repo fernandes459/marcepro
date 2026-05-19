@@ -406,13 +406,22 @@ export default function ClientsPage() {
                         <p className="text-[11px] text-muted-foreground">{client.cpf_cnpj || '—'}</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteClient(client.id)}
-                      className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"
-                      title="Excluir"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openEditDialog(client)}
+                        className="p-1.5 rounded-md hover:bg-primary/10 transition-colors"
+                        title="Editar"
+                      >
+                        <Edit className="h-4 w-4 text-primary/70 hover:text-primary" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClient(client.id)}
+                        className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5 text-xs text-muted-foreground">
