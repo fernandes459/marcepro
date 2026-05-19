@@ -456,6 +456,7 @@ export default function BudgetWizardDialog({
       seller_id: sellerId || null,
       project_type: projectType || null,
       budget_mode: budgetMode,
+      material_multiplier: materialMultiplier || 1,
     };
 
     if (editingBudget) {
