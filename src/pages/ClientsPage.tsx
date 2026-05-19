@@ -53,12 +53,25 @@ export default function ClientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form state
-  const [form, setForm] = useState({
+  const emptyForm = {
     name: '', phone: '', cpf_cnpj: '', email: '', cep: '',
     address: '', address_number: '', complement: '', neighborhood: '', city: '', state: '',
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
+
+  const openEditDialog = (c: Client) => {
+    setEditingId(c.id);
+    setForm({
+      name: c.name || '', phone: c.phone || '', cpf_cnpj: c.cpf_cnpj || '',
+      email: c.email || '', cep: c.cep || '', address: c.address || '',
+      address_number: c.address_number || '', complement: c.complement || '',
+      neighborhood: c.neighborhood || '', city: c.city || '', state: c.state || '',
+    });
+    setDialogOpen(true);
+  };
 
   const fetchClients = async () => {
     const { data, error } = await supabase
