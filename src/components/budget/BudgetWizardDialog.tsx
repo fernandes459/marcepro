@@ -185,7 +185,7 @@ export default function BudgetWizardDialog({
     setIncludeOverhead(true); setExtraTaxes(0); setExtraFreight(0); setExtraOther(0);
     setProductionDays(0); setCommissionPctOverride(null); setPaymentSchedule([]);
     setMargin(Number(companySettings?.default_margin ?? 40));
-    setDiscountPct(0); setComplexityFactor('1.0'); setFinishType('branco');
+    setDiscountPct(0); setComplexityFactor('1.0'); setFinishType('branco'); setMaterialMultiplier(1);
     setUseAdvancedPayment(false); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT);
     setDownPayment(0); setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
     setClientDescription('');
