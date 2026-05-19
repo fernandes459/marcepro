@@ -262,15 +262,19 @@ export default function BudgetWizardDialog({
   // ========= CALCULATIONS (decimal.js) =========
   const calc = useMemo(() => {
     const D = (n: number | string) => new Decimal(n || 0);
+    const matMul = D(materialMultiplier || 1);
     let totalMaterial = D(0), totalLabor = D(0);
     items.forEach(i => {
       totalMaterial = totalMaterial.plus(D(i.materialCost).times(i.quantity));
       totalLabor = totalLabor.plus(D(i.laborCost).times(i.quantity));
     });
-    const itemsCost = totalMaterial.plus(totalLabor);
-    const parametricCost = useParametric && moduleResult
+    // Aplica multiplicador regional sobre todo o material (itens + paramétrico)
+    const totalMaterialAdj = totalMaterial.times(matMul);
+    const itemsCost = totalMaterialAdj.plus(totalLabor);
+    const parametricBase = useParametric && moduleResult
       ? D(moduleResult.materialCost).plus(moduleResult.edgeTapeCost).plus(moduleResult.hardwareCost ?? 0)
       : D(0);
+    const parametricCost = parametricBase.times(matMul);
     const baseCost = itemsCost.plus(parametricCost).plus(extraTaxes).plus(extraFreight).plus(extraOther);
     const cMul = D(COMPLEXITY_OPTIONS.find(c => c.value === complexityFactor)?.multiplier || 1);
     const fMul = D(FINISH_OPTIONS.find(f => f.value === finishType)?.multiplier || 1);
@@ -283,7 +287,7 @@ export default function BudgetWizardDialog({
     const realMarginPct = totalCost.gt(0) ? realProfit.div(totalCost).times(100) : D(0);
     const minMargin = Number(companySettings?.min_margin ?? 20);
     return {
-      totalMaterial: totalMaterial.toNumber(),
+      totalMaterial: totalMaterialAdj.toNumber(),
       totalLabor: totalLabor.toNumber(),
       itemsCost: itemsCost.toNumber(),
       parametricCost: parametricCost.toNumber(),
@@ -300,7 +304,7 @@ export default function BudgetWizardDialog({
     };
   }, [items, useParametric, moduleResult, extraTaxes, extraFreight, extraOther,
       complexityFactor, finishType, includeOverhead, overheadPerProject,
-      margin, discountPct, companySettings]);
+      margin, discountPct, companySettings, materialMultiplier]);
 
   // payment per environment (rateado)
   const envSubtotals = useMemo(() => {
