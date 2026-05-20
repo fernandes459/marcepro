@@ -88,6 +88,7 @@ export default function BudgetsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [funnelPeriod, setFunnelPeriod] = useState<'month' | '3m' | '6m' | 'year' | 'all'>('month');
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<BudgetWithClient | null>(null);
   const [expandedBudgetId, setExpandedBudgetId] = useState<string | null>(null);
