@@ -149,31 +149,82 @@ export default function BudgetsPage() {
       (b.project_name || '').toLowerCase().includes(q);
   });
 
+  const periodStart = useMemo(() => {
+    if (funnelPeriod === 'all') return null;
+    const d = new Date();
+    if (funnelPeriod === 'month') d.setDate(1);
+    else if (funnelPeriod === '3m') d.setMonth(d.getMonth() - 3);
+    else if (funnelPeriod === '6m') d.setMonth(d.getMonth() - 6);
+    else if (funnelPeriod === 'year') { d.setMonth(0); d.setDate(1); }
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [funnelPeriod]);
+
+  const periodBudgets = useMemo(() => {
+    if (!periodStart) return budgets;
+    return budgets.filter(b => new Date(b.created_at) >= periodStart);
+  }, [budgets, periodStart]);
+
   const kpis = useMemo(() => {
     const sum = (arr: BudgetWithClient[]) => arr.reduce((s, b) => s + Number(b.final_price || 0), 0);
-    const pending = budgets.filter(b => b.status === 'pending' || b.status === 'draft');
-    const approved = budgets.filter(b => b.status === 'approved');
-    const inProd = budgets.filter(b => b.status === 'in_production');
-    const rejected = budgets.filter(b => b.status === 'rejected');
+    const pending = periodBudgets.filter(b => b.status === 'pending' || b.status === 'draft');
+    const approved = periodBudgets.filter(b => b.status === 'approved');
+    const inProd = periodBudgets.filter(b => b.status === 'in_production');
+    const rejected = periodBudgets.filter(b => b.status === 'rejected');
     const won = approved.length + inProd.length;
     const closedTotal = won + rejected.length;
     const winRate = closedTotal > 0 ? (won / closedTotal) * 100 : 0;
-    const total = budgets.length || 1;
+    const total = periodBudgets.length || 1;
     return {
-      total: budgets.length,
+      total: periodBudgets.length,
       pending: pending.length,
       approved: approved.length,
       inProduction: inProd.length,
       rejected: rejected.length,
+      rejectedList: rejected,
       revenueApproved: sum(approved) + sum(inProd),
+      revenueApprovedOnly: sum(approved),
+      revenueInProduction: sum(inProd),
       revenuePending: sum(pending),
       revenueLost: sum(rejected),
+      ticketMedio: won > 0 ? (sum(approved) + sum(inProd)) / won : 0,
       winRate,
       pctApproved: ((approved.length + inProd.length) / total) * 100,
       pctPending: (pending.length / total) * 100,
       pctRejected: (rejected.length / total) * 100,
     };
-  }, [budgets]);
+  }, [periodBudgets]);
+
+  const periodLabel: Record<typeof funnelPeriod, string> = {
+    month: 'Este mês',
+    '3m': 'Últimos 3 meses',
+    '6m': 'Últimos 6 meses',
+    year: 'Este ano',
+    all: 'Tudo',
+  } as const;
+
+  const extractRejectReason = (notes?: string | null): string | null => {
+    if (!notes) return null;
+    const m = notes.match(/\[Motivo recusa\]:\s*([^\n]+)/);
+    return m ? m[1].trim() : null;
+  };
+
+  const rejectWithReason = async (budget: BudgetWithClient) => {
+    const reason = window.prompt('Por que esse orçamento foi recusado?\n(ex: preço, prazo, concorrente, sumiu, outro)');
+    if (reason === null) return;
+    const cleaned = reason.trim();
+    const baseNotes = (budget.notes || '').replace(/\n?\[Motivo recusa\]:[^\n]*/g, '').trim();
+    const newNotes = cleaned
+      ? `${baseNotes}\n[Motivo recusa]: ${cleaned}`.trim()
+      : baseNotes;
+    const { error } = await supabase
+      .from('budgets')
+      .update({ status: 'rejected', notes: newNotes } as any)
+      .eq('id', budget.id);
+    if (error) { toast.error(`Erro: ${error.message}`); return; }
+    toast.success('Orçamento marcado como recusado');
+    fetchData();
+  };
 
   const exportToExcel = () => {
     if (filtered.length === 0) { toast.error('Nada para exportar'); return; }
