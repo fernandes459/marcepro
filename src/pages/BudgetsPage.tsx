@@ -720,7 +720,7 @@ export default function BudgetsPage() {
                               </Button>
                             )}
                             {(b.status === 'draft' || b.status === 'pending') && (
-                              <button onClick={() => updateBudgetStatus(b.id, 'rejected')} className="rounded p-1.5 hover:bg-destructive/10" title="Rejeitar">
+                              <button onClick={() => rejectWithReason(b)} className="rounded p-1.5 hover:bg-destructive/10" title="Recusar (com motivo)">
                                 <XCircle className="h-4 w-4 text-destructive" />
                               </button>
                             )}
