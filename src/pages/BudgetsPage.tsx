@@ -539,60 +539,122 @@ export default function BudgetsPage() {
         onApprove={async (id) => updateBudgetStatus(id, 'approved')}
       />
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        {[
-          { label: 'Total', value: kpis.total, icon: FileText, tone: 'text-foreground' },
-          { label: 'Pendentes', value: kpis.pending, icon: Clock, tone: 'text-warning' },
-          { label: 'Aprovados', value: kpis.approved, icon: CheckCircle2, tone: 'text-success' },
-          { label: 'Em Produção', value: kpis.inProduction, icon: Hammer, tone: 'text-info' },
-          { label: 'Faturamento Aprovado', value: formatBRL(kpis.revenueApproved), icon: TrendingUp, tone: 'text-gold', wide: true },
-        ].map((k, i) => {
-          const Icon = k.icon;
-          return (
-            <div key={i} className={`card-premium rounded-2xl p-4 ${k.wide ? 'col-span-2 md:col-span-3 lg:col-span-1' : ''}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{k.label}</span>
-                <Icon className={`h-4 w-4 ${k.tone}`} />
-              </div>
-              <p className={`font-display text-2xl font-semibold ${k.tone}`}>{k.value}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* CRM Diagnostic — funil embutido */}
-      <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
+      {/* Funil de Vendas — Diagnóstico do negócio */}
+      <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-4">
+        <div className="flex items-start justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-gold" />
-            <h3 className="font-display text-sm font-semibold">Funil de Vendas</h3>
+            <div>
+              <h3 className="font-display text-sm font-semibold">Funil de Vendas — Diagnóstico</h3>
+              <p className="text-[11px] text-muted-foreground">{periodLabel[funnelPeriod]} · {kpis.total} orçamento(s)</p>
+            </div>
           </div>
-          <span className="text-[11px] text-muted-foreground">
-            Taxa de conversão: <span className="font-bold text-success">{kpis.winRate.toFixed(0)}%</span> · {kpis.approved + kpis.inProduction} ganhos / {kpis.rejected} perdidos
-          </span>
+          <Select value={funnelPeriod} onValueChange={(v) => setFunnelPeriod(v as any)}>
+            <SelectTrigger className="w-40 h-8 rounded-full bg-muted/40 border-0 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="month">Este mês</SelectItem>
+              <SelectItem value="3m">Últimos 3 meses</SelectItem>
+              <SelectItem value="6m">Últimos 6 meses</SelectItem>
+              <SelectItem value="year">Este ano</SelectItem>
+              <SelectItem value="all">Tudo</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+
+        {/* Cards por estágio */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <button
+            type="button"
+            onClick={() => setFilterStatus('pending')}
+            className="text-left rounded-xl border border-warning/20 bg-warning/5 p-3 hover:bg-warning/10 transition-colors"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-warning">Em Aberto</span>
+              <Clock className="h-3.5 w-3.5 text-warning" />
+            </div>
+            <p className="font-display text-2xl font-semibold text-warning leading-tight">{kpis.pending}</p>
+            <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">{formatBRL(kpis.revenuePending)}</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('approved')}
+            className="text-left rounded-xl border border-success/20 bg-success/5 p-3 hover:bg-success/10 transition-colors"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-success">Fechados</span>
+              <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+            </div>
+            <p className="font-display text-2xl font-semibold text-success leading-tight">{kpis.approved}</p>
+            <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">{formatBRL(kpis.revenueApprovedOnly)}</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('in_production')}
+            className="text-left rounded-xl border border-info/20 bg-info/5 p-3 hover:bg-info/10 transition-colors"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-info">Em Produção</span>
+              <Hammer className="h-3.5 w-3.5 text-info" />
+            </div>
+            <p className="font-display text-2xl font-semibold text-info leading-tight">{kpis.inProduction}</p>
+            <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">{formatBRL(kpis.revenueInProduction)}</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('rejected')}
+            className="text-left rounded-xl border border-destructive/20 bg-destructive/5 p-3 hover:bg-destructive/10 transition-colors"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-destructive">Recusados</span>
+              <XCircle className="h-3.5 w-3.5 text-destructive" />
+            </div>
+            <p className="font-display text-2xl font-semibold text-destructive leading-tight">{kpis.rejected}</p>
+            <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">{formatBRL(kpis.revenueLost)}</p>
+          </button>
+        </div>
+
         {/* Barra de proporção */}
-        <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
-          <div className="bg-success transition-all" style={{ width: `${kpis.pctApproved}%` }} title={`Fechados: ${kpis.pctApproved.toFixed(0)}%`} />
-          <div className="bg-warning transition-all" style={{ width: `${kpis.pctPending}%` }} title={`Abertos: ${kpis.pctPending.toFixed(0)}%`} />
-          <div className="bg-destructive transition-all" style={{ width: `${kpis.pctRejected}%` }} title={`Recusados: ${kpis.pctRejected.toFixed(0)}%`} />
-        </div>
-        <div className="grid grid-cols-3 gap-3 text-xs">
-          <div>
-            <p className="text-muted-foreground flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-success" /> Fechados</p>
-            <p className="font-semibold text-success tabular-nums">{formatBRL(kpis.revenueApproved)}</p>
+        <div>
+          <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
+            <div className="bg-success transition-all" style={{ width: `${kpis.pctApproved}%` }} title={`Ganhos: ${kpis.pctApproved.toFixed(0)}%`} />
+            <div className="bg-warning transition-all" style={{ width: `${kpis.pctPending}%` }} title={`Abertos: ${kpis.pctPending.toFixed(0)}%`} />
+            <div className="bg-destructive transition-all" style={{ width: `${kpis.pctRejected}%` }} title={`Recusados: ${kpis.pctRejected.toFixed(0)}%`} />
           </div>
-          <div>
-            <p className="text-muted-foreground flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-warning" /> Abertos</p>
-            <p className="font-semibold text-warning tabular-nums">{formatBRL(kpis.revenuePending)}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-destructive" /> Recusados</p>
-            <p className="font-semibold text-destructive tabular-nums">{formatBRL(kpis.revenueLost)}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-2 text-[11px] text-muted-foreground">
+            <span>Conversão: <span className="font-bold text-success">{kpis.winRate.toFixed(0)}%</span></span>
+            <span>Ticket médio: <span className="font-semibold text-foreground tabular-nums">{formatBRL(kpis.ticketMedio)}</span></span>
+            <span>Receita total fechada: <span className="font-semibold text-gold tabular-nums">{formatBRL(kpis.revenueApproved)}</span></span>
           </div>
         </div>
+
+        {/* Feedbacks de recusa */}
+        {kpis.rejectedList.length > 0 && (
+          <div className="rounded-xl bg-muted/30 p-3 space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <XCircle className="h-3 w-3 text-destructive" /> Motivos de recusa
+            </p>
+            <ul className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              {kpis.rejectedList.slice(0, 8).map((b) => {
+                const reason = extractRejectReason(b.notes);
+                return (
+                  <li key={b.id} className="text-xs flex items-start gap-2">
+                    <span className="font-mono text-muted-foreground shrink-0">{b.code}</span>
+                    <span className="text-foreground/80 truncate flex-1">
+                      {(b.clients as any)?.name || b.project_name || '—'}
+                    </span>
+                    <span className={`shrink-0 ${reason ? 'text-foreground' : 'italic text-muted-foreground/70'}`}>
+                      {reason || 'sem feedback'}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </div>
+
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-2 items-center">
