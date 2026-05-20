@@ -12,7 +12,6 @@ import {
   Menu,
   LogOut,
   Package,
-  Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,7 +28,6 @@ const navGroups: NavGroup[] = [
     label: 'Comercial',
     items: [
       { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-      { path: '/crm', label: 'Funil CRM', icon: Target },
       { path: '/clientes', label: 'Clientes', icon: Users },
       { path: '/orcamentos', label: 'Orçamentos', icon: FileText },
     ],
