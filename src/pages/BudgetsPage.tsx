@@ -141,7 +141,13 @@ export default function BudgetsPage() {
   }, [user]);
 
   const filtered = budgets.filter(b => {
-    if (filterStatus !== 'all' && b.status !== filterStatus) return false;
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'open') {
+        if (b.status !== 'draft' && b.status !== 'pending') return false;
+      } else if (filterStatus === 'closed') {
+        if (b.status !== 'approved' && b.status !== 'in_production') return false;
+      } else if (b.status !== filterStatus) return false;
+    }
     const clientName = (b.clients as any)?.name || '';
     const q = search.toLowerCase();
     return clientName.toLowerCase().includes(q) ||
@@ -567,7 +573,7 @@ export default function BudgetsPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
           <button
             type="button"
-            onClick={() => setFilterStatus('pending')}
+            onClick={() => setFilterStatus('open')}
             className="text-left rounded-xl border border-warning/20 bg-warning/5 p-3 hover:bg-warning/10 transition-colors"
           >
             <div className="flex items-center justify-between mb-1">
@@ -579,15 +585,15 @@ export default function BudgetsPage() {
           </button>
           <button
             type="button"
-            onClick={() => setFilterStatus('approved')}
+            onClick={() => setFilterStatus('closed')}
             className="text-left rounded-xl border border-success/20 bg-success/5 p-3 hover:bg-success/10 transition-colors"
           >
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-success">Fechados</span>
               <CheckCircle2 className="h-3.5 w-3.5 text-success" />
             </div>
-            <p className="font-display text-2xl font-semibold text-success leading-tight">{kpis.approved}</p>
-            <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">{formatBRL(kpis.revenueApprovedOnly)}</p>
+            <p className="font-display text-2xl font-semibold text-success leading-tight">{kpis.approved + kpis.inProduction}</p>
+            <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">{formatBRL(kpis.revenueApproved)}</p>
           </button>
           <button
             type="button"
@@ -663,6 +669,8 @@ export default function BudgetsPage() {
           <SelectTrigger className="w-44 h-9 rounded-full bg-muted/40 border-0 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os status</SelectItem>
+            <SelectItem value="open">Em Aberto (rascunho + pendente)</SelectItem>
+            <SelectItem value="closed">Fechados (aprovado + em produção)</SelectItem>
             {Object.entries(statusConfig).map(([key, cfg]) => <SelectItem key={key} value={key}>{cfg.label}</SelectItem>)}
           </SelectContent>
         </Select>
