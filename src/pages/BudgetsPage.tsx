@@ -107,13 +107,14 @@ export default function BudgetsPage() {
   });
 
   const fetchData = async () => {
-    const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes, opCostsRes] = await Promise.all([
+    const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes, opCostsRes, prodRes] = await Promise.all([
       supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
       supabase.from('company_settings').select('*').limit(1).maybeSingle(),
       supabase.from('employees').select('id, name').eq('status', 'active').order('name'),
       supabase.from('material_catalog' as any).select('id, name, unit_cost, unit, supplier').order('name'),
       supabase.from('operational_costs').select('monthly_amount, active'),
+      supabase.from('production_tasks').select('budget_id, stage'),
     ]);
     if (budgetsRes.data) setBudgets(budgetsRes.data as any);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
@@ -124,6 +125,13 @@ export default function BudgetsPage() {
       const total = (opCostsRes.data as any[]).filter(c => c.active).reduce((s, c) => s + Number(c.monthly_amount || 0), 0);
       const avg = Math.max(1, Number((settingsRes.data as any).avg_projects_per_month) || 4);
       setOverheadPerProject(total / avg);
+    }
+    if (prodRes.data) {
+      const ids = new Set<string>();
+      (prodRes.data as any[]).forEach(t => {
+        if (t.budget_id && t.stage !== 'entregue' && t.stage !== 'cancelado') ids.add(t.budget_id);
+      });
+      setActiveProductionBudgetIds(ids);
     }
     setLoading(false);
   };
