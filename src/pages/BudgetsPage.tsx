@@ -176,25 +176,37 @@ export default function BudgetsPage() {
     return d;
   }, [funnelPeriod]);
 
+  // Status efetivo: se um orçamento "approved" já tem tarefa de produção ativa, ele é "in_production".
+  const effectiveStatusOf = (b: BudgetWithClient): string => {
+    if (activeProductionBudgetIds.has(b.id) && (b.status === 'approved' || b.status === 'in_production')) {
+      return 'in_production';
+    }
+    return b.status;
+  };
+
   const periodBudgets = useMemo(() => {
     if (!periodStart) return budgets;
     return budgets.filter(b => {
-      // Para fechados (aprovado / em produção), considera a data de aprovação (faturamento).
-      // Para os demais, usa a data de criação.
-      const isClosed = b.status === 'approved' || b.status === 'in_production';
-      const refDate = isClosed && (b as any).approved_at
-        ? new Date((b as any).approved_at)
-        : new Date(b.created_at);
+      const eff = effectiveStatusOf(b);
+      const isClosed = eff === 'approved' || eff === 'in_production';
+      // Closed: usa approved_at (faturamento). Fallback: updated_at (quando o status mudou).
+      // Demais: data de criação.
+      const refDateStr = isClosed
+        ? ((b as any).approved_at || b.updated_at || b.created_at)
+        : b.created_at;
+      const refDate = new Date(refDateStr);
       return refDate >= periodStart;
     });
-  }, [budgets, periodStart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budgets, periodStart, activeProductionBudgetIds]);
 
   const kpis = useMemo(() => {
     const sum = (arr: BudgetWithClient[]) => arr.reduce((s, b) => s + Number(b.final_price || 0), 0);
-    const pending = periodBudgets.filter(b => b.status === 'pending' || b.status === 'draft');
-    const approved = periodBudgets.filter(b => b.status === 'approved');
-    const inProd = periodBudgets.filter(b => b.status === 'in_production');
-    const rejected = periodBudgets.filter(b => b.status === 'rejected');
+    const withEff = periodBudgets.map(b => ({ b, eff: effectiveStatusOf(b) }));
+    const pending = withEff.filter(x => x.eff === 'pending' || x.eff === 'draft').map(x => x.b);
+    const approved = withEff.filter(x => x.eff === 'approved').map(x => x.b);
+    const inProd = withEff.filter(x => x.eff === 'in_production').map(x => x.b);
+    const rejected = withEff.filter(x => x.eff === 'rejected').map(x => x.b);
     const won = approved.length + inProd.length;
     const closedTotal = won + rejected.length;
     const winRate = closedTotal > 0 ? (won / closedTotal) * 100 : 0;
@@ -217,7 +229,8 @@ export default function BudgetsPage() {
       pctPending: (pending.length / total) * 100,
       pctRejected: (rejected.length / total) * 100,
     };
-  }, [periodBudgets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodBudgets, activeProductionBudgetIds]);
 
   const periodLabel: Record<typeof funnelPeriod, string> = {
     month: 'Este mês',
