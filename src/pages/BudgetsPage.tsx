@@ -84,6 +84,7 @@ export default function BudgetsPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [materialCatalog, setMaterialCatalog] = useState<MaterialCatalogItem[]>([]);
   const [companySettings, setCompanySettings] = useState<any>(null);
+  const [activeProductionBudgetIds, setActiveProductionBudgetIds] = useState<Set<string>>(new Set());
   const [overheadPerProject, setOverheadPerProject] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -106,13 +107,14 @@ export default function BudgetsPage() {
   });
 
   const fetchData = async () => {
-    const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes, opCostsRes] = await Promise.all([
+    const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes, opCostsRes, prodRes] = await Promise.all([
       supabase.from('budgets').select('*, clients(id, name, phone, email, city, cpf_cnpj, address, neighborhood, state, cep, address_number, complement)').order('created_at', { ascending: false }),
       supabase.from('clients').select('*').order('name'),
       supabase.from('company_settings').select('*').limit(1).maybeSingle(),
       supabase.from('employees').select('id, name').eq('status', 'active').order('name'),
       supabase.from('material_catalog' as any).select('id, name, unit_cost, unit, supplier').order('name'),
       supabase.from('operational_costs').select('monthly_amount, active'),
+      supabase.from('production_tasks').select('budget_id, stage'),
     ]);
     if (budgetsRes.data) setBudgets(budgetsRes.data as any);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
@@ -123,6 +125,13 @@ export default function BudgetsPage() {
       const total = (opCostsRes.data as any[]).filter(c => c.active).reduce((s, c) => s + Number(c.monthly_amount || 0), 0);
       const avg = Math.max(1, Number((settingsRes.data as any).avg_projects_per_month) || 4);
       setOverheadPerProject(total / avg);
+    }
+    if (prodRes.data) {
+      const ids = new Set<string>();
+      (prodRes.data as any[]).forEach(t => {
+        if (t.budget_id && t.stage !== 'entregue' && t.stage !== 'cancelado') ids.add(t.budget_id);
+      });
+      setActiveProductionBudgetIds(ids);
     }
     setLoading(false);
   };
@@ -136,17 +145,21 @@ export default function BudgetsPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'material_catalog' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const filtered = budgets.filter(b => {
+    const eff = activeProductionBudgetIds.has(b.id) && (b.status === 'approved' || b.status === 'in_production')
+      ? 'in_production'
+      : b.status;
     if (filterStatus !== 'all') {
       if (filterStatus === 'open') {
-        if (b.status !== 'draft' && b.status !== 'pending') return false;
+        if (eff !== 'draft' && eff !== 'pending') return false;
       } else if (filterStatus === 'closed') {
-        if (b.status !== 'approved' && b.status !== 'in_production') return false;
-      } else if (b.status !== filterStatus) return false;
+        if (eff !== 'approved' && eff !== 'in_production') return false;
+      } else if (eff !== filterStatus) return false;
     }
     const clientName = (b.clients as any)?.name || '';
     const q = search.toLowerCase();
@@ -166,25 +179,37 @@ export default function BudgetsPage() {
     return d;
   }, [funnelPeriod]);
 
+  // Status efetivo: se um orçamento "approved" já tem tarefa de produção ativa, ele é "in_production".
+  const effectiveStatusOf = (b: BudgetWithClient): string => {
+    if (activeProductionBudgetIds.has(b.id) && (b.status === 'approved' || b.status === 'in_production')) {
+      return 'in_production';
+    }
+    return b.status;
+  };
+
   const periodBudgets = useMemo(() => {
     if (!periodStart) return budgets;
     return budgets.filter(b => {
-      // Para fechados (aprovado / em produção), considera a data de aprovação (faturamento).
-      // Para os demais, usa a data de criação.
-      const isClosed = b.status === 'approved' || b.status === 'in_production';
-      const refDate = isClosed && (b as any).approved_at
-        ? new Date((b as any).approved_at)
-        : new Date(b.created_at);
+      const eff = effectiveStatusOf(b);
+      const isClosed = eff === 'approved' || eff === 'in_production';
+      // Closed: usa approved_at (faturamento). Fallback: updated_at (quando o status mudou).
+      // Demais: data de criação.
+      const refDateStr = isClosed
+        ? ((b as any).approved_at || (b as any).updated_at || b.created_at)
+        : b.created_at;
+      const refDate = new Date(refDateStr);
       return refDate >= periodStart;
     });
-  }, [budgets, periodStart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budgets, periodStart, activeProductionBudgetIds]);
 
   const kpis = useMemo(() => {
     const sum = (arr: BudgetWithClient[]) => arr.reduce((s, b) => s + Number(b.final_price || 0), 0);
-    const pending = periodBudgets.filter(b => b.status === 'pending' || b.status === 'draft');
-    const approved = periodBudgets.filter(b => b.status === 'approved');
-    const inProd = periodBudgets.filter(b => b.status === 'in_production');
-    const rejected = periodBudgets.filter(b => b.status === 'rejected');
+    const withEff = periodBudgets.map(b => ({ b, eff: effectiveStatusOf(b) }));
+    const pending = withEff.filter(x => x.eff === 'pending' || x.eff === 'draft').map(x => x.b);
+    const approved = withEff.filter(x => x.eff === 'approved').map(x => x.b);
+    const inProd = withEff.filter(x => x.eff === 'in_production').map(x => x.b);
+    const rejected = withEff.filter(x => x.eff === 'rejected').map(x => x.b);
     const won = approved.length + inProd.length;
     const closedTotal = won + rejected.length;
     const winRate = closedTotal > 0 ? (won / closedTotal) * 100 : 0;
@@ -207,7 +232,8 @@ export default function BudgetsPage() {
       pctPending: (pending.length / total) * 100,
       pctRejected: (rejected.length / total) * 100,
     };
-  }, [periodBudgets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodBudgets, activeProductionBudgetIds]);
 
   const periodLabel: Record<typeof funnelPeriod, string> = {
     month: 'Este mês',
