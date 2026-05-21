@@ -145,6 +145,7 @@ export default function BudgetsPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'material_catalog' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
