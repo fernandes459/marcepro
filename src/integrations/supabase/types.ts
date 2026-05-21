@@ -261,6 +261,7 @@ export type Database = {
       }
       budgets: {
         Row: {
+          approved_at: string | null
           budget_mode: string
           client_description: string | null
           client_id: string | null
@@ -284,6 +285,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          approved_at?: string | null
           budget_mode?: string
           client_description?: string | null
           client_id?: string | null
@@ -307,6 +309,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          approved_at?: string | null
           budget_mode?: string
           client_description?: string | null
           client_id?: string | null
