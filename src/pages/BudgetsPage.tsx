@@ -168,7 +168,15 @@ export default function BudgetsPage() {
 
   const periodBudgets = useMemo(() => {
     if (!periodStart) return budgets;
-    return budgets.filter(b => new Date(b.created_at) >= periodStart);
+    return budgets.filter(b => {
+      // Para fechados (aprovado / em produção), considera a data de aprovação (faturamento).
+      // Para os demais, usa a data de criação.
+      const isClosed = b.status === 'approved' || b.status === 'in_production';
+      const refDate = isClosed && (b as any).approved_at
+        ? new Date((b as any).approved_at)
+        : new Date(b.created_at);
+      return refDate >= periodStart;
+    });
   }, [budgets, periodStart]);
 
   const kpis = useMemo(() => {
@@ -271,10 +279,15 @@ export default function BudgetsPage() {
 
   const updateBudgetStatus = async (id: string, status: string) => {
     const budget = budgets.find(b => b.id === id);
-    const { error } = await supabase.from('budgets').update({ status } as any).eq('id', id);
+    const patch: any = { status };
+    if (status === 'approved') {
+      // Marca a data de aprovação (fechamento) — usada como referência de faturamento.
+      patch.approved_at = new Date().toISOString();
+    }
+    const { error } = await supabase.from('budgets').update(patch).eq('id', id);
     if (error) { toast.error(`Erro: ${error.message}`); return; }
     if (status === 'approved' && budget && user) {
-      await generateReceivablesAndCommission(budget);
+      await generateReceivablesAndCommission({ ...budget, approved_at: patch.approved_at } as any);
     }
     toast.success(`Status: ${statusConfig[status]?.label || status}`);
     fetchData();
