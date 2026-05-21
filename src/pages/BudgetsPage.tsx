@@ -669,6 +669,8 @@ export default function BudgetsPage() {
           <SelectTrigger className="w-44 h-9 rounded-full bg-muted/40 border-0 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os status</SelectItem>
+            <SelectItem value="open">Em Aberto (rascunho + pendente)</SelectItem>
+            <SelectItem value="closed">Fechados (aprovado + em produção)</SelectItem>
             {Object.entries(statusConfig).map(([key, cfg]) => <SelectItem key={key} value={key}>{cfg.label}</SelectItem>)}
           </SelectContent>
         </Select>
