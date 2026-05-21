@@ -141,7 +141,13 @@ export default function BudgetsPage() {
   }, [user]);
 
   const filtered = budgets.filter(b => {
-    if (filterStatus !== 'all' && b.status !== filterStatus) return false;
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'open') {
+        if (b.status !== 'draft' && b.status !== 'pending') return false;
+      } else if (filterStatus === 'closed') {
+        if (b.status !== 'approved' && b.status !== 'in_production') return false;
+      } else if (b.status !== filterStatus) return false;
+    }
     const clientName = (b.clients as any)?.name || '';
     const q = search.toLowerCase();
     return clientName.toLowerCase().includes(q) ||
