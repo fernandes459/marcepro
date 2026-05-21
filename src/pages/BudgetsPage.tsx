@@ -168,7 +168,15 @@ export default function BudgetsPage() {
 
   const periodBudgets = useMemo(() => {
     if (!periodStart) return budgets;
-    return budgets.filter(b => new Date(b.created_at) >= periodStart);
+    return budgets.filter(b => {
+      // Para fechados (aprovado / em produção), considera a data de aprovação (faturamento).
+      // Para os demais, usa a data de criação.
+      const isClosed = b.status === 'approved' || b.status === 'in_production';
+      const refDate = isClosed && (b as any).approved_at
+        ? new Date((b as any).approved_at)
+        : new Date(b.created_at);
+      return refDate >= periodStart;
+    });
   }, [budgets, periodStart]);
 
   const kpis = useMemo(() => {
