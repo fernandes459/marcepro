@@ -192,7 +192,7 @@ export default function BudgetsPage() {
       // Closed: usa approved_at (faturamento). Fallback: updated_at (quando o status mudou).
       // Demais: data de criação.
       const refDateStr = isClosed
-        ? ((b as any).approved_at || b.updated_at || b.created_at)
+        ? ((b as any).approved_at || (b as any).updated_at || b.created_at)
         : b.created_at;
       const refDate = new Date(refDateStr);
       return refDate >= periodStart;
