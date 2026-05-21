@@ -84,6 +84,7 @@ export default function BudgetsPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [materialCatalog, setMaterialCatalog] = useState<MaterialCatalogItem[]>([]);
   const [companySettings, setCompanySettings] = useState<any>(null);
+  const [activeProductionBudgetIds, setActiveProductionBudgetIds] = useState<Set<string>>(new Set());
   const [overheadPerProject, setOverheadPerProject] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
