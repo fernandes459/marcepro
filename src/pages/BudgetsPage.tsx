@@ -151,12 +151,15 @@ export default function BudgetsPage() {
   }, [user]);
 
   const filtered = budgets.filter(b => {
+    const eff = activeProductionBudgetIds.has(b.id) && (b.status === 'approved' || b.status === 'in_production')
+      ? 'in_production'
+      : b.status;
     if (filterStatus !== 'all') {
       if (filterStatus === 'open') {
-        if (b.status !== 'draft' && b.status !== 'pending') return false;
+        if (eff !== 'draft' && eff !== 'pending') return false;
       } else if (filterStatus === 'closed') {
-        if (b.status !== 'approved' && b.status !== 'in_production') return false;
-      } else if (b.status !== filterStatus) return false;
+        if (eff !== 'approved' && eff !== 'in_production') return false;
+      } else if (eff !== filterStatus) return false;
     }
     const clientName = (b.clients as any)?.name || '';
     const q = search.toLowerCase();
