@@ -269,9 +269,11 @@ export type Database = {
           company_id: string | null
           complexity_factor: number
           created_at: string
+          delivered_at: string | null
           final_price: number
           finish_type: string | null
           id: string
+          lost_reason: string | null
           material_multiplier: number
           notes: string | null
           payment_method: string | null
@@ -293,9 +295,11 @@ export type Database = {
           company_id?: string | null
           complexity_factor?: number
           created_at?: string
+          delivered_at?: string | null
           final_price?: number
           finish_type?: string | null
           id?: string
+          lost_reason?: string | null
           material_multiplier?: number
           notes?: string | null
           payment_method?: string | null
@@ -317,9 +321,11 @@ export type Database = {
           company_id?: string | null
           complexity_factor?: number
           created_at?: string
+          delivered_at?: string | null
           final_price?: number
           finish_type?: string | null
           id?: string
+          lost_reason?: string | null
           material_multiplier?: number
           notes?: string | null
           payment_method?: string | null
