@@ -27,6 +27,8 @@ import PaymentMilestones from '@/components/finance/PaymentMilestones';
 import BudgetWizardDialog, {
   type Client, type Employee, type MaterialCatalogItem, type Budget,
 } from '@/components/budget/BudgetWizardDialog';
+import { computeSnapshot, periodFromKey } from '@/engines/FinancialEngine';
+import { computeFunnel } from '@/engines/MetricsEngine';
 
 interface BudgetWithClient extends Budget {
   clients?: Client | null;
@@ -203,37 +205,48 @@ export default function BudgetsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budgets, periodStart, activeProductionBudgetIds]);
 
+  // ====== KPIs vindos das ENGINES (FinancialEngine + MetricsEngine) ======
+  // UI não calcula: apenas consome.
   const kpis = useMemo(() => {
-    const sum = (arr: BudgetWithClient[]) => arr.reduce((s, b) => s + Number(b.final_price || 0), 0);
-    const withEff = periodBudgets.map(b => ({ b, eff: effectiveStatusOf(b) }));
-    const pending = withEff.filter(x => x.eff === 'pending' || x.eff === 'draft').map(x => x.b);
-    const approved = withEff.filter(x => x.eff === 'approved').map(x => x.b);
-    const inProd = withEff.filter(x => x.eff === 'in_production').map(x => x.b);
-    const rejected = withEff.filter(x => x.eff === 'rejected').map(x => x.b);
-    const won = approved.length + inProd.length;
-    const closedTotal = won + rejected.length;
-    const winRate = closedTotal > 0 ? (won / closedTotal) * 100 : 0;
-    const total = periodBudgets.length || 1;
+    const period = periodFromKey(funnelPeriod);
+    const eff = (b: any) => effectiveStatusOf(b);
+    const funnel = computeFunnel(budgets as any, period, { effectiveStatusOf: eff });
+    const snap = computeSnapshot(budgets as any, [], period, { effectiveStatusOf: eff });
+    const withEff = budgets
+      .filter(b => {
+        const ref = b.status === 'approved' || b.status === 'in_production'
+          ? new Date(((b as any).approved_at) || (b as any).updated_at || b.created_at)
+          : new Date(b.created_at);
+        return !period.start || ref >= period.start;
+      })
+      .map(b => ({ b, eff: effectiveStatusOf(b) }));
+    const rejectedList = withEff.filter(x => x.eff === 'rejected').map(x => x.b);
+    const totalForPct = funnel.total || 1;
+    const fechadosCount = funnel.fechados;
     return {
-      total: periodBudgets.length,
-      pending: pending.length,
-      approved: approved.length,
-      inProduction: inProd.length,
-      rejected: rejected.length,
-      rejectedList: rejected,
-      revenueApproved: sum(approved) + sum(inProd),
-      revenueApprovedOnly: sum(approved),
-      revenueInProduction: sum(inProd),
-      revenuePending: sum(pending),
-      revenueLost: sum(rejected),
-      ticketMedio: won > 0 ? (sum(approved) + sum(inProd)) / won : 0,
-      winRate,
-      pctApproved: ((approved.length + inProd.length) / total) * 100,
-      pctPending: (pending.length / total) * 100,
-      pctRejected: (rejected.length / total) * 100,
+      total: funnel.total,
+      pending: funnel.emAberto + funnel.rascunho,
+      approved: fechadosCount - funnel.emProducao - funnel.finalizado,
+      inProduction: funnel.emProducao,
+      rejected: funnel.recusados,
+      rejectedList,
+      // FATURAMENTO real (todos os fechados: aprovado + produção + instalação + finalizado)
+      revenueApproved: snap.faturamentoFechado,
+      revenueApprovedOnly: snap.faturamentoAprovado,
+      revenueInProduction: snap.faturamentoEmProducao + snap.faturamentoFinalizado,
+      revenuePending: snap.faturamentoEmAberto,
+      revenueLost: snap.faturamentoPerdido,
+      ticketMedio: funnel.ticketMedio,
+      winRate: funnel.conversao,
+      pctApproved: (fechadosCount / totalForPct) * 100,
+      pctPending: ((funnel.emAberto + funnel.rascunho) / totalForPct) * 100,
+      pctRejected: (funnel.recusados / totalForPct) * 100,
+      tempoMedioDias: funnel.tempoMedioFechamentoDias,
+      margemMedia: snap.margemMedia,
+      lucroBruto: snap.lucroBrutoFechado,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodBudgets, activeProductionBudgetIds]);
+  }, [budgets, funnelPeriod, activeProductionBudgetIds]);
 
   const periodLabel: Record<typeof funnelPeriod, string> = {
     month: 'Este mês',

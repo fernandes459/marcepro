@@ -1,102 +1,84 @@
-## Objetivo
-Transformar o módulo Financeiro em uma central executiva da marcenaria (saldo real, previsões, alertas e críticas inteligentes) e criar a aba **Colaboradores** para registrar horas/dias trabalhados, integrada às despesas com nome do colaborador como subcategoria.
+# Reestruturação Total — ERP Marcenaria Premium
+
+Escopo grande. Vou executar em **6 ondas sequenciais**, cada onda entregando algo funcional e testável. Confirme e eu começo pela Onda 1.
 
 ---
 
-## 1. Financeiro voltado para empresa
+## Onda 1 — Fundação: Status canônicos + FinancialEngine
 
-### 1.1 Novos KPIs no topo (Home do Financeiro)
-- **Saldo Real** = soma `current_balance` de todas as contas bancárias (caixa atual disponível).
-- **Saldo Projetado (30 dias)** = Saldo Real + Receitas previstas (próximos 30 dias) − Despesas previstas (próximos 30 dias).
-- **Receitas Previstas** = total `pending`/`overdue` do tipo `income` com `due_date` nos próximos 30 dias.
-- **Despesas Previstas** = idem para `expense` (separa fixas vs. variáveis).
-- **Receitas Realizadas (mês)** e **Despesas Realizadas (mês)** — já existentes, manter.
-- **Burn Rate** = média mensal de despesas dos últimos 3 meses.
-- **Runway** = Saldo Real ÷ Burn Rate (meses de "fôlego").
+**Objetivo:** acabar com a divergência de números criando uma única fonte de verdade.
 
-### 1.2 Painel de Sugestões e Críticas (novo card destacado)
-Engine de regras que analisa as transações e gera alertas dinâmicos. Exemplos:
-- Despesas fixas > 60% das receitas → "Custos fixos altos demais."
-- Margem de lucro do mês < margem mínima (`company_settings.min_margin`) → "Lucro abaixo da meta."
-- Mais de X contas vencidas → "Você tem N contas vencidas totalizando R$..."
-- Categoria com aumento > 30% vs. mês anterior → "Gasto com 'Material' subiu X%."
-- Saldo projetado negativo → "Atenção: caixa pode ficar negativo em N dias."
-- Comissões pendentes não pagas há mais de 15 dias.
-- Cliente com saldo a receber vencido > 30 dias.
-- Cada alerta tem severidade (info/warning/danger), ícone e ação sugerida.
+- Criar `src/core/status.ts` com enum `PROJECT_STATUS` (rascunho, enviado, negociacao, aprovado, producao, instalacao, finalizado, recusado) e helpers `isClosed()`, `isOpen()`, `isRefused()`.
+- Migração SQL: normalizar `budgets.status` (mapear `pending`→`enviado`, `approved`→`aprovado`, `in_production`→`producao`, `rejected`→`recusado`), adicionar `delivered_at`, `lost_reason`.
+- Criar `src/engines/FinancialEngine.ts` — única fonte para: faturamento bruto (orçamentos fechados por `approved_at`), faturamento recebido (transactions paid), a receber, a pagar, saldo real, margem, lucro.
+- Criar `src/engines/MetricsEngine.ts` — funil comercial (abertos, fechados, recusados, conversão, ticket médio, tempo médio fechamento).
+- Refatorar `BudgetsPage`, `DashboardPage`, `FinancePage` para consumir SOMENTE as engines. Proibido cálculo em UI.
 
-### 1.3 Subcategoria nas despesas
-- Adicionar campo **Subcategoria** no `TransactionDialog` (já existe coluna `subcategory` no banco).
-- Para a categoria `Salários/Comissões/Mão de obra`, a subcategoria mostra dropdown com **nome do colaborador** (lista de `employees`).
-- Exibido nas listagens, gráficos e relatórios.
+## Onda 2 — Recebíveis profissionais (pagamento parcial)
+
+- Migração: adicionar `valor_original`, `valor_recebido`, `saldo_aberto` em `financial_transactions` (receitas).
+- Criar `src/engines/ReceivablesEngine.ts` com `registrarPagamento(tituloId, valor, forma, data)` — NUNCA cria novo lançamento, atualiza o título.
+- Tabela `payment_history` (id, transaction_id, valor, data, forma_pagamento, user_id).
+- Status automático: `aberto` → `parcial` → `pago` → `atrasado` (trigger por due_date).
+- UI: dialog "Receber pagamento" no Financeiro com input de valor parcial + histórico.
+
+## Onda 3 — Engenharia comercial (m² + regional + custos reais)
+
+- Tabelas: `m2_pricing_table` (tipo_material, valor_m2) e usar `region_pricing` existente como multiplicador.
+- Em `BudgetWizardDialog`: nova aba "Cálculo por m²" com inputs `metragem`, `tipoMaterial`, `regiao` → calcula `valorBase = m² × tabela[tipo] × multiplicador[regiao]`.
+- `CostEngine` em `src/engines/CostEngine.ts`: soma MDF + ferragens + fita + vidro + mão de obra + montagem + frete + impostos + comissão + op-costs.
+- Margem real, alertas: <15% crítico, <25% alerta, >35% saudável (badge colorido no orçamento).
+
+## Onda 4 — Dashboards executivos (4 painéis)
+
+Refatorar `DashboardPage` em abas:
+- **Comercial**: valor vendido, ticket médio, conversão, ranking vendedores, funil visual, tempo médio fechamento.
+- **Financeiro**: caixa atual, faturado recebido, pendente, inadimplência, contas futuras, fluxo projetado 90 dias, lucro previsto vs realizado.
+- **Operacional**: produção em andamento, instalações, atrasos, entregas no mês.
+- **Estratégico**: margem média, ROI, crescimento MoM/YoY, previsão financeira.
+
+Todos consumindo `FinancialEngine` + `MetricsEngine`.
+
+## Onda 5 — Cliente 360° + Timeline
+
+- Em `ClientsPage`, view de detalhe com KPIs (totalComprado, saldoAberto, qtdProjetos, ticketMedio).
+- Timeline cruzando: orçamentos, aprovações, pagamentos, marcos de produção, instalação, assistências, anotações.
+- Tabela `client_notes` para observações livres + upload de documentos/fotos (storage bucket `client-docs`).
+
+## Onda 6 — Relatórios avançados + Polimento premium
+
+- Página `/relatorios`: DRE simplificado, lucratividade por projeto/cliente/vendedor, inadimplência, curva ABC, previsão de caixa.
+- Exportação PDF/CSV.
+- Refino visual dark premium (Graphite + Gold já no DS), gráficos Recharts polidos, micro-animações framer-motion.
 
 ---
 
-## 2. Aba Colaboradores (nova seção dentro do Financeiro)
+## Detalhes técnicos (resumo)
 
-### 2.1 Tabela nova: `collaborator_work_logs`
-Registra horas/dias trabalhados por colaborador.
-
+```text
+src/
+├── core/
+│   ├── status.ts          ← enum único PROJECT_STATUS + helpers
+│   └── constants.ts
+├── engines/
+│   ├── FinancialEngine.ts ← receita/despesa/saldo/margem
+│   ├── MetricsEngine.ts   ← funil, conversão, ticket
+│   ├── ReceivablesEngine.ts ← pagamento parcial sem duplicar
+│   └── CostEngine.ts      ← custo real composto
+└── services/              ← já existem, vão usar engines
 ```
-- id, user_id, employee_id (uuid)
-- work_date (date)
-- hours_worked (numeric)         -- ex: 8.5
-- days_worked (numeric default 1)
-- hourly_rate (numeric)          -- snapshot do valor/hora no dia
-- daily_rate (numeric)           -- snapshot
-- total_amount (numeric generated) -- hours × rate OU days × daily
-- project_id / budget_id (uuid nullable)  -- vincular a obra
-- description (text)
-- status ('pending' | 'paid')
-- linked_transaction_id (uuid nullable) -- quando vira despesa
-- created_at, updated_at
-```
-RLS: padrão `can_access_data(auth.uid(), user_id)`.
 
-Adicionar em `employees`: `hourly_rate numeric`, `daily_rate numeric` (opcionais).
-
-### 2.2 Interface da aba
-- Lista de colaboradores com totais do mês (horas, dias, valor a pagar).
-- Botão "Registrar Horas" → modal com colaborador, data, horas OU dias, valor calculado, obra vinculada.
-- Filtro por colaborador, mês, status.
-- Botão **"Gerar despesa"** em registros pendentes → cria `financial_transaction` (categoria mão-de-obra, subcategoria = nome do colaborador, valor = total) e marca `status=paid` no log.
-- Resumo: total a pagar do mês por colaborador, custo médio/hora real, ranking.
-
-### 2.3 Integração
-- Card no Painel de Sugestões: "R$ X em horas de colaborador ainda não lançadas."
-- Aparece no DRE como linha de custo.
+Regras invioláveis:
+1. UI nunca calcula — só consome engines.
+2. Pagamento parcial atualiza, nunca duplica.
+3. Status `producao/instalacao/finalizado` contam como FECHADO no funil/faturamento.
+4. Faturamento usa `approved_at` (mês da aprovação), não `created_at`.
+5. Todo módulo financeiro nasce do orçamento aprovado (auto-geração de recebíveis).
 
 ---
 
-## 3. Detalhes técnicos
+## Pergunta antes de começar
 
-### Migrations
-1. `ALTER TABLE employees ADD COLUMN hourly_rate numeric DEFAULT 0, ADD COLUMN daily_rate numeric DEFAULT 0;`
-2. Criar tabela `collaborator_work_logs` + RLS + trigger updated_at.
+Cada onda dura ~1 mensagem grande de trabalho (migrations + 5-15 arquivos). **Confirma que toco onda por onda nessa ordem?** Se sim, começo agora pela Onda 1 (fundação — sem ela as outras não fecham).
 
-### Arquivos a criar
-- `src/components/finance/FinancialAdvisor.tsx` — engine de sugestões/críticas.
-- `src/components/finance/CollaboratorTab.tsx` — aba de horas trabalhadas.
-- `src/components/finance/WorkLogDialog.tsx` — modal de registro.
-- `src/hooks/useFinancialInsights.ts` — regras de análise.
-
-### Arquivos a editar
-- `src/pages/FinancePage.tsx` — novos KPIs, nova section `colaboradores`, integrar Advisor.
-- `src/components/finance/TransactionDialog.tsx` — campo subcategoria + dropdown colaborador para categorias de mão-de-obra.
-- `src/lib/finance-calc.ts` — funções `computeBurnRate`, `computeRunway`, `projectedBalance`.
-
-### UX
-- Mantém estética luxury (Graphite/Gold, Playfair).
-- Cards de alerta com cores semânticas (warning/destructive/success).
-- Tudo realtime via Supabase channels.
-
----
-
-## Fluxo para o usuário
-1. Abre Financeiro → vê instantaneamente Saldo Real, Saldo Projetado, alertas críticos no topo.
-2. Lê críticas: "Sua margem está em 18% (mínimo 25%). Reveja preço dos últimos orçamentos."
-3. Vai na aba **Colaboradores** → registra "João trabalhou 8h hoje na obra do cliente Maria."
-4. Clica "Gerar despesa" → vira lançamento financeiro com subcategoria "João Silva".
-5. Volta no Financeiro → vê impacto real no caixa e no lucro do projeto.
-
-Posso prosseguir com essa implementação?
+Se quiser inverter prioridade (ex: começar pelos recebíveis parciais, ou pelos dashboards), me diga.
