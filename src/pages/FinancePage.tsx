@@ -25,6 +25,7 @@ import { CurrencyInput } from '@/components/CurrencyInput';
 import { TransactionDialog } from '@/components/finance/TransactionDialog';
 import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
 import ReceivableDetailDialog from '@/components/finance/ReceivableDetailDialog';
+import PartialPaymentDialog from '@/components/finance/PartialPaymentDialog';
 import CollaboratorTab from '@/components/finance/CollaboratorTab';
 import FinancialAdvisor from '@/components/finance/FinancialAdvisor';
 import { useFinancialInsights, computeFinancialMetrics } from '@/hooks/useFinancialInsights';
@@ -118,6 +119,7 @@ export default function FinancePage() {
   // Edit transaction state - uses full TransactionDialog
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
+  const [paymentTx, setPaymentTx] = useState<Transaction | null>(null);
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
@@ -297,9 +299,16 @@ export default function FinancePage() {
   }
 
   async function markPaid(id: string) {
+    // Mantido para compat. Mas o fluxo padrão agora abre o dialog de pagamento (parcial/total).
+    const tx = transactions.find(t => t.id === id);
+    if (tx) { setPaymentTx(tx); return; }
     await supabase.from('financial_transactions').update({ status: 'paid', paid_date: new Date().toISOString().slice(0, 10) } as any).eq('id', id);
     toast.success('Marcado como pago');
     fetchAll();
+  }
+
+  function openPayment(tx: Transaction) {
+    setPaymentTx(tx);
   }
 
   async function deleteTransaction(id: string) {
@@ -1513,8 +1522,21 @@ export default function FinancePage() {
         allTransactions={transactions}
         clients={clients}
         budgets={budgetsList}
-        onMarkPaid={(id) => { markPaid(id); setDetailTx(null); }}
+        onMarkPaid={(id) => {
+          const tx = transactions.find(t => t.id === id);
+          if (tx) setPaymentTx(tx);
+          setDetailTx(null);
+        }}
       />
+
+      <PartialPaymentDialog
+        open={!!paymentTx}
+        onOpenChange={(o) => { if (!o) setPaymentTx(null); }}
+        transaction={paymentTx as any}
+        bankAccounts={bankAccountsWithBalance}
+        onSaved={fetchAll}
+      />
+
 
       <Dialog open={bankDialogOpen} onOpenChange={(o) => { setBankDialogOpen(o); if (!o) { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' }); } }}>
         <DialogContent className="max-w-md">

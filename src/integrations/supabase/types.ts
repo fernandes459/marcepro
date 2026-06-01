@@ -775,11 +775,14 @@ export type Database = {
           paid_date: string | null
           payment_method: string | null
           recurrence: string | null
+          saldo_aberto: number | null
           status: string
           subcategory: string | null
           type: string
           updated_at: string
           user_id: string
+          valor_original: number | null
+          valor_recebido: number
         }
         Insert: {
           amount?: number
@@ -799,11 +802,14 @@ export type Database = {
           paid_date?: string | null
           payment_method?: string | null
           recurrence?: string | null
+          saldo_aberto?: number | null
           status?: string
           subcategory?: string | null
           type: string
           updated_at?: string
           user_id: string
+          valor_original?: number | null
+          valor_recebido?: number
         }
         Update: {
           amount?: number
@@ -823,11 +829,14 @@ export type Database = {
           paid_date?: string | null
           payment_method?: string | null
           recurrence?: string | null
+          saldo_aberto?: number | null
           status?: string
           subcategory?: string | null
           type?: string
           updated_at?: string
           user_id?: string
+          valor_original?: number | null
+          valor_recebido?: number
         }
         Relationships: [
           {
@@ -1140,6 +1149,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      payment_history: {
+        Row: {
+          bank_account_id: string | null
+          company_id: string | null
+          created_at: string
+          data: string
+          forma_pagamento: string | null
+          id: string
+          notes: string | null
+          transaction_id: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          bank_account_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          data?: string
+          forma_pagamento?: string | null
+          id?: string
+          notes?: string | null
+          transaction_id: string
+          user_id: string
+          valor?: number
+        }
+        Update: {
+          bank_account_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          data?: string
+          forma_pagamento?: string | null
+          id?: string
+          notes?: string | null
+          transaction_id?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_history_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "financial_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_milestones: {
         Row: {
@@ -1562,6 +1618,17 @@ export type Database = {
           _summary?: string
         }
         Returns: string
+      }
+      registrar_pagamento_parcial: {
+        Args: {
+          _bank_account_id?: string
+          _data?: string
+          _forma_pagamento?: string
+          _notes?: string
+          _transaction_id: string
+          _valor: number
+        }
+        Returns: Json
       }
     }
     Enums: {
