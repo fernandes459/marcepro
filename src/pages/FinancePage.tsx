@@ -299,9 +299,16 @@ export default function FinancePage() {
   }
 
   async function markPaid(id: string) {
+    // Mantido para compat. Mas o fluxo padrão agora abre o dialog de pagamento (parcial/total).
+    const tx = transactions.find(t => t.id === id);
+    if (tx) { setPaymentTx(tx); return; }
     await supabase.from('financial_transactions').update({ status: 'paid', paid_date: new Date().toISOString().slice(0, 10) } as any).eq('id', id);
     toast.success('Marcado como pago');
     fetchAll();
+  }
+
+  function openPayment(tx: Transaction) {
+    setPaymentTx(tx);
   }
 
   async function deleteTransaction(id: string) {
