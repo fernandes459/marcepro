@@ -119,6 +119,7 @@ export default function FinancePage() {
   // Edit transaction state - uses full TransactionDialog
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
+  const [paymentTx, setPaymentTx] = useState<Transaction | null>(null);
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
