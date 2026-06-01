@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, CheckCircle2, History, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
-import CurrencyInput from '@/components/CurrencyInput';
+import { CurrencyInput } from '@/components/CurrencyInput';
 import { formatBRL } from '@/lib/format';
 import { registrarPagamento, fetchPaymentHistory, getSaldoAberto, PaymentHistoryRow } from '@/engines/ReceivablesEngine';
 
