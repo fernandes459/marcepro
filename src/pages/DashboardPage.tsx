@@ -175,21 +175,30 @@ export default function DashboardPage() {
   const goalRemaining = Math.max(0, monthlyGoal - monthIncome);
 
   // ===== Ponto de Equilíbrio (Break-Even) =====
+  // Fixas e variáveis usam TODAS as despesas do período (pagas + pendentes),
+  // para bater com o DRE e com o Top Categorias enviado à IA. A receita usa
+  // o que efetivamente entrou (paid) — definição padrão de break-even.
   const breakEven = useMemo(() => {
-    const paid = filteredTransactions.filter(t => t.status === 'paid');
-    const revenue = paid.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
-    const fixed = paid
-      .filter(t => t.type === 'expense' && isFixedExpense(t.category, t.is_fixed))
+    const expenses = filteredTransactions.filter(t => t.type === 'expense' && t.status !== 'cancelled');
+    const revenue = filteredTransactions
+      .filter(t => t.type === 'income' && t.status === 'paid')
       .reduce((s, t) => s + Number(t.amount), 0);
-    const variable = paid
-      .filter(t => t.type === 'expense' && !isFixedExpense(t.category, t.is_fixed))
+    const fixed = expenses
+      .filter(t => isFixedExpense(t.category, t.is_fixed))
       .reduce((s, t) => s + Number(t.amount), 0);
-    // Margem de Contribuição = (Receita - Custos Variáveis) / Receita
+    const variable = expenses
+      .filter(t => !isFixedExpense(t.category, t.is_fixed))
+      .reduce((s, t) => s + Number(t.amount), 0);
     const contributionMargin = revenue > 0 ? (revenue - variable) / revenue : 0;
     const point = contributionMargin > 0 ? fixed / contributionMargin : 0;
     const coverage = point > 0 ? Math.min(100, (revenue / point) * 100) : (fixed === 0 ? 100 : 0);
     return { fixed, variable, revenue, contributionMargin, point, coverage };
   }, [filteredTransactions]);
+
+  const cashBalance = useMemo(
+    () => calculateAvailableBalance(filteredTransactions as any, bankAccounts as any),
+    [filteredTransactions, bankAccounts]
+  );
 
   // ===== Projetos =====
   const activeProjects = useMemo(() => filteredTasks.filter(t => t.stage !== 'entregue'), [filteredTasks]);
