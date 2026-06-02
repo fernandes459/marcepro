@@ -283,7 +283,7 @@ export default function DashboardPage() {
       total_expenses: monthExpense,
       profit: monthProfit,
       margin_percent: margin,
-      cash_balance: 0,
+      cash_balance: cashBalance,
       overdue_receivables: overdueAmount,
       overdue_count: overdueReceivables.length,
       active_projects: activeProjects.length,
@@ -294,7 +294,7 @@ export default function DashboardPage() {
       top_clients: topClients,
       top_expense_categories: topExpenseCategories,
     };
-  }, [periodLabel, monthIncome, monthExpense, monthProfit, breakEven, activeProjects.length, assistanceProjects.length, deliveredProjects.length, monthlyGoal, filteredTransactions, overdueReceivables, clientsList]);
+  }, [periodLabel, monthIncome, monthExpense, monthProfit, breakEven, activeProjects.length, assistanceProjects.length, deliveredProjects.length, monthlyGoal, filteredTransactions, overdueReceivables, clientsList, cashBalance]);
 
   // ===== Taxa de Conversão (orçamentos do período) =====
   const periodBudgets = useMemo(
