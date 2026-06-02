@@ -538,6 +538,7 @@ export default function FinancePage() {
       { id: 'vencer', label: 'A Vencer', icon: Clock, onClick: () => setActiveSection('vencer') },
       { id: 'recebidos', label: 'Recebidos', icon: CheckCircle2, onClick: () => setActiveSection('recebidos') },
       { id: 'dre', label: 'DRE', icon: BarChart3, onClick: () => setActiveSection('dre') },
+      { id: 'despesas', label: 'Despesas', icon: PieChartIcon, onClick: () => setActiveSection('despesas') },
       { id: 'relatorio', label: 'Relatório', icon: FileBarChart, onClick: () => setActiveSection('relatorio') },
       { id: 'marcos', label: 'Marcos', icon: Milestone, onClick: () => setActiveSection('marcos') },
       { id: 'colaboradores', label: 'Colaboradores', icon: Users, onClick: () => setActiveSection('colaboradores') },
