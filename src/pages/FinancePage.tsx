@@ -495,6 +495,7 @@ export default function FinancePage() {
   const miniCards = [
     { id: 'lancamentos' as Section, title: 'Lançamentos', icon: Receipt, value: String(periodTransactions.length), sub: 'registros', color: 'text-primary' },
     { id: 'dre' as Section, title: 'DRE', icon: BarChart3, value: formatBRL(dreData.profit), sub: 'resultado do período', color: dreData.profit >= 0 ? 'text-success' : 'text-destructive' },
+    { id: 'despesas' as Section, title: 'Despesas', icon: PieChartIcon, value: formatBRL(dreData.totalExp), sub: `${formatBRL(dreData.fixedExp)} fixas`, color: 'text-destructive' },
     { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(globalPending.all.length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
     { id: 'recebidos' as Section, title: 'Recebidos', icon: CheckCircle2, value: formatBRL(paidIncome), sub: 'total recebido', color: 'text-success' },
     { id: 'relatorio' as Section, title: 'Relatório', icon: FileBarChart, value: String(clientProfitData.length), sub: 'clientes', color: 'text-info' },
