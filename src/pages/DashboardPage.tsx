@@ -18,7 +18,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
-import { summarizeFinance } from '@/lib/finance-calc';
+import { summarizeFinance, calculateAvailableBalance } from '@/lib/finance-calc';
 import { isFixedExpense } from '@/lib/financial';
 import ExecutiveAIPanel, { type ExecutiveMetrics } from '@/components/dashboard/ExecutiveAIPanel';
 
@@ -86,6 +86,7 @@ export default function DashboardPage() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [clientsList, setClientsList] = useState<ClientRow[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<{ id: string; current_balance: number; initial_balance: number | string | null }[]>([]);
   const [monthlyGoal, setMonthlyGoal] = useState(0);
   const [loading, setLoading] = useState(true);
   const today = useMemo(() => new Date(), []);
@@ -98,18 +99,20 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async () => {
     if (!user) return;
-    const [txRes, budRes, taskRes, settingsRes, clientsRes] = await Promise.all([
+    const [txRes, budRes, taskRes, settingsRes, clientsRes, banksRes] = await Promise.all([
       supabase.from('financial_transactions').select('id, type, amount, date, due_date, status, category, is_fixed'),
       supabase.from('budgets').select('id, status, final_price, created_at, client_id, clients(name)').order('created_at', { ascending: false }),
       supabase.from('production_tasks').select('id, stage, project_name, client_name, due_date'),
       supabase.from('company_settings').select('monthly_goal').maybeSingle(),
       supabase.from('clients').select('id, name, city, state, total_spent, budgets_count'),
+      supabase.from('bank_accounts').select('id, current_balance, initial_balance'),
     ]);
     if (txRes.data) setTransactions(txRes.data as Tx[]);
     if (budRes.data) setBudgets(budRes.data as unknown as Budget[]);
     if (taskRes.data) setTasks(taskRes.data as Task[]);
     if (settingsRes.data) setMonthlyGoal(Number(settingsRes.data.monthly_goal) || 0);
     if (clientsRes.data) setClientsList(clientsRes.data as ClientRow[]);
+    if (banksRes.data) setBankAccounts(banksRes.data as any);
     setLoading(false);
   }, [user]);
 
@@ -124,6 +127,7 @@ export default function DashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'production_tasks' }, () => void fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'company_settings' }, () => void fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => void fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts' }, () => void fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData, user]);
@@ -172,21 +176,30 @@ export default function DashboardPage() {
   const goalRemaining = Math.max(0, monthlyGoal - monthIncome);
 
   // ===== Ponto de Equilíbrio (Break-Even) =====
+  // Fixas e variáveis usam TODAS as despesas do período (pagas + pendentes),
+  // para bater com o DRE e com o Top Categorias enviado à IA. A receita usa
+  // o que efetivamente entrou (paid) — definição padrão de break-even.
   const breakEven = useMemo(() => {
-    const paid = filteredTransactions.filter(t => t.status === 'paid');
-    const revenue = paid.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
-    const fixed = paid
-      .filter(t => t.type === 'expense' && isFixedExpense(t.category, t.is_fixed))
+    const expenses = filteredTransactions.filter(t => t.type === 'expense' && t.status !== 'cancelled');
+    const revenue = filteredTransactions
+      .filter(t => t.type === 'income' && t.status === 'paid')
       .reduce((s, t) => s + Number(t.amount), 0);
-    const variable = paid
-      .filter(t => t.type === 'expense' && !isFixedExpense(t.category, t.is_fixed))
+    const fixed = expenses
+      .filter(t => isFixedExpense(t.category, t.is_fixed))
       .reduce((s, t) => s + Number(t.amount), 0);
-    // Margem de Contribuição = (Receita - Custos Variáveis) / Receita
+    const variable = expenses
+      .filter(t => !isFixedExpense(t.category, t.is_fixed))
+      .reduce((s, t) => s + Number(t.amount), 0);
     const contributionMargin = revenue > 0 ? (revenue - variable) / revenue : 0;
     const point = contributionMargin > 0 ? fixed / contributionMargin : 0;
     const coverage = point > 0 ? Math.min(100, (revenue / point) * 100) : (fixed === 0 ? 100 : 0);
     return { fixed, variable, revenue, contributionMargin, point, coverage };
   }, [filteredTransactions]);
+
+  const cashBalance = useMemo(
+    () => calculateAvailableBalance(filteredTransactions as any, bankAccounts as any),
+    [filteredTransactions, bankAccounts]
+  );
 
   // ===== Projetos =====
   const activeProjects = useMemo(() => filteredTasks.filter(t => t.stage !== 'entregue'), [filteredTasks]);
@@ -271,7 +284,7 @@ export default function DashboardPage() {
       total_expenses: monthExpense,
       profit: monthProfit,
       margin_percent: margin,
-      cash_balance: 0,
+      cash_balance: cashBalance,
       overdue_receivables: overdueAmount,
       overdue_count: overdueReceivables.length,
       active_projects: activeProjects.length,
@@ -282,7 +295,7 @@ export default function DashboardPage() {
       top_clients: topClients,
       top_expense_categories: topExpenseCategories,
     };
-  }, [periodLabel, monthIncome, monthExpense, monthProfit, breakEven, activeProjects.length, assistanceProjects.length, deliveredProjects.length, monthlyGoal, filteredTransactions, overdueReceivables, clientsList]);
+  }, [periodLabel, monthIncome, monthExpense, monthProfit, breakEven, activeProjects.length, assistanceProjects.length, deliveredProjects.length, monthlyGoal, filteredTransactions, overdueReceivables, clientsList, cashBalance]);
 
   // ===== Taxa de Conversão (orçamentos do período) =====
   const periodBudgets = useMemo(

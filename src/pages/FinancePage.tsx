@@ -86,7 +86,7 @@ const EXPENSE_COLORS = ['hsl(28, 85%, 56%)', 'hsl(0, 72%, 51%)', 'hsl(38, 92%, 5
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.06 } } };
 const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } };
 
-type Section = 'home' | 'lancamentos' | 'dre' | 'vencer' | 'recebidos' | 'relatorio' | 'contas' | 'marcos' | 'colaboradores';
+type Section = 'home' | 'lancamentos' | 'dre' | 'despesas' | 'vencer' | 'recebidos' | 'relatorio' | 'contas' | 'marcos' | 'colaboradores';
 
 export default function FinancePage() {
   const { user } = useAuth();
@@ -495,6 +495,7 @@ export default function FinancePage() {
   const miniCards = [
     { id: 'lancamentos' as Section, title: 'Lançamentos', icon: Receipt, value: String(periodTransactions.length), sub: 'registros', color: 'text-primary' },
     { id: 'dre' as Section, title: 'DRE', icon: BarChart3, value: formatBRL(dreData.profit), sub: 'resultado do período', color: dreData.profit >= 0 ? 'text-success' : 'text-destructive' },
+    { id: 'despesas' as Section, title: 'Despesas', icon: PieChartIcon, value: formatBRL(dreData.totalExp), sub: `${formatBRL(dreData.fixedExp)} fixas`, color: 'text-destructive' },
     { id: 'vencer' as Section, title: 'A Vencer', icon: Clock, value: String(globalPending.all.length), sub: formatBRL(pendingPayable + pendingReceivable), color: 'text-warning' },
     { id: 'recebidos' as Section, title: 'Recebidos', icon: CheckCircle2, value: formatBRL(paidIncome), sub: 'total recebido', color: 'text-success' },
     { id: 'relatorio' as Section, title: 'Relatório', icon: FileBarChart, value: String(clientProfitData.length), sub: 'clientes', color: 'text-info' },
@@ -506,6 +507,7 @@ export default function FinancePage() {
     switch (activeSection) {
       case 'lancamentos': return renderLancamentos();
       case 'dre': return renderDRE();
+      case 'despesas': return renderDespesas();
       case 'vencer': return renderAVencer();
       case 'recebidos': return renderRecebidos();
       case 'relatorio': return renderRelatorio();
@@ -536,6 +538,7 @@ export default function FinancePage() {
       { id: 'vencer', label: 'A Vencer', icon: Clock, onClick: () => setActiveSection('vencer') },
       { id: 'recebidos', label: 'Recebidos', icon: CheckCircle2, onClick: () => setActiveSection('recebidos') },
       { id: 'dre', label: 'DRE', icon: BarChart3, onClick: () => setActiveSection('dre') },
+      { id: 'despesas', label: 'Despesas', icon: PieChartIcon, onClick: () => setActiveSection('despesas') },
       { id: 'relatorio', label: 'Relatório', icon: FileBarChart, onClick: () => setActiveSection('relatorio') },
       { id: 'marcos', label: 'Marcos', icon: Milestone, onClick: () => setActiveSection('marcos') },
       { id: 'colaboradores', label: 'Colaboradores', icon: Users, onClick: () => setActiveSection('colaboradores') },
@@ -1114,6 +1117,147 @@ export default function FinancePage() {
       </div>
     );
   }
+
+  function renderDespesas() {
+    const expenses = periodTransactions.filter(t => t.type === 'expense' && t.status !== 'cancelled');
+    const fixedList = expenses.filter(t => isFixedExpense(t.category, t.is_fixed));
+    const variableList = expenses.filter(t => !isFixedExpense(t.category, t.is_fixed));
+    const fixedTotal = fixedList.reduce((s, t) => s + Number(t.amount), 0);
+    const variableTotal = variableList.reduce((s, t) => s + Number(t.amount), 0);
+    const total = fixedTotal + variableTotal;
+    const fixedPct = total > 0 ? (fixedTotal / total) * 100 : 0;
+    const variablePct = total > 0 ? (variableTotal / total) * 100 : 0;
+
+    function aggregate(list: Transaction[]) {
+      const map: Record<string, { paid: number; pending: number; count: number }> = {};
+      list.forEach(t => {
+        const key = t.category;
+        if (!map[key]) map[key] = { paid: 0, pending: 0, count: 0 };
+        const amt = Number(t.amount);
+        if (t.status === 'paid') map[key].paid += amt; else map[key].pending += amt;
+        map[key].count += 1;
+      });
+      return Object.entries(map)
+        .map(([cat, v]) => ({
+          category: cat,
+          label: getCategoryLabel(mergedCategories, cat),
+          total: v.paid + v.pending,
+          paid: v.paid,
+          pending: v.pending,
+          count: v.count,
+        }))
+        .sort((a, b) => b.total - a.total);
+    }
+
+    const fixedAgg = aggregate(fixedList);
+    const variableAgg = aggregate(variableList);
+
+    const monthRevenue = dreData.revenue;
+    const fixedPctRevenue = monthRevenue > 0 ? (fixedTotal / monthRevenue) * 100 : 0;
+    const variablePctRevenue = monthRevenue > 0 ? (variableTotal / monthRevenue) * 100 : 0;
+
+    function CategoryList({ items, tone }: { items: ReturnType<typeof aggregate>; tone: 'fixed' | 'variable' }) {
+      if (items.length === 0) {
+        return <p className="text-sm text-muted-foreground py-6 text-center">Nenhuma despesa {tone === 'fixed' ? 'fixa' : 'variável'} no período.</p>;
+      }
+      const max = items[0].total || 1;
+      const barColor = tone === 'fixed' ? 'bg-warning' : 'bg-destructive';
+      return (
+        <div className="space-y-3">
+          {items.map(item => (
+            <div key={item.category} className="space-y-1">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{item.label}</span>
+                <span className="tabular-nums font-semibold">{formatBRL(item.total)}</span>
+              </div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div className={`h-full ${barColor}`} style={{ width: `${(item.total / max) * 100}%` }} />
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>{item.count} lançamento{item.count !== 1 ? 's' : ''}</span>
+                <span>
+                  Pago {formatBRL(item.paid)} · Pendente {formatBRL(item.pending)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {/* Resumo */}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Despesas Fixas</p>
+              <p className="text-2xl font-bold font-display text-warning tabular-nums mt-1">{formatBRL(fixedTotal)}</p>
+              <p className="text-[11px] text-muted-foreground">{fixedPct.toFixed(1)}% do total · {fixedPctRevenue.toFixed(1)}% da receita</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Despesas Variáveis</p>
+              <p className="text-2xl font-bold font-display text-destructive tabular-nums mt-1">{formatBRL(variableTotal)}</p>
+              <p className="text-[11px] text-muted-foreground">{variablePct.toFixed(1)}% do total · {variablePctRevenue.toFixed(1)}% da receita</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Total no Período</p>
+              <p className="text-2xl font-bold font-display text-foreground tabular-nums mt-1">{formatBRL(total)}</p>
+              <p className="text-[11px] text-muted-foreground">{expenses.length} lançamento{expenses.length !== 1 ? 's' : ''}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Barra comparativa */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-display">Composição Fixo vs Variável</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {total > 0 ? (
+              <>
+                <div className="flex h-3 rounded-full overflow-hidden bg-muted">
+                  <div className="bg-warning" style={{ width: `${fixedPct}%` }} title={`Fixas ${fixedPct.toFixed(1)}%`} />
+                  <div className="bg-destructive" style={{ width: `${variablePct}%` }} title={`Variáveis ${variablePct.toFixed(1)}%`} />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-warning" /> Fixas {fixedPct.toFixed(1)}%</div>
+                  <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-destructive" /> Variáveis {variablePct.toFixed(1)}%</div>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">Sem despesas registradas no período.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Categorias */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-display flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-warning" /> Custos Fixos
+              </CardTitle>
+              <p className="text-[10px] text-muted-foreground">Aluguel, salários, água/luz/internet, manutenção. Independem do volume de obras.</p>
+            </CardHeader>
+            <CardContent><CategoryList items={fixedAgg} tone="fixed" /></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-display flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-destructive" /> Custos Variáveis
+              </CardTitle>
+              <p className="text-[10px] text-muted-foreground">Material, impostos, comissões, fretes, mão de obra extra. Crescem com a produção.</p>
+            </CardHeader>
+            <CardContent><CategoryList items={variableAgg} tone="variable" /></CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
 
   function renderAVencer() {
     // SEMPRE global (todos os pendentes/vencidos, mesmo de meses anteriores)
