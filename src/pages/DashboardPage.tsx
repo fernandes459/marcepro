@@ -18,7 +18,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
-import { summarizeFinance } from '@/lib/finance-calc';
+import { summarizeFinance, calculateAvailableBalance } from '@/lib/finance-calc';
 import { isFixedExpense } from '@/lib/financial';
 import ExecutiveAIPanel, { type ExecutiveMetrics } from '@/components/dashboard/ExecutiveAIPanel';
 
