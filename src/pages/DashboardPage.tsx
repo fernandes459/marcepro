@@ -86,6 +86,7 @@ export default function DashboardPage() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [clientsList, setClientsList] = useState<ClientRow[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<{ id: string; current_balance: number; initial_balance: number | string | null }[]>([]);
   const [monthlyGoal, setMonthlyGoal] = useState(0);
   const [loading, setLoading] = useState(true);
   const today = useMemo(() => new Date(), []);
