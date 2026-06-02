@@ -507,6 +507,7 @@ export default function FinancePage() {
     switch (activeSection) {
       case 'lancamentos': return renderLancamentos();
       case 'dre': return renderDRE();
+      case 'despesas': return renderDespesas();
       case 'vencer': return renderAVencer();
       case 'recebidos': return renderRecebidos();
       case 'relatorio': return renderRelatorio();
