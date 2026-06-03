@@ -696,7 +696,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-2">
                 {regionStats.map((r, i) => {
-                  const pct = totalClientsWithRegion > 0 ? (r.clients / totalClientsWithRegion) * 100 : 0;
+                  const pct = totalRegionRevenue > 0 ? (r.revenue / totalRegionRevenue) * 100 : 0;
                   return (
                     <div key={r.region} className="rounded-xl border border-border/50 p-3 hover:bg-muted/30 transition-colors">
                       <div className="flex items-center justify-between gap-3 mb-1.5">
@@ -706,11 +706,15 @@ export default function DashboardPage() {
                           <span className="text-sm font-semibold truncate">{r.region}</span>
                         </div>
                         <div className="flex items-center gap-3 text-[11px] shrink-0">
-                          <span className="text-muted-foreground">{r.clients} cliente(s)</span>
+                          <span className="text-muted-foreground">{r.budgets} fechado(s)</span>
                           <span className="font-semibold text-gold tabular-nums">{formatBRL(r.revenue)}</span>
                         </div>
                       </div>
                       <Progress value={pct} className="h-1.5" />
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1.5">
+                        <span>{r.clients} cliente(s)</span>
+                        <span>Ticket médio <span className="font-semibold text-foreground tabular-nums">{formatBRL(r.ticket)}</span></span>
+                      </div>
                     </div>
                   );
                 })}
