@@ -357,13 +357,15 @@ export default function FinancePage() {
     const overdue = all.filter(t => t.status === 'overdue' || (t.status === 'pending' && t.due_date && t.due_date < today));
     return { receivable, payable, overdueCount: overdue.length, all };
   }, [transactions, today]);
-  // Saldo trazido de períodos anteriores: soma de transações pagas antes do período atual
+  // Saldo trazido de períodos anteriores: saldo inicial das contas + movimentos pagos antes do período.
+  // Garante: previousBalance + (Entradas − Saídas do período) = totalBankBalance.
   const previousBalance = useMemo(() => {
+    const initial = bankAccounts.reduce((s, a) => s + Number(a.initial_balance || 0), 0);
     const before = transactions.filter(t => t.status === 'paid' && t.date && t.date < period.start);
     const inc = before.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
     const exp = before.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
-    return inc - exp;
-  }, [transactions, period.start]);
+    return initial + inc - exp;
+  }, [transactions, bankAccounts, period.start]);
   const totalIncome = summary.income;       // Entradas recebidas no período
   const totalExpense = summary.expense;     // Saídas pagas no período
   const profit = summary.profit;            // Resultado
