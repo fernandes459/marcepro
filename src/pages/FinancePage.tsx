@@ -549,23 +549,24 @@ export default function FinancePage() {
 
     return (
       <>
-        {/* HERO PREMIUM — Saldo dourado (estilo Power BI) */}
+        {/* HERO PREMIUM — Saldo real disponível */}
         <motion.div variants={itemVariants}>
-          <Card className="overflow-hidden border-0 shadow-premium relative bg-gradient-to-br from-[hsl(28,40%,18%)] via-[hsl(25,30%,12%)] to-[hsl(220,16%,10%)]">
-            {/* radial gold glow */}
-            <div className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+          <Card className="overflow-hidden border-border/60 shadow-soft relative bg-card">
+            <div className="pointer-events-none absolute -top-24 -right-16 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
             <CardContent className="p-6 sm:p-8 space-y-6 relative">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1.5">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-primary/80 font-bold">Saldo total disponível</p>
-                  <p className="text-4xl sm:text-5xl font-bold font-display text-gold tracking-tight tabular-nums">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground font-bold">Saldo real disponível</p>
+                  <p className={`text-4xl sm:text-5xl font-bold font-display tracking-tight tabular-nums ${totalBankBalance >= 0 ? 'text-foreground' : 'text-destructive'}`}>
                     {formatBRL(totalBankBalance)}
                   </p>
-                  <p className="text-xs text-white/50">{bankAccounts.length} {bankAccounts.length === 1 ? 'conta ativa' : 'contas ativas'}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {bankAccounts.length} {bankAccounts.length === 1 ? 'conta ativa' : 'contas ativas'} · saldo inicial + entradas pagas − saídas pagas
+                  </p>
                 </div>
                 <button
                   onClick={() => setActiveSection('contas')}
-                  className="rounded-full bg-white/10 hover:bg-white/20 transition-colors p-2.5 text-white"
+                  className="rounded-full bg-muted hover:bg-accent transition-colors p-2.5 text-foreground"
                   title="Ver contas"
                 >
                   <Wallet className="h-4 w-4" />
@@ -573,7 +574,7 @@ export default function FinancePage() {
               </div>
 
               {/* 3 KPIs — Entradas / Saídas / Resultado */}
-              <div className="grid grid-cols-3 gap-5 sm:gap-8 pt-5 border-t border-white/10">
+              <div className="grid grid-cols-3 gap-5 sm:gap-8 pt-5 border-t border-border/60">
                 <div>
                   <div className="flex items-center gap-1.5 text-success text-[10px] uppercase tracking-[0.18em] font-bold">
                     <ArrowUpRight className="h-3.5 w-3.5" /> Entradas
