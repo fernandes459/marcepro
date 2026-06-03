@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
 import { summarizeFinance, calculateAvailableBalance } from '@/lib/finance-calc';
 import { isFixedExpense } from '@/lib/financial';
+import { isClosed, isRefused } from '@/core/status';
 import ExecutiveAIPanel, { type ExecutiveMetrics } from '@/components/dashboard/ExecutiveAIPanel';
 
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -196,9 +197,10 @@ export default function DashboardPage() {
     return { fixed, variable, revenue, contributionMargin, point, coverage };
   }, [filteredTransactions]);
 
+  // Saldo real disponível = independente do filtro de período (dinheiro físico nas contas hoje).
   const cashBalance = useMemo(
-    () => calculateAvailableBalance(filteredTransactions as any, bankAccounts as any),
-    [filteredTransactions, bankAccounts]
+    () => calculateAvailableBalance(transactions as any, bankAccounts as any),
+    [transactions, bankAccounts]
   );
 
   // ===== Projetos =====
@@ -297,36 +299,50 @@ export default function DashboardPage() {
     };
   }, [periodLabel, monthIncome, monthExpense, monthProfit, breakEven, activeProjects.length, assistanceProjects.length, deliveredProjects.length, monthlyGoal, filteredTransactions, overdueReceivables, clientsList, cashBalance]);
 
-  // ===== Taxa de Conversão (orçamentos do período) =====
+  // ===== Taxa de Conversão (orçamentos do período — status canônicos) =====
   const periodBudgets = useMemo(
     () => budgets.filter(b => b.created_at && b.created_at.slice(0, 10) >= period.start && b.created_at.slice(0, 10) <= period.end),
     [budgets, period.start, period.end]
   );
   const conversion = useMemo(() => {
     const total = periodBudgets.length;
-    const won = periodBudgets.filter(b => ['approved', 'aprovado', 'won', 'closed', 'fechado'].includes((b.status || '').toLowerCase())).length;
-    const lost = periodBudgets.filter(b => ['lost', 'rejected', 'perdido', 'recusado'].includes((b.status || '').toLowerCase())).length;
+    const won = periodBudgets.filter(b => isClosed(b.status)).length;
+    const lost = periodBudgets.filter(b => isRefused(b.status)).length;
     const rate = total > 0 ? (won / total) * 100 : 0;
     return { total, won, lost, rate };
   }, [periodBudgets]);
 
-  // ===== Diagnóstico de Regiões =====
+  // ===== Diagnóstico de Regiões — CRUZA dados reais: budgets fechados × cliente (cidade/UF) =====
   const regionStats = useMemo(() => {
-    const map = new Map<string, { region: string; clients: number; revenue: number; budgets: number }>();
-    clientsList.forEach(c => {
+    const clientMap = new Map(clientsList.map(c => [c.id, c]));
+    const map = new Map<string, { region: string; clients: Set<string>; revenue: number; budgets: number }>();
+    budgets.forEach(b => {
+      if (!isClosed(b.status)) return;
+      if (!b.client_id) return;
+      const c = clientMap.get(b.client_id);
+      if (!c) return;
       const city = (c.city || '').trim();
       const uf = (c.state || '').trim().toUpperCase();
       if (!city && !uf) return;
       const key = city ? `${city}${uf ? ' - ' + uf : ''}` : uf;
-      const cur = map.get(key) || { region: key, clients: 0, revenue: 0, budgets: 0 };
-      cur.clients += 1;
-      cur.revenue += Number(c.total_spent || 0);
-      cur.budgets += Number(c.budgets_count || 0);
+      const cur = map.get(key) || { region: key, clients: new Set<string>(), revenue: 0, budgets: 0 };
+      cur.clients.add(b.client_id);
+      cur.revenue += Number(b.final_price || 0);
+      cur.budgets += 1;
       map.set(key, cur);
     });
-    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue || b.clients - a.clients).slice(0, 6);
-  }, [clientsList]);
-  const totalClientsWithRegion = regionStats.reduce((s, r) => s + r.clients, 0);
+    return Array.from(map.values())
+      .map(r => ({
+        region: r.region,
+        clients: r.clients.size,
+        revenue: r.revenue,
+        budgets: r.budgets,
+        ticket: r.budgets > 0 ? r.revenue / r.budgets : 0,
+      }))
+      .sort((a, b) => b.revenue - a.revenue || b.clients - a.clients)
+      .slice(0, 6);
+  }, [budgets, clientsList]);
+  const totalRegionRevenue = regionStats.reduce((s, r) => s + r.revenue, 0);
 
   const hasCriticalAlerts = assistanceProjects.length > 0 || overdueProjects.length > 0 || overdueReceivables.length > 0;
 
@@ -680,7 +696,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-2">
                 {regionStats.map((r, i) => {
-                  const pct = totalClientsWithRegion > 0 ? (r.clients / totalClientsWithRegion) * 100 : 0;
+                  const pct = totalRegionRevenue > 0 ? (r.revenue / totalRegionRevenue) * 100 : 0;
                   return (
                     <div key={r.region} className="rounded-xl border border-border/50 p-3 hover:bg-muted/30 transition-colors">
                       <div className="flex items-center justify-between gap-3 mb-1.5">
@@ -690,11 +706,15 @@ export default function DashboardPage() {
                           <span className="text-sm font-semibold truncate">{r.region}</span>
                         </div>
                         <div className="flex items-center gap-3 text-[11px] shrink-0">
-                          <span className="text-muted-foreground">{r.clients} cliente(s)</span>
+                          <span className="text-muted-foreground">{r.budgets} fechado(s)</span>
                           <span className="font-semibold text-gold tabular-nums">{formatBRL(r.revenue)}</span>
                         </div>
                       </div>
                       <Progress value={pct} className="h-1.5" />
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1.5">
+                        <span>{r.clients} cliente(s)</span>
+                        <span>Ticket médio <span className="font-semibold text-foreground tabular-nums">{formatBRL(r.ticket)}</span></span>
+                      </div>
                     </div>
                   );
                 })}
