@@ -197,9 +197,10 @@ export default function DashboardPage() {
     return { fixed, variable, revenue, contributionMargin, point, coverage };
   }, [filteredTransactions]);
 
+  // Saldo real disponível = independente do filtro de período (dinheiro físico nas contas hoje).
   const cashBalance = useMemo(
-    () => calculateAvailableBalance(filteredTransactions as any, bankAccounts as any),
-    [filteredTransactions, bankAccounts]
+    () => calculateAvailableBalance(transactions as any, bankAccounts as any),
+    [transactions, bankAccounts]
   );
 
   // ===== Projetos =====
