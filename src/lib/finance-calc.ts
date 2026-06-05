@@ -9,7 +9,6 @@ import Decimal from 'decimal.js';
  * - Faturamento (Entradas)  = receitas com status `paid` (dinheiro que entrou)
  * - Despesas    (Saídas)    = despesas com status `paid` (dinheiro que saiu)
  * - Lucro / Resultado       = Faturamento - Despesas
- * - Saldo Disponível        = soma do `current_balance` das contas cadastradas
  * - A Receber               = receitas com status `pending` ou `overdue`
  * - A Pagar                 = despesas com status `pending` ou `overdue`
  * - Vencidos                = qualquer transação com status `overdue` OU
@@ -97,16 +96,6 @@ export function summarizeFinance(txs: FinanceTx[], todayISO?: string): FinanceSu
 }
 
 export function calculateAvailableBalance(txs: FinanceTx[], accounts: FinanceAccount[] = []): number {
-  const accountsWithStoredBalance = accounts.filter(
-    (account) => account.current_balance !== undefined && account.current_balance !== null,
-  );
-
-  if (accountsWithStoredBalance.length > 0) {
-    return accountsWithStoredBalance
-      .reduce((acc, account) => acc.plus(new Decimal(account.current_balance || 0)), new Decimal(0))
-      .toNumber();
-  }
-
   const initialBalance = accounts.reduce(
     (acc, account) => acc.plus(new Decimal(account.initial_balance || 0)),
     new Decimal(0),
@@ -126,16 +115,6 @@ export function calculateAccountBalances(
   accounts: FinanceAccount[] = [],
   transfers: FinanceTransfer[] = [],
 ): Record<string, number> {
-  const accountsWithStoredBalance = accounts.filter(
-    (account) => account.id && account.current_balance !== undefined && account.current_balance !== null,
-  );
-
-  if (accountsWithStoredBalance.length > 0) {
-    return Object.fromEntries(
-      accountsWithStoredBalance.map((account) => [account.id!, new Decimal(account.current_balance || 0).toNumber()]),
-    );
-  }
-
   const balances = new Map<string, Decimal>();
 
   accounts.forEach((account) => {

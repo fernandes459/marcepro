@@ -231,7 +231,7 @@ export default function FinancePage() {
         account_type: bankForm.account_type, agency: bankForm.agency || null,
         account_number: bankForm.account_number || null,
         initial_balance: bankForm.initial_balance,
-        current_balance: bankForm.current_balance,
+        current_balance: bankForm.initial_balance,
         color: bankForm.color,
       } as any).eq('id', editingBankId);
       if (error) { toast.error('Erro ao atualizar conta'); return; }
@@ -241,7 +241,7 @@ export default function FinancePage() {
         user_id: user!.id, name: bankForm.name, bank_name: bankForm.bank_name || null,
         account_type: bankForm.account_type, agency: bankForm.agency || null,
         account_number: bankForm.account_number || null, initial_balance: bankForm.initial_balance,
-        current_balance: bankForm.current_balance, color: bankForm.color,
+        current_balance: bankForm.initial_balance, color: bankForm.color,
         is_main: bankAccounts.length === 0,
       } as any);
       if (error) { toast.error('Erro ao salvar conta'); return; }
@@ -357,12 +357,15 @@ export default function FinancePage() {
     const overdue = all.filter(t => t.status === 'overdue' || (t.status === 'pending' && t.due_date && t.due_date < today));
     return { receivable, payable, overdueCount: overdue.length, all };
   }, [transactions, today]);
-  // Saldo antes do período: saldo atual real − resultado pago do período.
-  // Garante: previousBalance + (Entradas − Saídas do período) = saldo atual das contas.
+  // Saldo trazido de períodos anteriores: saldo inicial das contas + movimentos pagos antes do período.
+  // Garante: previousBalance + (Entradas − Saídas do período) = totalBankBalance.
   const previousBalance = useMemo(() => {
-    const available = calculateAvailableBalance(transactions, bankAccounts);
-    return available - summary.income + summary.expense;
-  }, [bankAccounts, summary.expense, summary.income, transactions]);
+    const initial = bankAccounts.reduce((s, a) => s + Number(a.initial_balance || 0), 0);
+    const before = transactions.filter(t => t.status === 'paid' && t.date && t.date < period.start);
+    const inc = before.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+    const exp = before.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+    return initial + inc - exp;
+  }, [transactions, bankAccounts, period.start]);
   const totalIncome = summary.income;       // Entradas recebidas no período
   const totalExpense = summary.expense;     // Saídas pagas no período
   const profit = summary.profit;            // Resultado
@@ -558,7 +561,7 @@ export default function FinancePage() {
                     {formatBRL(totalBankBalance)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {bankAccounts.length} {bankAccounts.length === 1 ? 'conta ativa' : 'contas ativas'} · soma do saldo atual cadastrado nas contas
+                    {bankAccounts.length} {bankAccounts.length === 1 ? 'conta ativa' : 'contas ativas'} · saldo inicial + entradas pagas − saídas pagas
                   </p>
                 </div>
                 <button
@@ -602,7 +605,7 @@ export default function FinancePage() {
               <CardContent className="p-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Saldo anterior</p>
                 <p className={`text-base sm:text-lg font-bold font-display tabular-nums mt-0.5 ${previousBalance >= 0 ? 'text-info' : 'text-destructive'}`}>{formatBRL(previousBalance)}</p>
-                <p className="text-[10px] text-muted-foreground">saldo antes do período</p>
+                <p className="text-[10px] text-muted-foreground">veio de períodos passados</p>
               </CardContent>
             </Card>
             <Card className="border-l-4 border-l-success cursor-pointer hover:bg-accent/30" onClick={() => setActiveSection('vencer')}>
@@ -1706,19 +1709,18 @@ export default function FinancePage() {
               <div className="space-y-2"><Label>Nº Conta</Label><Input value={bankForm.account_number} onChange={e => setBankForm({ ...bankForm, account_number: e.target.value })} placeholder="12345-6" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Saldo Inicial</Label><CurrencyInput value={bankForm.initial_balance} onChange={v => setBankForm({ ...bankForm, initial_balance: v, ...(editingBankId ? {} : { current_balance: v }) })} /></div>
-              <div className="space-y-2"><Label>Saldo Atual</Label><CurrencyInput value={bankForm.current_balance} onChange={v => setBankForm({ ...bankForm, current_balance: v })} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2"><Label>{editingBankId ? 'Saldo Inicial (histórico)' : 'Saldo Inicial'}</Label><CurrencyInput value={bankForm.initial_balance} onChange={v => setBankForm({ ...bankForm, initial_balance: v, ...(editingBankId ? {} : { current_balance: v }) })} /></div>
               <div className="space-y-2"><Label>Cor</Label><Input type="color" value={bankForm.color} onChange={e => setBankForm({ ...bankForm, color: e.target.value })} className="h-10" /></div>
             </div>
-            <div className="rounded-lg border border-border bg-muted/30 p-3">
-              <Label>Saldo usado no Financeiro</Label>
-              <p className="text-xl font-bold font-display text-gold tabular-nums mt-1">
-                {formatBRL(bankForm.current_balance)}
-              </p>
-              <p className="text-[10px] text-muted-foreground mt-1">Valor disponível informado na conta bancária.</p>
-            </div>
+            {editingBankId && (
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <Label>Saldo calculado em tempo real</Label>
+                <p className="text-xl font-bold font-display text-gold tabular-nums mt-1">
+                  {formatBRL(accountBalances[editingBankId] ?? bankForm.initial_balance)}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1">Saldo inicial + entradas pagas − saídas pagas.</p>
+              </div>
+            )}
             <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleSaveBank}>
               {editingBankId ? 'Salvar Alterações' : 'Cadastrar Conta'}
             </Button>
