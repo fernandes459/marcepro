@@ -1709,18 +1709,19 @@ export default function FinancePage() {
               <div className="space-y-2"><Label>Nº Conta</Label><Input value={bankForm.account_number} onChange={e => setBankForm({ ...bankForm, account_number: e.target.value })} placeholder="12345-6" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>{editingBankId ? 'Saldo Inicial (histórico)' : 'Saldo Inicial'}</Label><CurrencyInput value={bankForm.initial_balance} onChange={v => setBankForm({ ...bankForm, initial_balance: v, ...(editingBankId ? {} : { current_balance: v }) })} /></div>
+              <div className="space-y-2"><Label>Saldo Inicial</Label><CurrencyInput value={bankForm.initial_balance} onChange={v => setBankForm({ ...bankForm, initial_balance: v, ...(editingBankId ? {} : { current_balance: v }) })} /></div>
+              <div className="space-y-2"><Label>Saldo Atual</Label><CurrencyInput value={bankForm.current_balance} onChange={v => setBankForm({ ...bankForm, current_balance: v })} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Cor</Label><Input type="color" value={bankForm.color} onChange={e => setBankForm({ ...bankForm, color: e.target.value })} className="h-10" /></div>
             </div>
-            {editingBankId && (
-              <div className="rounded-lg border border-border bg-muted/30 p-3">
-                <Label>Saldo calculado em tempo real</Label>
-                <p className="text-xl font-bold font-display text-gold tabular-nums mt-1">
-                  {formatBRL(accountBalances[editingBankId] ?? bankForm.initial_balance)}
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-1">Saldo inicial + entradas pagas − saídas pagas.</p>
-              </div>
-            )}
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <Label>Saldo usado no Financeiro</Label>
+              <p className="text-xl font-bold font-display text-gold tabular-nums mt-1">
+                {formatBRL(bankForm.current_balance)}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-1">Valor disponível informado na conta bancária.</p>
+            </div>
             <Button className="w-full gradient-primary shadow-primary border-0" onClick={handleSaveBank}>
               {editingBankId ? 'Salvar Alterações' : 'Cadastrar Conta'}
             </Button>
