@@ -357,15 +357,12 @@ export default function FinancePage() {
     const overdue = all.filter(t => t.status === 'overdue' || (t.status === 'pending' && t.due_date && t.due_date < today));
     return { receivable, payable, overdueCount: overdue.length, all };
   }, [transactions, today]);
-  // Saldo trazido de períodos anteriores: saldo inicial das contas + movimentos pagos antes do período.
-  // Garante: previousBalance + (Entradas − Saídas do período) = totalBankBalance.
+  // Saldo antes do período: saldo atual real − resultado pago do período.
+  // Garante: previousBalance + (Entradas − Saídas do período) = saldo atual das contas.
   const previousBalance = useMemo(() => {
-    const initial = bankAccounts.reduce((s, a) => s + Number(a.initial_balance || 0), 0);
-    const before = transactions.filter(t => t.status === 'paid' && t.date && t.date < period.start);
-    const inc = before.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
-    const exp = before.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
-    return initial + inc - exp;
-  }, [transactions, bankAccounts, period.start]);
+    const available = calculateAvailableBalance(transactions, bankAccounts);
+    return available - summary.income + summary.expense;
+  }, [bankAccounts, summary.expense, summary.income, transactions]);
   const totalIncome = summary.income;       // Entradas recebidas no período
   const totalExpense = summary.expense;     // Saídas pagas no período
   const profit = summary.profit;            // Resultado
@@ -605,7 +602,7 @@ export default function FinancePage() {
               <CardContent className="p-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Saldo anterior</p>
                 <p className={`text-base sm:text-lg font-bold font-display tabular-nums mt-0.5 ${previousBalance >= 0 ? 'text-info' : 'text-destructive'}`}>{formatBRL(previousBalance)}</p>
-                <p className="text-[10px] text-muted-foreground">veio de períodos passados</p>
+                <p className="text-[10px] text-muted-foreground">saldo antes do período</p>
               </CardContent>
             </Card>
             <Card className="border-l-4 border-l-success cursor-pointer hover:bg-accent/30" onClick={() => setActiveSection('vencer')}>
