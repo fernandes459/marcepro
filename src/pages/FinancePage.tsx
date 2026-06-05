@@ -231,7 +231,7 @@ export default function FinancePage() {
         account_type: bankForm.account_type, agency: bankForm.agency || null,
         account_number: bankForm.account_number || null,
         initial_balance: bankForm.initial_balance,
-        current_balance: bankForm.initial_balance,
+        current_balance: bankForm.current_balance,
         color: bankForm.color,
       } as any).eq('id', editingBankId);
       if (error) { toast.error('Erro ao atualizar conta'); return; }
@@ -241,7 +241,7 @@ export default function FinancePage() {
         user_id: user!.id, name: bankForm.name, bank_name: bankForm.bank_name || null,
         account_type: bankForm.account_type, agency: bankForm.agency || null,
         account_number: bankForm.account_number || null, initial_balance: bankForm.initial_balance,
-        current_balance: bankForm.initial_balance, color: bankForm.color,
+        current_balance: bankForm.current_balance, color: bankForm.color,
         is_main: bankAccounts.length === 0,
       } as any);
       if (error) { toast.error('Erro ao salvar conta'); return; }
@@ -561,7 +561,7 @@ export default function FinancePage() {
                     {formatBRL(totalBankBalance)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {bankAccounts.length} {bankAccounts.length === 1 ? 'conta ativa' : 'contas ativas'} · saldo inicial + entradas pagas − saídas pagas
+                    {bankAccounts.length} {bankAccounts.length === 1 ? 'conta ativa' : 'contas ativas'} · soma do saldo atual cadastrado nas contas
                   </p>
                 </div>
                 <button
