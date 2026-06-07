@@ -44,6 +44,7 @@ export interface Budget {
   payment_method: string | null; notes: string | null; client_description: string | null; created_at: string;
   complexity_factor: number; finish_type: string | null;
   seller_id?: string | null; project_type?: string | null; budget_mode?: string | null;
+  source?: string | null;
 }
 
 interface Props {
