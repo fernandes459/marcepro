@@ -178,7 +178,7 @@ export default function BudgetWizardDialog({
   }, [installments, installmentMethod, companySettings]);
 
   function resetAll() {
-    setSelectedClientId(''); setClientNotes('');
+    setSelectedClientId(''); setClientNotes(''); setLeadSource('');
     setProjectName(''); setSellerId(''); setProjectType(''); setBudgetMode('completo');
     setProjectDate(new Date().toISOString().slice(0, 10)); setProjectNotes('');
     setEnvironments(['Cozinha']); setNewEnvName('');
