@@ -281,6 +281,7 @@ export type Database = {
           project_name: string | null
           project_type: string | null
           seller_id: string | null
+          source: string | null
           status: string
           total_cost: number
           updated_at: string
@@ -307,6 +308,7 @@ export type Database = {
           project_name?: string | null
           project_type?: string | null
           seller_id?: string | null
+          source?: string | null
           status?: string
           total_cost?: number
           updated_at?: string
@@ -333,6 +335,7 @@ export type Database = {
           project_name?: string | null
           project_type?: string | null
           seller_id?: string | null
+          source?: string | null
           status?: string
           total_cost?: number
           updated_at?: string
