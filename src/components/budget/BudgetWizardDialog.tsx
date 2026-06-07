@@ -102,6 +102,7 @@ export default function BudgetWizardDialog({
   // Tab 1: Cliente
   const [selectedClientId, setSelectedClientId] = useState('');
   const [clientNotes, setClientNotes] = useState('');
+  const [leadSource, setLeadSource] = useState<string>('');
 
   // Tab 2: Projeto
   const [projectName, setProjectName] = useState('');
