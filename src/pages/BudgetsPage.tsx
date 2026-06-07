@@ -29,6 +29,7 @@ import BudgetWizardDialog, {
 } from '@/components/budget/BudgetWizardDialog';
 import { computeSnapshot, periodFromKey } from '@/engines/FinancialEngine';
 import { computeFunnel } from '@/engines/MetricsEngine';
+import OpenPipelinePanel from '@/components/budget/OpenPipelinePanel';
 
 interface BudgetWithClient extends Budget {
   clients?: Client | null;
