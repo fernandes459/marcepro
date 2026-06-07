@@ -608,14 +608,35 @@ export default function BudgetWizardDialog({
                         </div>
                       </div>
                     )}
-                    <div className="space-y-1.5">
-                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">Observações sobre o cliente</Label>
-                      <Textarea
-                        value={clientNotes}
-                        onChange={(e) => setClientNotes(e.target.value)}
-                        placeholder="Preferências, contatos adicionais, restrições..."
-                        className="min-h-[80px] text-sm"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Como o cliente chegou até você? *</Label>
+                        <Select value={leadSource} onValueChange={setLeadSource}>
+                          <SelectTrigger className="h-11"><SelectValue placeholder="Origem do lead" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="indicacao">Indicação</SelectItem>
+                            <SelectItem value="instagram">Instagram</SelectItem>
+                            <SelectItem value="facebook">Facebook</SelectItem>
+                            <SelectItem value="google">Google / Site</SelectItem>
+                            <SelectItem value="anuncio">Anúncio pago</SelectItem>
+                            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                            <SelectItem value="arquiteto">Arquiteto / Parceiro</SelectItem>
+                            <SelectItem value="showroom">Showroom / Loja</SelectItem>
+                            <SelectItem value="cliente_antigo">Cliente antigo (recompra)</SelectItem>
+                            <SelectItem value="outro">Outro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[10px] text-muted-foreground">Essencial para entender de onde vem seu faturamento.</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Observações sobre o cliente</Label>
+                        <Textarea
+                          value={clientNotes}
+                          onChange={(e) => setClientNotes(e.target.value)}
+                          placeholder="Preferências, contatos adicionais, restrições..."
+                          className="min-h-[80px] text-sm"
+                        />
+                      </div>
                     </div>
                   </div>
                 </TabsContent>
