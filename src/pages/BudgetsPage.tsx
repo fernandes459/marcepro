@@ -29,6 +29,7 @@ import BudgetWizardDialog, {
 } from '@/components/budget/BudgetWizardDialog';
 import { computeSnapshot, periodFromKey } from '@/engines/FinancialEngine';
 import { computeFunnel } from '@/engines/MetricsEngine';
+import OpenPipelinePanel from '@/components/budget/OpenPipelinePanel';
 
 interface BudgetWithClient extends Budget {
   clients?: Client | null;
@@ -595,6 +596,17 @@ export default function BudgetsPage() {
           fetchData();
         }}
         onApprove={async (id) => updateBudgetStatus(id, 'approved')}
+      />
+
+      {/* PIPELINE EM ABERTO — Cards + Diagnóstico IA + cruzamentos */}
+      <OpenPipelinePanel
+        budgets={budgets as any}
+        employees={employees as any}
+        activeProductionIds={activeProductionBudgetIds}
+        onOpenBudget={(id) => {
+          const b = budgets.find(x => x.id === id);
+          if (b) { setEditingBudget(b); setWizardOpen(true); }
+        }}
       />
 
       {/* Funil de Vendas — Diagnóstico do negócio */}

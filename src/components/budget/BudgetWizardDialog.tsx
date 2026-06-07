@@ -44,6 +44,7 @@ export interface Budget {
   payment_method: string | null; notes: string | null; client_description: string | null; created_at: string;
   complexity_factor: number; finish_type: string | null;
   seller_id?: string | null; project_type?: string | null; budget_mode?: string | null;
+  source?: string | null;
 }
 
 interface Props {
@@ -101,6 +102,7 @@ export default function BudgetWizardDialog({
   // Tab 1: Cliente
   const [selectedClientId, setSelectedClientId] = useState('');
   const [clientNotes, setClientNotes] = useState('');
+  const [leadSource, setLeadSource] = useState<string>('');
 
   // Tab 2: Projeto
   const [projectName, setProjectName] = useState('');
@@ -176,7 +178,7 @@ export default function BudgetWizardDialog({
   }, [installments, installmentMethod, companySettings]);
 
   function resetAll() {
-    setSelectedClientId(''); setClientNotes('');
+    setSelectedClientId(''); setClientNotes(''); setLeadSource('');
     setProjectName(''); setSellerId(''); setProjectType(''); setBudgetMode('completo');
     setProjectDate(new Date().toISOString().slice(0, 10)); setProjectNotes('');
     setEnvironments(['Cozinha']); setNewEnvName('');
@@ -193,6 +195,7 @@ export default function BudgetWizardDialog({
 
   async function loadFromBudget(b: Budget) {
     setSelectedClientId(b.client_id || '');
+    setLeadSource((b as any).source || '');
     setProjectName(b.project_name || '');
     setSellerId(b.seller_id || '');
     setProjectType(b.project_type || '');
@@ -457,6 +460,7 @@ export default function BudgetWizardDialog({
       project_type: projectType || null,
       budget_mode: budgetMode,
       material_multiplier: materialMultiplier || 1,
+      source: leadSource || null,
     };
 
     if (editingBudget) {
@@ -604,14 +608,35 @@ export default function BudgetWizardDialog({
                         </div>
                       </div>
                     )}
-                    <div className="space-y-1.5">
-                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">Observações sobre o cliente</Label>
-                      <Textarea
-                        value={clientNotes}
-                        onChange={(e) => setClientNotes(e.target.value)}
-                        placeholder="Preferências, contatos adicionais, restrições..."
-                        className="min-h-[80px] text-sm"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Como o cliente chegou até você? *</Label>
+                        <Select value={leadSource} onValueChange={setLeadSource}>
+                          <SelectTrigger className="h-11"><SelectValue placeholder="Origem do lead" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="indicacao">Indicação</SelectItem>
+                            <SelectItem value="instagram">Instagram</SelectItem>
+                            <SelectItem value="facebook">Facebook</SelectItem>
+                            <SelectItem value="google">Google / Site</SelectItem>
+                            <SelectItem value="anuncio">Anúncio pago</SelectItem>
+                            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                            <SelectItem value="arquiteto">Arquiteto / Parceiro</SelectItem>
+                            <SelectItem value="showroom">Showroom / Loja</SelectItem>
+                            <SelectItem value="cliente_antigo">Cliente antigo (recompra)</SelectItem>
+                            <SelectItem value="outro">Outro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[10px] text-muted-foreground">Essencial para entender de onde vem seu faturamento.</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Observações sobre o cliente</Label>
+                        <Textarea
+                          value={clientNotes}
+                          onChange={(e) => setClientNotes(e.target.value)}
+                          placeholder="Preferências, contatos adicionais, restrições..."
+                          className="min-h-[80px] text-sm"
+                        />
+                      </div>
                     </div>
                   </div>
                 </TabsContent>

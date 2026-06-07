@@ -1,0 +1,1 @@
+ALTER TABLE public.budgets ADD COLUMN IF NOT EXISTS source text; CREATE INDEX IF NOT EXISTS idx_budgets_source ON public.budgets(source);
