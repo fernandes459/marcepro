@@ -598,6 +598,17 @@ export default function BudgetsPage() {
         onApprove={async (id) => updateBudgetStatus(id, 'approved')}
       />
 
+      {/* PIPELINE EM ABERTO — Cards + Diagnóstico IA + cruzamentos */}
+      <OpenPipelinePanel
+        budgets={budgets as any}
+        employees={employees as any}
+        activeProductionIds={activeProductionBudgetIds}
+        onOpenBudget={(id) => {
+          const b = budgets.find(x => x.id === id);
+          if (b) { setEditingBudget(b); setWizardOpen(true); }
+        }}
+      />
+
       {/* Funil de Vendas — Diagnóstico do negócio */}
       <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-4">
         <div className="flex items-start justify-between flex-wrap gap-3">
