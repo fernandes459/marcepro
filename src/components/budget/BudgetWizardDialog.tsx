@@ -460,6 +460,7 @@ export default function BudgetWizardDialog({
       project_type: projectType || null,
       budget_mode: budgetMode,
       material_multiplier: materialMultiplier || 1,
+      source: leadSource || null,
     };
 
     if (editingBudget) {
