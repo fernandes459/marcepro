@@ -195,6 +195,7 @@ export default function BudgetWizardDialog({
 
   async function loadFromBudget(b: Budget) {
     setSelectedClientId(b.client_id || '');
+    setLeadSource((b as any).source || '');
     setProjectName(b.project_name || '');
     setSellerId(b.seller_id || '');
     setProjectType(b.project_type || '');
