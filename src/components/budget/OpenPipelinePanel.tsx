@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Clock, MapPin, Megaphone, Loader2, AlertTriangle, Target, Phone, Calendar, TrendingUp, ChevronRight } from 'lucide-react';
+import { Sparkles, Clock, MapPin, Megaphone, Loader2, AlertTriangle, Target, Phone, Calendar, TrendingUp, ChevronRight, CheckCircle2, ListChecks, User, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { formatBRL } from '@/lib/format';
@@ -128,6 +128,112 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
   const [aiLoading, setAiLoading] = useState(false);
   const [ai, setAi] = useState<any | null>(null);
 
+  // ===== Follow-ups (tarefas automáticas) =====
+  type FollowUp = {
+    id: string; title: string; description: string | null; assignee: string | null;
+    priority: 'low' | 'normal' | 'high' | 'urgent'; due_date: string | null;
+    status: 'pending' | 'done' | 'cancelled'; origin: 'manual' | 'ai';
+    budget_id: string | null; client_id: string | null; ai_batch_id: string | null;
+    created_at: string;
+  };
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [creatingTasks, setCreatingTasks] = useState(false);
+
+  const loadFollowUps = useCallback(async () => {
+    const { data, error } = await (supabase as any)
+      .from('crm_follow_ups')
+      .select('*')
+      .in('status', ['pending'])
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .limit(50);
+    if (!error && data) setFollowUps(data as FollowUp[]);
+  }, []);
+
+  useEffect(() => { loadFollowUps(); }, [loadFollowUps]);
+
+  // Realtime
+  useEffect(() => {
+    const ch = supabase.channel('crm-followups-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'crm_follow_ups' }, () => loadFollowUps())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [loadFollowUps]);
+
+  function mapPriority(p?: string): 'low' | 'normal' | 'high' | 'urgent' {
+    const v = (p || '').toLowerCase();
+    if (v === 'alta' || v === 'high' || v === 'urgente' || v === 'urgent') return 'high';
+    if (v === 'baixa' || v === 'low') return 'low';
+    return 'normal';
+  }
+  function dueFromPriority(p: 'low' | 'normal' | 'high' | 'urgent'): string {
+    const days = p === 'high' ? 1 : p === 'normal' ? 3 : 7;
+    const d = new Date(); d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+
+  async function createFollowUpsFromAi(aiData: any) {
+    const acoes: any[] = Array.isArray(aiData?.acoes_urgentes) ? aiData.acoes_urgentes : [];
+    if (acoes.length === 0) return;
+    setCreatingTasks(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error('Não autenticado');
+
+      // crypto.randomUUID — agrupador deste diagnóstico
+      const batchId = (crypto as any).randomUUID ? crypto.randomUUID() : `${Date.now()}`;
+
+      // Match cliente → budget aberto (por nome do cliente)
+      const norm = (s?: string | null) => (s || '').toLowerCase().trim();
+      const matchBudget = (clientName?: string | null) => {
+        if (!clientName) return null;
+        const n = norm(clientName);
+        return open.find(b => norm(b.clients?.name).includes(n) || n.includes(norm(b.clients?.name))) || null;
+      };
+
+      const rows = acoes.map(a => {
+        const priority = mapPriority(a.prioridade);
+        const matched = matchBudget(a.cliente);
+        const assignee = matched ? (sellerName(matched.seller_id) || 'Comercial') : 'Comercial';
+        return {
+          user_id: userId,
+          budget_id: matched?.id ?? null,
+          client_id: matched?.clients?.id ?? null,
+          title: String(a.titulo || 'Follow-up').slice(0, 200),
+          description: a.acao ? String(a.acao).slice(0, 1000) : null,
+          assignee,
+          priority,
+          due_date: dueFromPriority(priority),
+          status: 'pending',
+          origin: 'ai',
+          ai_batch_id: batchId,
+        };
+      });
+
+      const { error } = await (supabase as any).from('crm_follow_ups').insert(rows);
+      if (error) throw error;
+      toast.success(`${rows.length} tarefa(s) criada(s) automaticamente`);
+      loadFollowUps();
+    } catch (e: any) {
+      toast.error(e?.message || 'Falha ao criar tarefas');
+    } finally { setCreatingTasks(false); }
+  }
+
+  async function concluirFollowUp(id: string) {
+    const { error } = await (supabase as any)
+      .from('crm_follow_ups')
+      .update({ status: 'done', done_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Tarefa concluída');
+    setFollowUps(prev => prev.filter(f => f.id !== id));
+  }
+  async function removerFollowUp(id: string) {
+    const { error } = await (supabase as any).from('crm_follow_ups').delete().eq('id', id);
+    if (error) { toast.error(error.message); return; }
+    setFollowUps(prev => prev.filter(f => f.id !== id));
+  }
+
   async function runAI() {
     setAiLoading(true); setAi(null);
     try {
@@ -154,6 +260,8 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
       if (error) throw error;
       if ((data as any)?.error) { toast.error((data as any).error); return; }
       setAi(data);
+      // Auto-cria follow-ups com responsável, prazo e prioridade
+      await createFollowUpsFromAi(data);
     } catch (e: any) {
       toast.error(e?.message || 'Falha ao gerar diagnóstico');
     } finally { setAiLoading(false); }
@@ -175,9 +283,9 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
               </p>
             </div>
           </div>
-          <Button onClick={runAI} disabled={aiLoading || open.length === 0} size="sm" className="gradient-primary border-0 shadow-primary h-9 gap-1.5">
-            {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            Diagnóstico IA
+          <Button onClick={runAI} disabled={aiLoading || creatingTasks || open.length === 0} size="sm" className="gradient-primary border-0 shadow-primary h-9 gap-1.5">
+            {aiLoading || creatingTasks ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {creatingTasks ? 'Criando tarefas…' : 'Diagnóstico IA'}
           </Button>
         </div>
 
@@ -306,6 +414,78 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
           <p className="text-[11px] text-center text-muted-foreground">+ {openSorted.length - 9} outros na lista abaixo</p>
         )}
       </div>
+
+      {/* Follow-ups / Tarefas comerciais */}
+      <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <ListChecks className="h-4 w-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-display text-sm font-semibold">Follow-ups & Tarefas</h4>
+            <p className="text-[11px] text-muted-foreground">
+              Geradas automaticamente pelo Diagnóstico IA · {followUps.length} pendente(s)
+            </p>
+          </div>
+          {followUps.some(f => f.origin === 'ai') && (
+            <span className="text-[10px] rounded-full bg-primary/10 text-primary px-2 py-0.5 font-semibold">IA</span>
+          )}
+        </div>
+
+        {followUps.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border/60 p-6 text-center text-xs text-muted-foreground">
+            Nenhuma tarefa pendente. Clique em <span className="font-semibold text-primary">Diagnóstico IA</span> para gerar follow-ups com responsável e prazo.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {followUps.map(f => {
+              const overdue = f.due_date && new Date(f.due_date) < new Date(new Date().toDateString());
+              const pTone = f.priority === 'high' || f.priority === 'urgent' ? 'bg-destructive/10 text-destructive border-destructive/30'
+                : f.priority === 'low' ? 'bg-info/10 text-info border-info/30'
+                : 'bg-warning/10 text-warning border-warning/30';
+              const pLabel = f.priority === 'high' || f.priority === 'urgent' ? 'Alta' : f.priority === 'low' ? 'Baixa' : 'Média';
+              const matched = f.budget_id ? budgets.find(b => b.id === f.budget_id) : null;
+              return (
+                <div key={f.id} className="rounded-xl border border-border/60 bg-card/60 p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold leading-snug flex-1">{f.title}</p>
+                    <span className={cn('text-[10px] font-semibold rounded-full border px-2 py-0.5 shrink-0', pTone)}>{pLabel}</span>
+                  </div>
+                  {f.description && <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3">{f.description}</p>}
+                  <div className="flex items-center justify-between flex-wrap gap-2 text-[10px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{f.assignee || 'Comercial'}</span>
+                    {f.due_date && (
+                      <span className={cn('inline-flex items-center gap-1 tabular-nums', overdue && 'text-destructive font-semibold')}>
+                        <Calendar className="h-3 w-3" />
+                        {new Date(f.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        {overdue && ' · atrasada'}
+                      </span>
+                    )}
+                    {f.origin === 'ai' && <span className="inline-flex items-center gap-1 text-primary"><Sparkles className="h-3 w-3" />IA</span>}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40">
+                    {matched ? (
+                      <button onClick={() => onOpenBudget(matched.id)} className="text-[10px] font-mono text-primary hover:underline truncate">
+                        {matched.code} — {matched.clients?.name || matched.project_name}
+                      </button>
+                    ) : <span className="text-[10px] text-muted-foreground">—</span>}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => removerFollowUp(f.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-[10px] gap-1" onClick={() => concluirFollowUp(f.id)}>
+                        <CheckCircle2 className="h-3 w-3" /> Concluir
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+
 
       {/* Cruzamento detalhado */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

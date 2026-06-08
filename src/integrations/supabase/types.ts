@@ -603,6 +603,78 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_follow_ups: {
+        Row: {
+          ai_batch_id: string | null
+          assignee: string | null
+          budget_id: string | null
+          client_id: string | null
+          company_id: string | null
+          created_at: string
+          description: string | null
+          done_at: string | null
+          due_date: string | null
+          id: string
+          origin: string
+          priority: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_batch_id?: string | null
+          assignee?: string | null
+          budget_id?: string | null
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          done_at?: string | null
+          due_date?: string | null
+          id?: string
+          origin?: string
+          priority?: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_batch_id?: string | null
+          assignee?: string | null
+          budget_id?: string | null
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          done_at?: string | null
+          due_date?: string | null
+          id?: string
+          origin?: string
+          priority?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_follow_ups_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_follow_ups_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       edge_tapes: {
         Row: {
           active: boolean
