@@ -283,9 +283,9 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
               </p>
             </div>
           </div>
-          <Button onClick={runAI} disabled={aiLoading || open.length === 0} size="sm" className="gradient-primary border-0 shadow-primary h-9 gap-1.5">
-            {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            Diagnóstico IA
+          <Button onClick={runAI} disabled={aiLoading || creatingTasks || open.length === 0} size="sm" className="gradient-primary border-0 shadow-primary h-9 gap-1.5">
+            {aiLoading || creatingTasks ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {creatingTasks ? 'Criando tarefas…' : 'Diagnóstico IA'}
           </Button>
         </div>
 
