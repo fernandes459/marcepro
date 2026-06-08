@@ -128,6 +128,112 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
   const [aiLoading, setAiLoading] = useState(false);
   const [ai, setAi] = useState<any | null>(null);
 
+  // ===== Follow-ups (tarefas automáticas) =====
+  type FollowUp = {
+    id: string; title: string; description: string | null; assignee: string | null;
+    priority: 'low' | 'normal' | 'high' | 'urgent'; due_date: string | null;
+    status: 'pending' | 'done' | 'cancelled'; origin: 'manual' | 'ai';
+    budget_id: string | null; client_id: string | null; ai_batch_id: string | null;
+    created_at: string;
+  };
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [creatingTasks, setCreatingTasks] = useState(false);
+
+  const loadFollowUps = useCallback(async () => {
+    const { data, error } = await (supabase as any)
+      .from('crm_follow_ups')
+      .select('*')
+      .in('status', ['pending'])
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .limit(50);
+    if (!error && data) setFollowUps(data as FollowUp[]);
+  }, []);
+
+  useEffect(() => { loadFollowUps(); }, [loadFollowUps]);
+
+  // Realtime
+  useEffect(() => {
+    const ch = supabase.channel('crm-followups-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'crm_follow_ups' }, () => loadFollowUps())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [loadFollowUps]);
+
+  function mapPriority(p?: string): 'low' | 'normal' | 'high' | 'urgent' {
+    const v = (p || '').toLowerCase();
+    if (v === 'alta' || v === 'high' || v === 'urgente' || v === 'urgent') return 'high';
+    if (v === 'baixa' || v === 'low') return 'low';
+    return 'normal';
+  }
+  function dueFromPriority(p: 'low' | 'normal' | 'high' | 'urgent'): string {
+    const days = p === 'high' ? 1 : p === 'normal' ? 3 : 7;
+    const d = new Date(); d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+
+  async function createFollowUpsFromAi(aiData: any) {
+    const acoes: any[] = Array.isArray(aiData?.acoes_urgentes) ? aiData.acoes_urgentes : [];
+    if (acoes.length === 0) return;
+    setCreatingTasks(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error('Não autenticado');
+
+      // crypto.randomUUID — agrupador deste diagnóstico
+      const batchId = (crypto as any).randomUUID ? crypto.randomUUID() : `${Date.now()}`;
+
+      // Match cliente → budget aberto (por nome do cliente)
+      const norm = (s?: string | null) => (s || '').toLowerCase().trim();
+      const matchBudget = (clientName?: string | null) => {
+        if (!clientName) return null;
+        const n = norm(clientName);
+        return open.find(b => norm(b.clients?.name).includes(n) || n.includes(norm(b.clients?.name))) || null;
+      };
+
+      const rows = acoes.map(a => {
+        const priority = mapPriority(a.prioridade);
+        const matched = matchBudget(a.cliente);
+        const assignee = matched ? (sellerName(matched.seller_id) || 'Comercial') : 'Comercial';
+        return {
+          user_id: userId,
+          budget_id: matched?.id ?? null,
+          client_id: matched?.clients?.id ?? null,
+          title: String(a.titulo || 'Follow-up').slice(0, 200),
+          description: a.acao ? String(a.acao).slice(0, 1000) : null,
+          assignee,
+          priority,
+          due_date: dueFromPriority(priority),
+          status: 'pending',
+          origin: 'ai',
+          ai_batch_id: batchId,
+        };
+      });
+
+      const { error } = await (supabase as any).from('crm_follow_ups').insert(rows);
+      if (error) throw error;
+      toast.success(`${rows.length} tarefa(s) criada(s) automaticamente`);
+      loadFollowUps();
+    } catch (e: any) {
+      toast.error(e?.message || 'Falha ao criar tarefas');
+    } finally { setCreatingTasks(false); }
+  }
+
+  async function concluirFollowUp(id: string) {
+    const { error } = await (supabase as any)
+      .from('crm_follow_ups')
+      .update({ status: 'done', done_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) { toast.error(error.message); return; }
+    toast.success('Tarefa concluída');
+    setFollowUps(prev => prev.filter(f => f.id !== id));
+  }
+  async function removerFollowUp(id: string) {
+    const { error } = await (supabase as any).from('crm_follow_ups').delete().eq('id', id);
+    if (error) { toast.error(error.message); return; }
+    setFollowUps(prev => prev.filter(f => f.id !== id));
+  }
+
   async function runAI() {
     setAiLoading(true); setAi(null);
     try {
@@ -154,6 +260,8 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
       if (error) throw error;
       if ((data as any)?.error) { toast.error((data as any).error); return; }
       setAi(data);
+      // Auto-cria follow-ups com responsável, prazo e prioridade
+      await createFollowUpsFromAi(data);
     } catch (e: any) {
       toast.error(e?.message || 'Falha ao gerar diagnóstico');
     } finally { setAiLoading(false); }
