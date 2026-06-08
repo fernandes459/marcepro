@@ -415,6 +415,78 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
         )}
       </div>
 
+      {/* Follow-ups / Tarefas comerciais */}
+      <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <ListChecks className="h-4 w-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-display text-sm font-semibold">Follow-ups & Tarefas</h4>
+            <p className="text-[11px] text-muted-foreground">
+              Geradas automaticamente pelo Diagnóstico IA · {followUps.length} pendente(s)
+            </p>
+          </div>
+          {followUps.some(f => f.origin === 'ai') && (
+            <span className="text-[10px] rounded-full bg-primary/10 text-primary px-2 py-0.5 font-semibold">IA</span>
+          )}
+        </div>
+
+        {followUps.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border/60 p-6 text-center text-xs text-muted-foreground">
+            Nenhuma tarefa pendente. Clique em <span className="font-semibold text-primary">Diagnóstico IA</span> para gerar follow-ups com responsável e prazo.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {followUps.map(f => {
+              const overdue = f.due_date && new Date(f.due_date) < new Date(new Date().toDateString());
+              const pTone = f.priority === 'high' || f.priority === 'urgent' ? 'bg-destructive/10 text-destructive border-destructive/30'
+                : f.priority === 'low' ? 'bg-info/10 text-info border-info/30'
+                : 'bg-warning/10 text-warning border-warning/30';
+              const pLabel = f.priority === 'high' || f.priority === 'urgent' ? 'Alta' : f.priority === 'low' ? 'Baixa' : 'Média';
+              const matched = f.budget_id ? budgets.find(b => b.id === f.budget_id) : null;
+              return (
+                <div key={f.id} className="rounded-xl border border-border/60 bg-card/60 p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold leading-snug flex-1">{f.title}</p>
+                    <span className={cn('text-[10px] font-semibold rounded-full border px-2 py-0.5 shrink-0', pTone)}>{pLabel}</span>
+                  </div>
+                  {f.description && <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3">{f.description}</p>}
+                  <div className="flex items-center justify-between flex-wrap gap-2 text-[10px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{f.assignee || 'Comercial'}</span>
+                    {f.due_date && (
+                      <span className={cn('inline-flex items-center gap-1 tabular-nums', overdue && 'text-destructive font-semibold')}>
+                        <Calendar className="h-3 w-3" />
+                        {new Date(f.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        {overdue && ' · atrasada'}
+                      </span>
+                    )}
+                    {f.origin === 'ai' && <span className="inline-flex items-center gap-1 text-primary"><Sparkles className="h-3 w-3" />IA</span>}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40">
+                    {matched ? (
+                      <button onClick={() => onOpenBudget(matched.id)} className="text-[10px] font-mono text-primary hover:underline truncate">
+                        {matched.code} — {matched.clients?.name || matched.project_name}
+                      </button>
+                    ) : <span className="text-[10px] text-muted-foreground">—</span>}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => removerFollowUp(f.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-[10px] gap-1" onClick={() => concluirFollowUp(f.id)}>
+                        <CheckCircle2 className="h-3 w-3" /> Concluir
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+
+
       {/* Cruzamento detalhado */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Origem */}
