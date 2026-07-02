@@ -155,6 +155,24 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
   // Ordenação de cards abertos (mais antigos primeiro)
   const openSorted = useMemo(() => open.slice().sort((a, b) => ageDays(b.created_at) - ageDays(a.created_at)), [open, now]);
 
+  // ===== Etapas do funil (Kanban) =====
+  const [stageFilter, setStageFilter] = useState<PipelineStage | null>(null);
+  const stageGroups = useMemo(() => {
+    const groups: Record<PipelineStage, BudgetRow[]> = {
+      novo_contato: [], qualificacao: [], proposta: [], negociacao: [], fechamento: [],
+    };
+    // Abertos são distribuídos entre novo_contato → negociacao
+    openSorted.forEach(b => { groups[inferStage(b)].push(b); });
+    // Fechados vão para "fechamento"
+    closed.forEach(b => { groups.fechamento.push(b); });
+    return groups;
+  }, [openSorted, closed]);
+
+  const visibleCards = useMemo(() => {
+    if (!stageFilter) return openSorted;
+    return (stageGroups[stageFilter] || []).filter(b => b.status === 'draft' || b.status === 'pending');
+  }, [stageFilter, openSorted, stageGroups]);
+
   // ===== IA =====
   const [aiLoading, setAiLoading] = useState(false);
   const [ai, setAi] = useState<any | null>(null);
