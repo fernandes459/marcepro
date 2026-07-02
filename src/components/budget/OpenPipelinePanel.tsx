@@ -60,7 +60,7 @@ interface BudgetRow {
   id: string; code: string; project_name: string | null; status: string;
   final_price: number; total_cost: number; source: string | null;
   created_at: string; updated_at: string; approved_at: string | null;
-  seller_id: string | null;
+  seller_id: string | null; notes?: string | null;
   clients?: { id: string; name: string; phone: string | null; city: string | null; state: string | null } | null;
 }
 
