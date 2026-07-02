@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Clock, MapPin, Megaphone, Loader2, AlertTriangle, Target, Phone, Calendar, TrendingUp, ChevronRight, CheckCircle2, ListChecks, User, Trash2 } from 'lucide-react';
+import { Sparkles, Clock, MapPin, Megaphone, Loader2, AlertTriangle, Target, Phone, Calendar, TrendingUp, ChevronRight, CheckCircle2, ListChecks, User, Trash2, PhoneCall, Search, FileText, Handshake, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { formatBRL } from '@/lib/format';
