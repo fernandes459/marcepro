@@ -515,9 +515,6 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
         {visibleCards.length > 9 && (
           <p className="text-[11px] text-center text-muted-foreground">+ {visibleCards.length - 9} outros na lista abaixo</p>
         )}
-        {openSorted.length > 9 && (
-          <p className="text-[11px] text-center text-muted-foreground">+ {openSorted.length - 9} outros na lista abaixo</p>
-        )}
       </div>
 
       {/* Follow-ups / Tarefas comerciais */}
