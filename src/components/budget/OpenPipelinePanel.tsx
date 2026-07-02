@@ -25,6 +25,37 @@ export function sourceLabel(s?: string | null) {
   return BUDGET_SOURCES.find(x => x.value === s)?.label ?? s;
 }
 
+// ===== Etapas do funil (inferidas automaticamente conforme o orçamento evolui) =====
+export type PipelineStage = 'novo_contato' | 'qualificacao' | 'proposta' | 'negociacao' | 'fechamento';
+
+export const STAGE_META: Record<PipelineStage, { label: string; icon: any; tone: string; ring: string; order: number }> = {
+  novo_contato: { label: 'Novo Contato',    icon: PhoneCall, tone: 'text-info',        ring: 'border-info/30 bg-info/5',        order: 1 },
+  qualificacao: { label: 'Qualificação',    icon: Search,    tone: 'text-primary',     ring: 'border-primary/30 bg-primary/5',  order: 2 },
+  proposta:     { label: 'Proposta Enviada', icon: FileText,  tone: 'text-warning',     ring: 'border-warning/30 bg-warning/5',  order: 3 },
+  negociacao:   { label: 'Negociação',      icon: Handshake, tone: 'text-gold',        ring: 'border-gold/30 bg-gold/5',        order: 4 },
+  fechamento:   { label: 'Fechamento',      icon: Trophy,    tone: 'text-success',     ring: 'border-success/30 bg-success/5',  order: 5 },
+};
+
+/**
+ * Deriva a etapa do funil a partir dos dados do orçamento — sem alterar schema.
+ * Regras:
+ *  - Aprovado/Produção  → Fechamento
+ *  - Rascunho <= 2 dias → Novo Contato
+ *  - Rascunho           → Qualificação
+ *  - Pendente + idade > 12d OU notes com palavras de negociação → Negociação
+ *  - Pendente           → Proposta Enviada
+ */
+export function inferStage(b: { status: string; created_at: string; updated_at?: string; notes?: string | null; final_price?: number | null }): PipelineStage {
+  if (b.status === 'approved' || b.status === 'in_production') return 'fechamento';
+  const age = Math.max(0, Math.floor((Date.now() - new Date(b.created_at).getTime()) / 86400000));
+  const notes = (b.notes || '').toLowerCase();
+  const negociando = /(negoci|desconto|contra[- ]?proposta|revis|ajuste de preço|nova proposta)/i.test(notes);
+  if (b.status === 'draft') return age <= 2 ? 'novo_contato' : 'qualificacao';
+  // pending
+  if (negociando || age > 12) return 'negociacao';
+  return 'proposta';
+}
+
 interface BudgetRow {
   id: string; code: string; project_name: string | null; status: string;
   final_price: number; total_cost: number; source: string | null;
