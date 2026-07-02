@@ -419,22 +419,75 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
           </div>
         )}
 
+        {/* Kanban de Etapas do Funil — atualiza automaticamente conforme o orçamento avança */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Etapas do Funil</span>
+              <span className="text-[10px] text-muted-foreground">· atualização automática</span>
+            </div>
+            {stageFilter && (
+              <button onClick={() => setStageFilter(null)} className="text-[10px] text-primary hover:underline">
+                Limpar filtro
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {(Object.keys(STAGE_META) as PipelineStage[]).sort((a, b) => STAGE_META[a].order - STAGE_META[b].order).map(stage => {
+              const meta = STAGE_META[stage];
+              const list = stageGroups[stage] || [];
+              const total = list.reduce((s, b) => s + Number(b.final_price || 0), 0);
+              const active = stageFilter === stage;
+              const Icon = meta.icon;
+              return (
+                <button key={stage}
+                  onClick={() => setStageFilter(active ? null : stage)}
+                  className={cn(
+                    'text-left rounded-xl border p-2.5 transition-all hover:shadow-md',
+                    meta.ring,
+                    active ? 'ring-2 ring-primary/60 shadow-md' : 'hover:border-primary/40'
+                  )}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className={cn('flex items-center gap-1.5', meta.tone)}>
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wider">{meta.label}</span>
+                    </div>
+                    <span className="text-[10px] font-bold tabular-nums">{list.length}</span>
+                  </div>
+                  <p className="text-xs font-bold tabular-nums leading-tight">{formatBRL(total)}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Cards de orçamentos em aberto */}
-        {openSorted.length === 0 ? (
+        {visibleCards.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border/60 p-6 text-center text-sm text-muted-foreground">
-            Nenhum orçamento em aberto. Bom trabalho! 🎯
+            {stageFilter
+              ? <>Nenhum orçamento na etapa <span className="font-semibold">{STAGE_META[stageFilter].label}</span>.</>
+              : <>Nenhum orçamento em aberto. Bom trabalho! 🎯</>}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {openSorted.slice(0, 9).map(b => {
+            {visibleCards.slice(0, 9).map(b => {
               const age = ageDays(b.created_at);
               const ageTone = age > 30 ? 'text-destructive' : age > 15 ? 'text-warning' : 'text-muted-foreground';
+              const stage = inferStage(b);
+              const stageMeta = STAGE_META[stage];
+              const StageIcon = stageMeta.icon;
               return (
                 <button key={b.id} onClick={() => onOpenBudget(b.id)}
                   className="text-left rounded-xl border border-border/60 bg-card/60 p-3 hover:border-primary/40 hover:shadow-md transition-all space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-mono text-[10px] text-muted-foreground">{b.code}</span>
-                    <span className={cn('text-[10px] font-semibold tabular-nums', ageTone)}>{age}d</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn('inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold', stageMeta.ring, stageMeta.tone)}>
+                        <StageIcon className="h-2.5 w-2.5" />
+                        {stageMeta.label}
+                      </span>
+                      <span className={cn('text-[10px] font-semibold tabular-nums', ageTone)}>{age}d</span>
+                    </div>
                   </div>
                   <p className="text-sm font-semibold truncate">{b.clients?.name || b.project_name || '—'}</p>
                   <p className="text-base font-display font-bold text-primary tabular-nums">{formatBRL(b.final_price)}</p>
@@ -458,6 +511,9 @@ export default function OpenPipelinePanel({ budgets, employees, activeProduction
               );
             })}
           </div>
+        )}
+        {visibleCards.length > 9 && (
+          <p className="text-[11px] text-center text-muted-foreground">+ {visibleCards.length - 9} outros na lista abaixo</p>
         )}
         {openSorted.length > 9 && (
           <p className="text-[11px] text-center text-muted-foreground">+ {openSorted.length - 9} outros na lista abaixo</p>
