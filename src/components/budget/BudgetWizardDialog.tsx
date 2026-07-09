@@ -491,6 +491,55 @@ export default function BudgetWizardDialog({
       if (iErr) { toast.error(`Erro nos itens: ${iErr.message}`); setSaving(false); return; }
     }
 
+    // ========= AUTO-SYNC MATERIAL CATALOG =========
+    // Para cada item com nome e custo, cadastra novo material ou atualiza o preço do existente.
+    try {
+      const uniqueItems = new Map<string, { name: string; unit_cost: number; unit: string }>();
+      items.forEach(i => {
+        const name = (i.name || '').trim();
+        const cost = Number(i.materialCost) || 0;
+        if (!name || cost <= 0) return;
+        const key = name.toLowerCase();
+        uniqueItems.set(key, { name, unit_cost: cost, unit: i.unit || 'un' });
+      });
+      if (uniqueItems.size > 0) {
+        const names = Array.from(uniqueItems.values()).map(v => v.name);
+        const { data: existing } = await supabase
+          .from('material_catalog')
+          .select('id, name, unit_cost')
+          .eq('user_id', user.id)
+          .in('name', names);
+        const existingMap = new Map<string, { id: string; unit_cost: number }>();
+        (existing || []).forEach((m: any) => existingMap.set(m.name.toLowerCase(), { id: m.id, unit_cost: Number(m.unit_cost) }));
+        const toInsert: any[] = [];
+        for (const [key, v] of uniqueItems) {
+          const found = existingMap.get(key);
+          if (found) {
+            if (Math.abs(found.unit_cost - v.unit_cost) > 0.001) {
+              await supabase
+                .from('material_catalog')
+                .update({ unit_cost: v.unit_cost, unit: v.unit, source: 'budget_auto' })
+                .eq('id', found.id);
+            }
+          } else {
+            toInsert.push({
+              user_id: user.id,
+              name: v.name,
+              unit_cost: v.unit_cost,
+              unit: v.unit,
+              source: 'budget_auto',
+            });
+          }
+        }
+        if (toInsert.length > 0) {
+          await supabase.from('material_catalog').insert(toInsert);
+        }
+      }
+    } catch (err) {
+      console.warn('[material-catalog auto-sync]', err);
+    }
+
+
     // Sync payment_milestones from explicit paymentSchedule
     if (budgetId) {
       // Delete linked financial transactions of existing milestones first to avoid duplicates
