@@ -216,16 +216,51 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
     };
 
     let error;
+    let createdId: string | null = null;
     if (editTransaction?.id) {
       const res = await supabase.from('financial_transactions').update(payload as any).eq('id', editTransaction.id);
       error = res.error;
     } else {
-      const res = await supabase.from('financial_transactions').insert(payload as any);
+      const res = await supabase.from('financial_transactions').insert(payload as any).select('id').single();
       error = res.error;
+      createdId = res.data?.id ?? null;
     }
 
     if (error) { toast.error('Erro ao salvar'); console.error(error); return; }
+
+    // Gera lançamentos recorrentes futuros (apenas na criação, quando marcado como fixo)
+    if (!editTransaction?.id && createdId && isFixed && recurrence !== 'none') {
+      const occurrences = recurrence === 'weekly' ? 12 : recurrence === 'yearly' ? 3 : 11;
+      const baseDate = new Date((dueDate || date) + 'T12:00:00');
+      const baseCompetence = new Date(date + 'T12:00:00');
+      const future: any[] = [];
+      for (let i = 1; i <= occurrences; i++) {
+        const d = new Date(baseDate);
+        const c = new Date(baseCompetence);
+        if (recurrence === 'monthly') { d.setMonth(d.getMonth() + i); c.setMonth(c.getMonth() + i); }
+        else if (recurrence === 'weekly') { d.setDate(d.getDate() + 7 * i); c.setDate(c.getDate() + 7 * i); }
+        else if (recurrence === 'yearly') { d.setFullYear(d.getFullYear() + i); c.setFullYear(c.getFullYear() + i); }
+        future.push({
+          ...payload,
+          status: 'pending',
+          date: c.toISOString().slice(0, 10),
+          due_date: d.toISOString().slice(0, 10),
+          notes: [finalNotes, `Recorrência automática (${i}/${occurrences}) — origem ${createdId.slice(0, 8)}`].filter(Boolean).join('\n'),
+        });
+      }
+      if (future.length > 0) {
+        const { error: recErr } = await supabase.from('financial_transactions').insert(future as any);
+        if (recErr) {
+          console.error(recErr);
+          toast.warning('Lançamento salvo, mas falhou ao gerar as recorrências futuras');
+        } else {
+          toast.success(`${future.length} recorrências futuras geradas`);
+        }
+      }
+    }
+
     toast.success(editTransaction?.id ? 'Lançamento atualizado!' : 'Lançamento criado!');
+
     resetForm();
     onOpenChange(false);
     onSaved();
