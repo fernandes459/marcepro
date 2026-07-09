@@ -44,10 +44,12 @@ export const VARIABLE_EXPENSE_CATEGORIES = new Set<string>([
 ]);
 
 export function isFixedExpense(category: string, isFixedFlag?: boolean) {
+  // Flag manual do usuário tem prioridade — marcou como fixa, é fixa.
+  if (isFixedFlag) return true;
   if (FIXED_EXPENSE_CATEGORIES.has(category)) return true;
-  if (VARIABLE_EXPENSE_CATEGORIES.has(category)) return false;
-  return Boolean(isFixedFlag);
+  return false;
 }
+
 
 export const DEFAULT_INCOME_CATEGORIES: FinancialCategoryOption[] = [
   { value: 'project', label: 'Projeto / Orçamento', type: 'income', isSystem: true, color: 'hsl(var(--success))', sortOrder: 1 },
