@@ -506,36 +506,51 @@ export default function BudgetWizardDialog({
       if (iErr) { toast.error(`Erro nos itens: ${iErr.message}`); setSaving(false); return; }
     }
 
-    // ========= AUTO-SYNC MATERIAL CATALOG =========
-    // Para cada item com nome e custo, cadastra novo material ou atualiza o preço do existente.
+    // ========= AUTO-SYNC MATERIAL CATALOG (com detecção fuzzy) =========
     try {
       const uniqueItems = new Map<string, { name: string; unit_cost: number; unit: string }>();
       items.forEach(i => {
         const name = (i.name || '').trim();
         const cost = Number(i.materialCost) || 0;
         if (!name || cost <= 0) return;
-        const key = name.toLowerCase();
-        uniqueItems.set(key, { name, unit_cost: cost, unit: i.unit || 'un' });
+        uniqueItems.set(normalizeMaterialName(name), { name, unit_cost: cost, unit: i.unit || 'un' });
       });
       if (uniqueItems.size > 0) {
-        const names = Array.from(uniqueItems.values()).map(v => v.name);
+        // Busca o catálogo completo do usuário para permitir comparação fuzzy.
         const { data: existing } = await supabase
           .from('material_catalog')
-          .select('id, name, unit_cost')
-          .eq('user_id', user.id)
-          .in('name', names);
-        const existingMap = new Map<string, { id: string; unit_cost: number }>();
-        (existing || []).forEach((m: any) => existingMap.set(m.name.toLowerCase(), { id: m.id, unit_cost: Number(m.unit_cost) }));
+          .select('id, name, unit_cost, unit, supplier')
+          .eq('user_id', user.id);
+        const catalog = (existing || []) as any[];
         const toInsert: any[] = [];
-        for (const [key, v] of uniqueItems) {
-          const found = existingMap.get(key);
-          if (found) {
-            if (Math.abs(found.unit_cost - v.unit_cost) > 0.001) {
+        const ambiguous: Array<{
+          input: { name: string; unit_cost: number; unit: string };
+          suggestion: { id: string; name: string; unit_cost: number; score: number };
+          decision: 'use_existing' | 'create_new';
+        }> = [];
+
+        for (const v of uniqueItems.values()) {
+          const match = findBestMatch(v.name, catalog, 0.82);
+          if (match && match.score >= 0.97) {
+            // Match praticamente exato → apenas atualiza preço se mudou.
+            if (Math.abs(Number(match.item.unit_cost) - v.unit_cost) > 0.001) {
               await supabase
                 .from('material_catalog')
                 .update({ unit_cost: v.unit_cost, unit: v.unit, source: 'budget_auto' })
-                .eq('id', found.id);
+                .eq('id', match.item.id);
             }
+          } else if (match) {
+            // Similar mas não idêntico → pede confirmação ao usuário.
+            ambiguous.push({
+              input: v,
+              suggestion: {
+                id: match.item.id,
+                name: match.item.name,
+                unit_cost: Number(match.item.unit_cost),
+                score: match.score,
+              },
+              decision: 'use_existing',
+            });
           } else {
             toInsert.push({
               user_id: user.id,
@@ -549,10 +564,14 @@ export default function BudgetWizardDialog({
         if (toInsert.length > 0) {
           await supabase.from('material_catalog').insert(toInsert);
         }
+        if (ambiguous.length > 0) {
+          setPendingMatches(ambiguous);
+        }
       }
     } catch (err) {
       console.warn('[material-catalog auto-sync]', err);
     }
+
 
 
     // Sync payment_milestones from explicit paymentSchedule
