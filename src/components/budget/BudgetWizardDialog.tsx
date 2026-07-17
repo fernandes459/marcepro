@@ -23,6 +23,7 @@ import { CurrencyInput } from '@/components/CurrencyInput';
 import ClientPicker from './ClientPicker';
 import ModuleConfigurator, { ModuleConfig, ModuleResult } from './ModuleConfigurator';
 import { AISuggestPricing } from './AISuggestPricing';
+import { findBestMatch, normalizeMaterialName } from '@/lib/material-match';
 
 // ----------- TYPES -----------
 export interface Client {
@@ -98,6 +99,11 @@ export default function BudgetWizardDialog({
   const { user } = useAuth();
   const [tab, setTab] = useState<TabKey>('cliente');
   const [saving, setSaving] = useState(false);
+  const [pendingMatches, setPendingMatches] = useState<Array<{
+    input: { name: string; unit_cost: number; unit: string };
+    suggestion: { id: string; name: string; unit_cost: number; score: number };
+    decision: 'use_existing' | 'create_new';
+  }>>([]);
 
   // Tab 1: Cliente
   const [selectedClientId, setSelectedClientId] = useState('');
@@ -348,18 +354,27 @@ export default function BudgetWizardDialog({
   }
   function removeItem(idx: number) { setItems(prev => prev.filter((_, i) => i !== idx)); }
   function applyCatalog(idx: number, name: string) {
-    const m = materialCatalog.find(x => x.name.trim().toLowerCase() === name.trim().toLowerCase());
-    if (!m) return;
+    const trimmed = (name || '').trim();
+    if (!trimmed) return;
+    const match = findBestMatch(trimmed, materialCatalog as any, 0.85);
+    if (!match) return;
+    const m = match.item;
+    const isExact = normalizeMaterialName(m.name) === normalizeMaterialName(trimmed);
     setItems(prev => {
       const next = [...prev];
       next[idx] = {
         ...next[idx],
-        name: m.name,
-        materialCost: Number(m.unit_cost) || 0,
-        unitPrice: Number(m.unit_cost || 0) + Number(next[idx].laborCost || 0),
+        name: m.name, // padroniza para o nome do catálogo
+        materialCost: Number(next[idx].materialCost) > 0 ? next[idx].materialCost : Number(m.unit_cost) || 0,
+        unitPrice: (Number(next[idx].materialCost) > 0 ? next[idx].materialCost : Number(m.unit_cost) || 0) + Number(next[idx].laborCost || 0),
       };
       return next;
     });
+    if (!isExact) {
+      toast.info(`Material vinculado a "${m.name}" do catálogo`, {
+        description: `Similaridade ${(match.score * 100).toFixed(0)}%`,
+      });
+    }
   }
 
   // ========= ENV HELPERS =========
@@ -491,36 +506,51 @@ export default function BudgetWizardDialog({
       if (iErr) { toast.error(`Erro nos itens: ${iErr.message}`); setSaving(false); return; }
     }
 
-    // ========= AUTO-SYNC MATERIAL CATALOG =========
-    // Para cada item com nome e custo, cadastra novo material ou atualiza o preço do existente.
+    // ========= AUTO-SYNC MATERIAL CATALOG (com detecção fuzzy) =========
     try {
       const uniqueItems = new Map<string, { name: string; unit_cost: number; unit: string }>();
       items.forEach(i => {
         const name = (i.name || '').trim();
         const cost = Number(i.materialCost) || 0;
         if (!name || cost <= 0) return;
-        const key = name.toLowerCase();
-        uniqueItems.set(key, { name, unit_cost: cost, unit: i.unit || 'un' });
+        uniqueItems.set(normalizeMaterialName(name), { name, unit_cost: cost, unit: i.unit || 'un' });
       });
       if (uniqueItems.size > 0) {
-        const names = Array.from(uniqueItems.values()).map(v => v.name);
+        // Busca o catálogo completo do usuário para permitir comparação fuzzy.
         const { data: existing } = await supabase
           .from('material_catalog')
-          .select('id, name, unit_cost')
-          .eq('user_id', user.id)
-          .in('name', names);
-        const existingMap = new Map<string, { id: string; unit_cost: number }>();
-        (existing || []).forEach((m: any) => existingMap.set(m.name.toLowerCase(), { id: m.id, unit_cost: Number(m.unit_cost) }));
+          .select('id, name, unit_cost, unit, supplier')
+          .eq('user_id', user.id);
+        const catalog = (existing || []) as any[];
         const toInsert: any[] = [];
-        for (const [key, v] of uniqueItems) {
-          const found = existingMap.get(key);
-          if (found) {
-            if (Math.abs(found.unit_cost - v.unit_cost) > 0.001) {
+        const ambiguous: Array<{
+          input: { name: string; unit_cost: number; unit: string };
+          suggestion: { id: string; name: string; unit_cost: number; score: number };
+          decision: 'use_existing' | 'create_new';
+        }> = [];
+
+        for (const v of uniqueItems.values()) {
+          const match = findBestMatch(v.name, catalog, 0.82);
+          if (match && match.score >= 0.97) {
+            // Match praticamente exato → apenas atualiza preço se mudou.
+            if (Math.abs(Number(match.item.unit_cost) - v.unit_cost) > 0.001) {
               await supabase
                 .from('material_catalog')
                 .update({ unit_cost: v.unit_cost, unit: v.unit, source: 'budget_auto' })
-                .eq('id', found.id);
+                .eq('id', match.item.id);
             }
+          } else if (match) {
+            // Similar mas não idêntico → pede confirmação ao usuário.
+            ambiguous.push({
+              input: v,
+              suggestion: {
+                id: match.item.id,
+                name: match.item.name,
+                unit_cost: Number(match.item.unit_cost),
+                score: match.score,
+              },
+              decision: 'use_existing',
+            });
           } else {
             toInsert.push({
               user_id: user.id,
@@ -534,10 +564,14 @@ export default function BudgetWizardDialog({
         if (toInsert.length > 0) {
           await supabase.from('material_catalog').insert(toInsert);
         }
+        if (ambiguous.length > 0) {
+          setPendingMatches(ambiguous);
+        }
       }
     } catch (err) {
       console.warn('[material-catalog auto-sync]', err);
     }
+
 
 
     // Sync payment_milestones from explicit paymentSchedule
@@ -587,6 +621,7 @@ export default function BudgetWizardDialog({
 
   // ========= RENDER =========
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="h-[100dvh] w-[100dvw] max-w-none rounded-none border-0 p-0 gap-0 grid-rows-[auto_1fr_auto] flex flex-col overflow-hidden sm:rounded-none">
         <div className="flex h-full min-h-0 flex-col bg-background">
@@ -1527,6 +1562,89 @@ export default function BudgetWizardDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={pendingMatches.length > 0} onOpenChange={(o) => { if (!o) setPendingMatches([]); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="font-display">Materiais parecidos encontrados</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-muted-foreground -mt-2">
+          Detectamos possíveis duplicatas no catálogo. Confirme se deseja usar o material existente ou cadastrar como novo.
+        </p>
+        <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+          {pendingMatches.map((p, i) => (
+            <div key={i} className="rounded-xl border border-border/60 p-3 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Digitado</div>
+                  <div className="text-sm font-medium truncate">{p.input.name}</div>
+                  <div className="text-[11px] text-muted-foreground">{formatBRL(p.input.unit_cost)} / {p.input.unit}</div>
+                </div>
+                <div className="min-w-0 text-right">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Existente ({(p.suggestion.score * 100).toFixed(0)}%)</div>
+                  <div className="text-sm font-medium truncate">{p.suggestion.name}</div>
+                  <div className="text-[11px] text-muted-foreground">{formatBRL(p.suggestion.unit_cost)}</div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={p.decision === 'use_existing' ? 'default' : 'outline'}
+                  className="flex-1 h-8 text-xs"
+                  onClick={() => setPendingMatches(prev => prev.map((x, idx) => idx === i ? { ...x, decision: 'use_existing' } : x))}
+                >
+                  Usar existente
+                </Button>
+                <Button
+                  size="sm"
+                  variant={p.decision === 'create_new' ? 'default' : 'outline'}
+                  className="flex-1 h-8 text-xs"
+                  onClick={() => setPendingMatches(prev => prev.map((x, idx) => idx === i ? { ...x, decision: 'create_new' } : x))}
+                >
+                  Criar novo
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" onClick={() => setPendingMatches([])}>Cancelar</Button>
+          <Button
+            onClick={async () => {
+              if (!user) { setPendingMatches([]); return; }
+              try {
+                for (const p of pendingMatches) {
+                  if (p.decision === 'use_existing') {
+                    if (Math.abs(p.suggestion.unit_cost - p.input.unit_cost) > 0.001) {
+                      await supabase
+                        .from('material_catalog')
+                        .update({ unit_cost: p.input.unit_cost, unit: p.input.unit, source: 'budget_auto' })
+                        .eq('id', p.suggestion.id);
+                    }
+                  } else {
+                    await supabase.from('material_catalog').insert({
+                      user_id: user.id,
+                      name: p.input.name,
+                      unit_cost: p.input.unit_cost,
+                      unit: p.input.unit,
+                      source: 'budget_auto',
+                    } as any);
+                  }
+                }
+                toast.success('Catálogo de materiais atualizado');
+              } catch (err: any) {
+                toast.error(`Erro ao atualizar catálogo: ${err?.message ?? err}`);
+              } finally {
+                setPendingMatches([]);
+              }
+            }}
+          >
+            Confirmar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
