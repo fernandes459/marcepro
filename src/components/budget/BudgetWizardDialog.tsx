@@ -349,18 +349,27 @@ export default function BudgetWizardDialog({
   }
   function removeItem(idx: number) { setItems(prev => prev.filter((_, i) => i !== idx)); }
   function applyCatalog(idx: number, name: string) {
-    const m = materialCatalog.find(x => x.name.trim().toLowerCase() === name.trim().toLowerCase());
-    if (!m) return;
+    const trimmed = (name || '').trim();
+    if (!trimmed) return;
+    const match = findBestMatch(trimmed, materialCatalog as any, 0.85);
+    if (!match) return;
+    const m = match.item;
+    const isExact = normalizeMaterialName(m.name) === normalizeMaterialName(trimmed);
     setItems(prev => {
       const next = [...prev];
       next[idx] = {
         ...next[idx],
-        name: m.name,
-        materialCost: Number(m.unit_cost) || 0,
-        unitPrice: Number(m.unit_cost || 0) + Number(next[idx].laborCost || 0),
+        name: m.name, // padroniza para o nome do catálogo
+        materialCost: Number(next[idx].materialCost) > 0 ? next[idx].materialCost : Number(m.unit_cost) || 0,
+        unitPrice: (Number(next[idx].materialCost) > 0 ? next[idx].materialCost : Number(m.unit_cost) || 0) + Number(next[idx].laborCost || 0),
       };
       return next;
     });
+    if (!isExact) {
+      toast.info(`Material vinculado a "${m.name}" do catálogo`, {
+        description: `Similaridade ${(match.score * 100).toFixed(0)}%`,
+      });
+    }
   }
 
   // ========= ENV HELPERS =========
