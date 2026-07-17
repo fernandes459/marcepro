@@ -1561,6 +1561,89 @@ export default function BudgetWizardDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={pendingMatches.length > 0} onOpenChange={(o) => { if (!o) setPendingMatches([]); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="font-display">Materiais parecidos encontrados</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-muted-foreground -mt-2">
+          Detectamos possíveis duplicatas no catálogo. Confirme se deseja usar o material existente ou cadastrar como novo.
+        </p>
+        <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+          {pendingMatches.map((p, i) => (
+            <div key={i} className="rounded-xl border border-border/60 p-3 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Digitado</div>
+                  <div className="text-sm font-medium truncate">{p.input.name}</div>
+                  <div className="text-[11px] text-muted-foreground">{formatBRL(p.input.unit_cost)} / {p.input.unit}</div>
+                </div>
+                <div className="min-w-0 text-right">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Existente ({(p.suggestion.score * 100).toFixed(0)}%)</div>
+                  <div className="text-sm font-medium truncate">{p.suggestion.name}</div>
+                  <div className="text-[11px] text-muted-foreground">{formatBRL(p.suggestion.unit_cost)}</div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={p.decision === 'use_existing' ? 'default' : 'outline'}
+                  className="flex-1 h-8 text-xs"
+                  onClick={() => setPendingMatches(prev => prev.map((x, idx) => idx === i ? { ...x, decision: 'use_existing' } : x))}
+                >
+                  Usar existente
+                </Button>
+                <Button
+                  size="sm"
+                  variant={p.decision === 'create_new' ? 'default' : 'outline'}
+                  className="flex-1 h-8 text-xs"
+                  onClick={() => setPendingMatches(prev => prev.map((x, idx) => idx === i ? { ...x, decision: 'create_new' } : x))}
+                >
+                  Criar novo
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" onClick={() => setPendingMatches([])}>Cancelar</Button>
+          <Button
+            onClick={async () => {
+              if (!user) { setPendingMatches([]); return; }
+              try {
+                for (const p of pendingMatches) {
+                  if (p.decision === 'use_existing') {
+                    if (Math.abs(p.suggestion.unit_cost - p.input.unit_cost) > 0.001) {
+                      await supabase
+                        .from('material_catalog')
+                        .update({ unit_cost: p.input.unit_cost, unit: p.input.unit, source: 'budget_auto' })
+                        .eq('id', p.suggestion.id);
+                    }
+                  } else {
+                    await supabase.from('material_catalog').insert({
+                      user_id: user.id,
+                      name: p.input.name,
+                      unit_cost: p.input.unit_cost,
+                      unit: p.input.unit,
+                      source: 'budget_auto',
+                    } as any);
+                  }
+                }
+                toast.success('Catálogo de materiais atualizado');
+              } catch (err: any) {
+                toast.error(`Erro ao atualizar catálogo: ${err?.message ?? err}`);
+              } finally {
+                setPendingMatches([]);
+              }
+            }}
+          >
+            Confirmar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
