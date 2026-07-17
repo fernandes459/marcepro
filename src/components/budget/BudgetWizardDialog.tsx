@@ -99,6 +99,11 @@ export default function BudgetWizardDialog({
   const { user } = useAuth();
   const [tab, setTab] = useState<TabKey>('cliente');
   const [saving, setSaving] = useState(false);
+  const [pendingMatches, setPendingMatches] = useState<Array<{
+    input: { name: string; unit_cost: number; unit: string };
+    suggestion: { id: string; name: string; unit_cost: number; score: number };
+    decision: 'use_existing' | 'create_new';
+  }>>([]);
 
   // Tab 1: Cliente
   const [selectedClientId, setSelectedClientId] = useState('');
