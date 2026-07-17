@@ -23,6 +23,7 @@ import { CurrencyInput } from '@/components/CurrencyInput';
 import ClientPicker from './ClientPicker';
 import ModuleConfigurator, { ModuleConfig, ModuleResult } from './ModuleConfigurator';
 import { AISuggestPricing } from './AISuggestPricing';
+import { findBestMatch, normalizeMaterialName } from '@/lib/material-match';
 
 // ----------- TYPES -----------
 export interface Client {
