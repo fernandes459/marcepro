@@ -30,6 +30,8 @@ import BudgetWizardDialog, {
 import { computeSnapshot, periodFromKey } from '@/engines/FinancialEngine';
 import { computeFunnel } from '@/engines/MetricsEngine';
 import OpenPipelinePanel from '@/components/budget/OpenPipelinePanel';
+import OrcamentistaProDialog from '@/components/budget/OrcamentistaProDialog';
+
 
 interface BudgetWithClient extends Budget {
   clients?: Client | null;
@@ -564,9 +566,13 @@ export default function BudgetsPage() {
           <h1 className="text-3xl font-bold font-display tracking-tight">Orçamentos</h1>
           <p className="text-muted-foreground text-sm mt-1">Pipeline comercial — fluxo guiado em 7 etapas</p>
         </div>
-        <Button onClick={() => { setEditingBudget(null); setWizardOpen(true); }} className="gradient-primary shadow-primary border-0">
-          <Plus className="h-4 w-4 mr-2" /> Novo Orçamento
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <OrcamentistaProDialog />
+          <Button onClick={() => { setEditingBudget(null); setWizardOpen(true); }} className="gradient-primary shadow-primary border-0">
+            <Plus className="h-4 w-4 mr-2" /> Novo Orçamento
+          </Button>
+        </div>
+
       </div>
 
       {/* WIZARD */}
