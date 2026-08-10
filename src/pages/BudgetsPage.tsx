@@ -30,6 +30,8 @@ import BudgetWizardDialog, {
 import { computeSnapshot, periodFromKey } from '@/engines/FinancialEngine';
 import { computeFunnel } from '@/engines/MetricsEngine';
 import OpenPipelinePanel from '@/components/budget/OpenPipelinePanel';
+import OrcamentistaProDialog from '@/components/budget/OrcamentistaProDialog';
+
 
 interface BudgetWithClient extends Budget {
   clients?: Client | null;
