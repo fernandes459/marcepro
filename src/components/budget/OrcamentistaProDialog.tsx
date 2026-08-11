@@ -41,7 +41,7 @@ export default function OrcamentistaProDialog() {
 
   const [empresa, setEmpresa] = useState('FW Planejados');
   const [cliente, setCliente] = useState('');
-  const [valorVenda, setValorVenda] = useState('');
+  const [margemDesejada, setMargemDesejada] = useState('30');
   const [prazoDias, setPrazoDias] = useState('');
   const [custoDiario, setCustoDiario] = useState('');
   const [funcionarios, setFuncionarios] = useState('');
@@ -59,7 +59,7 @@ export default function OrcamentistaProDialog() {
   const missing = useMemo(() => {
     const m: string[] = [];
     if (!cliente.trim()) m.push('nome do cliente');
-    if (!n(valorVenda)) m.push('valor de venda');
+    if (!n(margemDesejada)) m.push('margem de lucro desejada');
     if (!n(prazoDias)) m.push('prazo de produção');
     if (!n(custoDiario)) m.push('custo diário da equipe');
     if (!n(funcionarios)) m.push('nº de funcionários');
@@ -67,7 +67,7 @@ export default function OrcamentistaProDialog() {
     if (!estado.trim()) m.push('estado');
     if (isFW && somaSocios !== 100) m.push('participação dos sócios (deve somar 100%)');
     return m;
-  }, [cliente, valorVenda, prazoDias, custoDiario, funcionarios, cidade, estado, isFW, somaSocios]);
+  }, [cliente, margemDesejada, prazoDias, custoDiario, funcionarios, cidade, estado, isFW, somaSocios]);
 
   const addFiles = async (list: FileList | null) => {
     if (!list) return;
@@ -89,7 +89,7 @@ export default function OrcamentistaProDialog() {
         body: {
           answers: {
             empresa, cliente,
-            valorVenda: n(valorVenda), prazoDias: n(prazoDias),
+            margemDesejada: n(margemDesejada), prazoDias: n(prazoDias),
             custoDiarioEquipe: n(custoDiario), funcionarios: n(funcionarios),
             cidade, estado, padrao, material,
             socios: isFW ? socios.filter(s => s.nome.trim()) : [],
@@ -319,7 +319,7 @@ export default function OrcamentistaProDialog() {
               </Select>
             ))}
             {field('Cliente', <Input value={cliente} onChange={e => setCliente(e.target.value)} placeholder="Nome do cliente" />)}
-            {field('Valor de venda desejado (R$)', <Input inputMode="decimal" value={valorVenda} onChange={e => setValorVenda(e.target.value)} placeholder="0,00" />)}
+            {field('Margem de lucro desejada (%)', <Input inputMode="decimal" value={margemDesejada} onChange={e => setMargemDesejada(e.target.value)} placeholder="30" />)}
             {field('Prazo de produção (dias)', <Input inputMode="numeric" value={prazoDias} onChange={e => setPrazoDias(e.target.value)} placeholder="30" />)}
             {field('Custo operacional diário da equipe (R$)', <Input inputMode="decimal" value={custoDiario} onChange={e => setCustoDiario(e.target.value)} placeholder="450" />)}
             {field('Funcionários no projeto', <Input inputMode="numeric" value={funcionarios} onChange={e => setFuncionarios(e.target.value)} placeholder="3" />)}
