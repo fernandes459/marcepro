@@ -149,6 +149,7 @@ Analise os arquivos anexos (projeto/planta/render/foto com medidas), extraia amb
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content },
         ],
+        temperature: 0.1,
         response_format: { type: 'json_object' },
       }),
     });
