@@ -13,7 +13,7 @@ interface Payload {
   answers: {
     empresa: string;
     cliente: string;
-    valorVenda: number;
+    margemDesejada: number;
     prazoDias: number;
     custoDiarioEquipe: number;
     funcionarios: number;
@@ -91,7 +91,8 @@ Deno.serve(async (req: Request) => {
     const briefing = `DADOS DO PROJETO
 - Empresa: ${a.empresa}
 - Cliente: ${a.cliente}
-- Valor de venda desejado: R$ ${Number(a.valorVenda || 0).toFixed(2)}
+- Margem de lucro desejada: ${Number(a.margemDesejada || 0).toFixed(1)}% sobre o custo total
+  (calcule o valor de venda a partir dessa margem: valor_venda = custo_total × (1 + margem/100) e use-o em resultado_financeiro.valor_venda)
 - Prazo de produção: ${a.prazoDias} dias
 - Custo operacional diário da equipe: R$ ${Number(a.custoDiarioEquipe || 0).toFixed(2)}
 - Funcionários no projeto: ${a.funcionarios}
