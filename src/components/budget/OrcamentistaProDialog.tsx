@@ -420,6 +420,45 @@ export default function OrcamentistaProDialog() {
                 ))}
               </div>
 
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Sugestões de preço</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {([
+                    ['Mínimo', n(result.recomendacao_comercial?.preco_minimo), 'border-warning/40'],
+                    ['Ideal', n(result.recomendacao_comercial?.preco_ideal) || vendaOf(result), 'border-primary/60 ring-2 ring-primary/20'],
+                    ['Premium', n(result.recomendacao_comercial?.preco_premium), 'border-success/40'],
+                  ] as [string, number, string][]).map(([label, value, tone]) => {
+                    const custo = n(result.custos?.total);
+                    const margem = custo > 0 ? ((value - custo) / custo) * 100 : 0;
+                    const active = selectedPrice === value && value > 0;
+                    return (
+                      <Card key={label} className={`border-2 ${tone} ${active ? 'bg-primary/5' : ''}`}>
+                        <CardContent className="p-3 space-y-1.5">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                          <p className="font-display text-xl font-bold">{formatBRL(value)}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Lucro {formatBRL(value - custo)} · Margem {margem.toFixed(1)}%
+                          </p>
+                          <Button size="sm" variant={active ? 'default' : 'outline'} className="w-full"
+                            onClick={() => setSelectedPrice(value)}>
+                            {active ? 'Selecionado' : 'Selecionar'}
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+                {result.recomendacao_comercial?.justificativa && (
+                  <p className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    {result.recomendacao_comercial.justificativa}
+                  </p>
+                )}
+                <Button onClick={approveBudget} disabled={approving} className="w-full gap-2 gradient-primary shadow-primary border-0">
+                  {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Aprovar orçamento ({formatBRL(selectedPrice || vendaOf(result))}) e enviar para Em Aberto
+                </Button>
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={exportPdf} className="gap-1.5">
                   <FileText className="h-3.5 w-3.5" /> PDF profissional
