@@ -35,8 +35,26 @@ PESQUISA DE PREÇOS
 Referência principal de mercado: leomadeiras.com.br (MDF 6/15/18/25mm, ferragens, corrediças, dobradiças, pistões, puxadores, perfis, fitas de borda, acessórios).
 Sem acesso online, use média atualizada de mercado brasileiro e SEMPRE inclua a observação: "Valores estimados com base em preços médios de mercado."
 
+LEITURA DOS ARQUIVOS (obrigatória e exaustiva)
+Antes de calcular, faça uma varredura completa de CADA arquivo enviado (PDF, planta, render, foto, print, tabela):
+- Leia TODO texto visível: cotas, legendas, carimbos, listas de materiais, códigos de ferragens, anotações à mão, tabelas de ambientes.
+- Extraia por ambiente: nome, largura × altura × profundidade (mm), nº de portas, gavetas, prateleiras, nichos, divisórias, cabideiros, gavetões, portas de correr, iluminação, espelhos, vidros, perfis.
+- Registre cores, texturas, acabamentos, espessuras (6/15/18/25mm), tipo de fita de borda e ferragens citadas.
+- Converta todas as medidas para mm; se houver escala ou cota de referência, use-a para inferir medidas faltantes.
+- Se houver conflito entre arquivos ou entre desenho e texto, adote o valor mais específico e registre o conflito em observacoes_tecnicas.
+- NUNCA ignore um ambiente ou item que apareça em qualquer arquivo. Liste todos, mesmo os pequenos (rodapés, tamponamentos, painéis, prateleiras avulsas).
+- Só estime quando o dado realmente não existir nos arquivos — e marque a estimativa explicitamente como premissa.
+
+CONFERÊNCIA FINAL (obrigatória antes de responder)
+1. Recalcule todos os totais: valor_total = quantidade × valor_unitario em cada linha; soma dos materiais e ferragens confere com custos.material.
+2. custos.total = material + estrutura_marcenaria + operacional. resultado_financeiro.valor_venda = custos.total × (1 + margem/100).
+3. lucro_bruto = valor_venda − custos.total; margem_pct coerente; divisão de sócios soma 100% do lucro líquido.
+4. Área total = soma das áreas dos ambientes; chapas ≈ área com perda ÷ 5,09 m² (2750×1850mm), arredondado para cima.
+5. Se algum número não fechar, corrija antes de responder. Zero inconsistências.
+
 ANÁLISE TÉCNICA (obrigatória)
 Calcule: área total em m², quantidade de chapas, aproveitamento, perda técnica, fundos, portas, gavetas, prateleiras, divisórias, ferragens, fitas de borda, componentes especiais, tempo estimado de fabricação e complexidade.
+
 
 REGRAS FW PLANEJADOS
 Total = Material + 10% sobre o material (estrutura da marcenaria) + Custo operacional + Lucro.
@@ -131,6 +149,7 @@ Analise os arquivos anexos (projeto/planta/render/foto com medidas), extraia amb
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content },
         ],
+        temperature: 0.1,
         response_format: { type: 'json_object' },
       }),
     });
