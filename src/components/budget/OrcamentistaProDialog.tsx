@@ -56,6 +56,12 @@ export default function OrcamentistaProDialog() {
   const isFW = empresa === 'FW Planejados';
   const somaSocios = useMemo(() => socios.reduce((s, x) => s + n(x.percentual), 0), [socios]);
 
+  /** Valor de venda derivado da margem desejada (fallback quando a IA não retorna). */
+  const vendaOf = (r: any) =>
+    n(r?.resultado_financeiro?.valor_venda) ||
+    n(r?.recomendacao_comercial?.preco_recomendado) ||
+    n(r?.custos?.total) * (1 + n(margemDesejada) / 100);
+
   const missing = useMemo(() => {
     const m: string[] = [];
     if (!cliente.trim()) m.push('nome do cliente');
