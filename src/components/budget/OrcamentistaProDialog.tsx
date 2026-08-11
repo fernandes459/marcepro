@@ -161,7 +161,7 @@ export default function OrcamentistaProDialog() {
         <div class="kpi"><span>Operacional</span><b>${formatBRL(n(r.custos?.operacional))}</b></div>
         ${isFW ? `<div class="kpi"><span>Estrutura (10%)</span><b>${formatBRL(n(r.custos?.estrutura_marcenaria))}</b></div>` : ''}
         <div class="kpi"><span>Custo total</span><b>${formatBRL(n(r.custos?.total))}</b></div>
-        <div class="kpi"><span>Venda</span><b>${formatBRL(n(r.resultado_financeiro?.valor_venda) || n(valorVenda))}</b></div>
+        <div class="kpi"><span>Venda</span><b>${formatBRL(vendaOf(r))}</b></div>
         <div class="kpi"><span>Lucro líquido</span><b>${formatBRL(n(r.resultado_financeiro?.lucro_liquido))}</b></div>
         <div class="kpi"><span>Margem</span><b>${n(r.resultado_financeiro?.margem_pct).toFixed(1)}%</b></div>
       </div>
@@ -263,7 +263,7 @@ export default function OrcamentistaProDialog() {
       ['Estrutura Marcenaria (10%)', isFW ? { f: 'B2*0.1' } : 0],
       ['Operacional', { f: 'OPERACIONAL!F2' }],
       ['Custo Total', { f: 'B2+B3+B4' }],
-      ['Valor de Venda', n(valorVenda)],
+      ['Valor de Venda', vendaOf(r)],
       ['Lucro Bruto', { f: 'B6-B5' }],
       ['Impostos', n(r.resultado_financeiro?.impostos)],
       ['Lucro Líquido', { f: 'B7-B8' }],
@@ -409,7 +409,7 @@ export default function OrcamentistaProDialog() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   ['Custo total', n(result.custos?.total)],
-                  ['Venda', n(result.resultado_financeiro?.valor_venda) || n(valorVenda)],
+                  ['Venda', vendaOf(result)],
                   ['Lucro líquido', n(result.resultado_financeiro?.lucro_liquido)],
                   ['Recomendado', n(result.recomendacao_comercial?.preco_recomendado)],
                 ].map(([label, v]) => (
