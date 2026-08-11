@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  Brain, Loader2, Upload, X, FileText, FileSpreadsheet, Sparkles, Plus, Trash2,
+  Brain, Loader2, Upload, X, FileText, FileSpreadsheet, Sparkles, Plus, Trash2, CheckCircle2,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import ReactMarkdown from 'react-markdown';
@@ -37,6 +37,8 @@ export default function OrcamentistaProDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [selectedPrice, setSelectedPrice] = useState(0);
+  const [approving, setApproving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [empresa, setEmpresa] = useState('FW Planejados');
