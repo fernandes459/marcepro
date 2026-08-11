@@ -109,6 +109,11 @@ export default function OrcamentistaProDialog() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setResult(data);
+      setSelectedPrice(
+        n(data?.recomendacao_comercial?.preco_ideal) ||
+        n(data?.recomendacao_comercial?.preco_recomendado) ||
+        n(data?.resultado_financeiro?.valor_venda),
+      );
       toast.success('Orçamento analisado pela IA');
     } catch (e) {
       console.error(e);
@@ -117,6 +122,81 @@ export default function OrcamentistaProDialog() {
       setLoading(false);
     }
   };
+
+  /* ---------- aprovar e criar orçamento (entra em "Em Aberto") ---------- */
+
+  const approveBudget = async () => {
+    if (!result) return;
+    const preco = selectedPrice || vendaOf(result);
+    if (preco <= 0) { toast.error('Selecione um preço válido.'); return; }
+    setApproving(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth?.user;
+      if (!user) throw new Error('Sessão expirada. Faça login novamente.');
+
+      // Cliente: reaproveita se já existir pelo nome
+      let clientId: string | null = null;
+      const { data: found } = await supabase
+        .from('clients').select('id').ilike('name', cliente.trim()).limit(1).maybeSingle();
+      if (found?.id) clientId = found.id;
+      else {
+        const { data: created } = await supabase
+          .from('clients')
+          .insert({ user_id: user.id, name: cliente.trim(), phone: '', city: cidade || null, state: estado || null })
+          .select('id').single();
+        clientId = created?.id ?? null;
+      }
+
+      const custo = n(result.custos?.total);
+      const margem = custo > 0 ? ((preco - custo) / custo) * 100 : 0;
+
+      const { data: budget, error } = await supabase.from('budgets').insert({
+        user_id: user.id,
+        code: 'TEMP',
+        status: 'pending',
+        client_id: clientId,
+        project_name: `${padrao} · ${material} — ${cliente.trim()}`,
+        client_description: result.resumo_executivo?.material || material,
+        total_cost: custo,
+        profit_margin: Number(margem.toFixed(2)),
+        final_price: preco,
+        finish_type: padrao,
+        source: 'Orçamentista IA',
+        notes: (result.recomendacao_comercial?.justificativa || '').slice(0, 1000),
+      } as any).select('id').single();
+      if (error || !budget) throw new Error(error?.message || 'Falha ao criar orçamento');
+
+      const itens = [
+        ...(result.ambientes || []).map((a: any) => ({
+          name: a.nome || 'Ambiente', quantity: 1,
+          material_cost: 0, labor_cost: 0, unit_price: 0, room_label: a.nome || null,
+        })),
+        ...(result.materiais || []).map((m: any) => ({
+          name: m.descricao || 'Material', quantity: Math.max(1, Math.round(n(m.quantidade)) || 1),
+          material_cost: n(m.valor_unitario), labor_cost: 0, unit_price: n(m.valor_unitario), room_label: null,
+        })),
+        ...(result.ferragens || []).map((f: any) => ({
+          name: f.item || 'Ferragem', quantity: Math.max(1, Math.round(n(f.quantidade)) || 1),
+          material_cost: n(f.valor_unitario), labor_cost: 0, unit_price: n(f.valor_unitario), room_label: 'Ferragens',
+        })),
+      ].filter(i => i.name.trim());
+
+      if (itens.length) {
+        await supabase.from('budget_items').insert(itens.map(i => ({ ...i, budget_id: budget.id })) as any);
+      }
+
+      toast.success('Orçamento criado e enviado para o pipeline "Em Aberto"');
+      setOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : 'Falha ao aprovar orçamento');
+    } finally {
+      setApproving(false);
+    }
+  };
+
+
 
   /* ---------- exportações ---------- */
 
