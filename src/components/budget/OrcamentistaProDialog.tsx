@@ -313,68 +313,179 @@ export default function OrcamentistaProDialog() {
     const r = result;
     const wb = XLSX.utils.book_new();
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-      ['RESUMO'], ['Empresa', empresa], ['Cliente', cliente], ['Projeto', r.resumo_executivo?.empresa ? cliente : cliente],
-      ['Cidade', `${cidade}/${estado}`], ['Data', new Date().toLocaleDateString('pt-BR')],
-      ['Prazo (dias)', n(prazoDias)], ['Padrão', padrao], ['Material', material],
-      ['Área total (m²)', n(r.levantamento_tecnico?.area_total_m2)], ['Chapas', n(r.levantamento_tecnico?.chapas)],
-    ]), 'RESUMO');
+    const BRL = 'R$ #,##0.00';
+    const PCT = '0.0%';
+    const NUM = '#,##0.00';
 
+    /** Cria a aba já aplicando larguras e formatos numéricos por coluna. */
+    const sheet = (
+      name: string,
+      aoa: any[][],
+      opts: { widths: number[]; formats?: Record<string, string>; merges?: string[] },
+    ) => {
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = opts.widths.map((w) => ({ wch: w }));
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      Object.entries(opts.formats || {}).forEach(([col, fmt]) => {
+        const c = XLSX.utils.decode_col(col);
+        for (let row = range.s.r; row <= range.e.r; row++) {
+          const cell = ws[XLSX.utils.encode_cell({ r: row, c })];
+          if (cell && (cell.t === 'n' || cell.f)) cell.z = fmt;
+        }
+      });
+      if (opts.merges) ws['!merges'] = opts.merges.map((m) => XLSX.utils.decode_range(m));
+      XLSX.utils.book_append_sheet(wb, ws, name);
+      return ws;
+    };
+
+    const lt = r.levantamento_tecnico || {};
+    const ambientes = (r.ambientes || []) as any[];
+
+    /* ---------- RESUMO ---------- */
+    const resumo: any[][] = [
+      [`ORÇAMENTO — ${empresa.toUpperCase()}`],
+      [],
+      ['Cliente', cliente],
+      ['Empresa', empresa],
+      ['Projeto', ambientes.map((a) => a.nome).filter(Boolean).join(' + ') || '—'],
+      ['Cidade / UF', `${cidade} / ${estado}`],
+      ['Data do orçamento', new Date().toLocaleDateString('pt-BR')],
+      ['Prazo de produção (dias)', n(prazoDias)],
+      ['Funcionários no projeto', n(funcionarios)],
+      ['Custo operacional diário da equipe (R$)', n(custoDiario)],
+      ['Margem de lucro aplicada', n(margemDesejada) / 100],
+      [],
+      ['ESPECIFICAÇÕES TÉCNICAS'],
+      ['Material principal', material],
+      ['Padrão', padrao],
+      ['Área total (m²)', n(lt.area_total_m2)],
+      ['Chapas estimadas', n(lt.chapas)],
+      ['Perda técnica (%)', n(lt.perda_tecnica_pct) / 100],
+      ['Portas / Gavetas / Prateleiras', `${n(lt.portas)} / ${n(lt.gavetas)} / ${n(lt.prateleiras)}`],
+      ['Complexidade', lt.complexidade || '—'],
+      [],
+      ['AMBIENTES'],
+      ['Ambiente', 'Medidas', 'Área (m²)', 'Descrição'],
+      ...ambientes.map((a) => [a.nome, a.medidas, n(a.area_m2), a.descricao]),
+      [],
+      ['Observações', lt.observacoes || 'Valores estimados com base em preços médios de mercado.'],
+    ];
+    sheet('RESUMO', resumo, { widths: [42, 34, 14, 60], merges: ['A1:D1'] });
+
+    /* ---------- MATERIAIS ---------- */
     const mats = (r.materiais || []) as any[];
-    const matsAoa: any[][] = [['Descrição', 'Quantidade', 'Unidade', 'Valor Unitário', 'Valor Total']];
-    mats.forEach((m, i) => matsAoa.push([m.descricao, n(m.quantidade), m.unidade, n(m.valor_unitario), { f: `B${i + 2}*D${i + 2}` }]));
-    matsAoa.push(['TOTAL', '', '', '', { f: `SUM(E2:E${mats.length + 1})` }]);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(matsAoa), 'MATERIAIS');
+    const matsAoa: any[][] = [
+      ['MATERIAIS — CHAPAS E INSUMOS'],
+      ['Descrição', 'Qtd', 'Unid.', 'Valor Unit. (R$)', 'Valor Total (R$)'],
+      ...mats.map((m, i) => [m.descricao, n(m.quantidade), m.unidade || 'un', n(m.valor_unitario), { f: `B${i + 3}*D${i + 3}`, t: 'n' }]),
+      [],
+      ['SUBTOTAL MATERIAIS', '', '', '', { f: `SUM(E3:E${mats.length + 2})`, t: 'n' }],
+    ];
+    const matTotalRow = mats.length + 4;
+    sheet('MATERIAIS', matsAoa, { widths: [56, 8, 10, 18, 18], formats: { D: BRL, E: BRL, B: NUM }, merges: ['A1:E1'] });
 
+    /* ---------- FERRAGENS ---------- */
     const ferr = (r.ferragens || []) as any[];
-    const ferrAoa: any[][] = [['Item', 'Quantidade', 'Valor Unitário', 'Valor Total']];
-    ferr.forEach((f, i) => ferrAoa.push([f.item, n(f.quantidade), n(f.valor_unitario), { f: `B${i + 2}*C${i + 2}` }]));
-    ferrAoa.push(['TOTAL', '', '', { f: `SUM(D2:D${ferr.length + 1})` }]);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ferrAoa), 'FERRAGENS');
+    const ferrAoa: any[][] = [
+      ['FERRAGENS E ACESSÓRIOS'],
+      ['Item', 'Qtd', 'Valor Unit. (R$)', 'Valor Total (R$)'],
+      ...ferr.map((f, i) => [f.item, n(f.quantidade), n(f.valor_unitario), { f: `B${i + 3}*C${i + 3}`, t: 'n' }]),
+      [],
+      ['SUBTOTAL FERRAGENS', '', '', { f: `SUM(D3:D${ferr.length + 2})`, t: 'n' }],
+    ];
+    const ferrTotalRow = ferr.length + 4;
+    sheet('FERRAGENS', ferrAoa, { widths: [56, 8, 18, 18], formats: { C: BRL, D: BRL, B: NUM }, merges: ['A1:D1'] });
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-      ['Funcionários', 'Dias', 'Custo Diário', 'Total Equipe', '% s/ Materiais (7%)', 'Total Operacional'],
-      [n(funcionarios), n(prazoDias), n(custoDiario), { f: 'B2*C2' }, { f: "MATERIAIS!E" + (mats.length + 2) + "*0.07" }, { f: 'D2+E2' }],
-    ]), 'OPERACIONAL');
+    const MAT = `MATERIAIS!E${matTotalRow}`;
+    const FER = `FERRAGENS!D${ferrTotalRow}`;
 
-    const totalMatRef = `MATERIAIS!E${mats.length + 2}`;
-    const totalFerrRef = `FERRAGENS!D${ferr.length + 2}`;
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-      ['FINANCEIRO'],
-      ['Material', { f: `${totalMatRef}+${totalFerrRef}` }],
-      ['Estrutura Marcenaria (10%)', isFW ? { f: 'B2*0.1' } : 0],
-      ['Operacional', { f: 'OPERACIONAL!F2' }],
-      ['Custo Total', { f: 'B2+B3+B4' }],
-      ['Valor de Venda', vendaOf(r)],
-      ['Lucro Bruto', { f: 'B6-B5' }],
-      ['Impostos', n(r.resultado_financeiro?.impostos)],
-      ['Lucro Líquido', { f: 'B7-B8' }],
-      ['Margem %', { f: 'IF(B6=0,0,B9/B6)' }],
-    ]), 'FINANCEIRO');
+    /* ---------- OPERACIONAL ---------- */
+    sheet('OPERACIONAL', [
+      ['CUSTO OPERACIONAL'],
+      ['Descrição', 'Funcionários', 'Dias', 'Custo Diário (R$)'],
+      ['Equipe de produção', n(funcionarios), { f: 'RESUMO!B8', t: 'n' }, { f: 'RESUMO!B10', t: 'n' }],
+      [],
+      ['Mão de obra (dias × custo diário)', '', '', { f: 'C3*D3', t: 'n' }],
+      ['Overhead operacional (7% sobre materiais)', '', '', { f: `0.07*(${MAT}+${FER})`, t: 'n' }],
+      [],
+      ['TOTAL OPERACIONAL', '', '', { f: 'D5+D6', t: 'n' }],
+    ], { widths: [46, 14, 10, 20], formats: { D: BRL }, merges: ['A1:D1'] });
 
+    /* ---------- FINANCEIRO ---------- */
+    const estrutura = isFW ? { f: `0.10*(${MAT}+${FER})`, t: 'n' } : 0;
+    sheet('FINANCEIRO', [
+      ['RESUMO FINANCEIRO'],
+      ['Componente', 'Valor (R$)', '% do custo'],
+      ['Material (chapas + insumos)', { f: MAT, t: 'n' }, { f: 'IF($B$8=0,0,B3/$B$8)', t: 'n' }],
+      ['Ferragens e acessórios', { f: FER, t: 'n' }, { f: 'IF($B$8=0,0,B4/$B$8)', t: 'n' }],
+      ['Estrutura de marcenaria (10% s/ material)', estrutura, { f: 'IF($B$8=0,0,B5/$B$8)', t: 'n' }],
+      ['Operacional (mão de obra + overhead)', { f: 'OPERACIONAL!D8', t: 'n' }, { f: 'IF($B$8=0,0,B6/$B$8)', t: 'n' }],
+      ['Impostos', n(r.resultado_financeiro?.impostos), { f: 'IF($B$8=0,0,B7/$B$8)', t: 'n' }],
+      ['CUSTO REAL DO PROJETO', { f: 'SUM(B3:B7)', t: 'n' }],
+      [],
+      ['Margem de lucro desejada', { f: 'RESUMO!B11', t: 'n' }],
+      ['PREÇO DE VENDA (Custo × (1 + margem))', { f: 'B8*(1+B10)', t: 'n' }],
+      ['Lucro bruto', { f: 'B11-B8', t: 'n' }],
+      ['Margem sobre a venda', { f: 'IF(B11=0,0,B12/B11)', t: 'n' }],
+    ], { widths: [42, 20, 14], formats: { B: BRL, C: PCT }, merges: ['A1:C1'] });
+    // margem em % (linhas 10 e 13)
+    const fin = wb.Sheets['FINANCEIRO'];
+    ['B10'].forEach((ref) => { if (fin[ref]) fin[ref].z = PCT; });
+
+    /* ---------- DIVISÃO DE SÓCIOS ---------- */
     if (isFW) {
-      const ss = (r.divisao_socios || []).length ? r.divisao_socios : socios.map(s => ({ nome: s.nome, participacao_pct: s.percentual }));
-      const aoa: any[][] = [['Nome do Sócio', 'Participação %', 'Valor Recebido']];
-      ss.forEach((s: any, i: number) => aoa.push([s.nome, n(s.participacao_pct) / 100, { f: `FINANCEIRO!$B$9*B${i + 2}` }]));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'SOCIOS');
+      const ss = (r.divisao_socios || []).length
+        ? r.divisao_socios
+        : socios.map((s) => ({ nome: s.nome, participacao_pct: s.percentual }));
+      sheet('DIVISAO DE SOCIOS', [
+        ['DIVISÃO DE SÓCIOS'],
+        ['Sócio', 'Participação', 'Valor (R$)'],
+        ...ss.map((s: any, i: number) => [s.nome || `Sócio ${i + 1}`, n(s.participacao_pct) / 100, { f: `FINANCEIRO!$B$12*B${i + 3}`, t: 'n' }]),
+      ], { widths: [32, 16, 20], formats: { B: PCT, C: BRL }, merges: ['A1:C1'] });
+    } else {
+      sheet('DIVISAO DE SOCIOS', [
+        ['DIVISÃO DE SÓCIOS'],
+        [],
+        ['N/A — PlanejadoSousa não possui divisão societária.'],
+      ], { widths: [60], merges: ['A1:C1'] });
     }
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-      ['FORMAÇÃO DE PREÇO'],
-      ['Material × 1', { f: 'FINANCEIRO!B2' }],
-      ['Material × 2', { f: 'FINANCEIRO!B2*2' }],
-      ['Material × 3', { f: 'FINANCEIRO!B2*3' }],
-      ['Área (m²)', n(r.levantamento_tecnico?.area_total_m2)],
-      ['Valor por m²', { f: 'IF(B5=0,0,FINANCEIRO!B6/B5)' }],
-      ['Preço mínimo', n(r.recomendacao_comercial?.preco_minimo)],
-      ['Preço ideal', n(r.recomendacao_comercial?.preco_ideal)],
-      ['Preço premium', n(r.recomendacao_comercial?.preco_premium)],
-      ['Preço recomendado', n(r.recomendacao_comercial?.preco_recomendado)],
-    ]), 'FORMACAO_PRECO');
+    /* ---------- FORMAÇÃO DE PREÇO ---------- */
+    const rec = r.recomendacao_comercial || {};
+    const area = n(lt.area_total_m2);
+    const alerta = 'IF(B{r}<FINANCEIRO!$B$8,"⚠ PREJUÍZO — abaixo do custo real","Cobre o custo real")';
+    const linha = (label: string, formula: string, row: number) => [
+      label,
+      { f: formula, t: 'n' },
+      { f: `B${row}-FINANCEIRO!$B$8`, t: 'n' },
+      { f: alerta.replace('{r}', String(row)) },
+    ];
+    sheet('FORMACAO DE PRECO', [
+      ['FORMAÇÃO DE PREÇO — COMPARATIVO'],
+      ['Método', 'Valor (R$)', 'vs. Custo Real', 'Observação'],
+      linha('Material × 1,0', `${MAT}+${FER}`, 3),
+      linha('Material × 2,0', `2*(${MAT}+${FER})`, 4),
+      linha('Material × 3,0', `3*(${MAT}+${FER})`, 5),
+      [],
+      ['Área do projeto (m²)', area],
+      linha('Margem mínima (15%)', 'FINANCEIRO!$B$8*1.15', 8),
+      linha('Margem desejada', 'FINANCEIRO!$B$11', 9),
+      linha('Margem premium (+20 p.p.)', 'FINANCEIRO!$B$8*(1+RESUMO!B11+0.2)', 10),
+      [],
+      ['PREÇO MÍNIMO ACEITÁVEL', n(rec.preco_minimo) || { f: 'B8', t: 'n' }],
+      ['PREÇO IDEAL (RECOMENDADO)', n(rec.preco_ideal) || { f: 'B9', t: 'n' }],
+      ['PREÇO PREMIUM', n(rec.preco_premium) || { f: 'B10', t: 'n' }],
+      ['Valor por m² (preço ideal ÷ área)', { f: 'IF(B7=0,0,B13/B7)', t: 'n' }],
+      [],
+      ['Justificativa', rec.justificativa || '—'],
+    ], { widths: [40, 20, 18, 46], formats: { B: BRL, C: BRL }, merges: ['A1:D1'] });
+    const fp = wb.Sheets['FORMACAO DE PRECO'];
+    if (fp['B7']) fp['B7'].z = NUM;
 
-    XLSX.writeFile(wb, `orcamento-${cliente.replace(/\s+/g, '-').toLowerCase() || 'projeto'}.xlsx`);
+    XLSX.writeFile(wb, `Orcamento_${(cliente || 'projeto').replace(/\s+/g, '_')}_${empresa.replace(/\s+/g, '')}.xlsx`);
     toast.success('Planilha gerada com fórmulas editáveis');
   };
+
 
   /* ---------- UI ---------- */
 
