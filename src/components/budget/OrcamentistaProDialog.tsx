@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  Brain, Loader2, Upload, X, FileText, FileSpreadsheet, Sparkles, Plus, Trash2,
+  Brain, Loader2, Upload, X, FileText, FileSpreadsheet, Sparkles, Plus, Trash2, CheckCircle2,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import ReactMarkdown from 'react-markdown';
@@ -37,11 +37,13 @@ export default function OrcamentistaProDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [selectedPrice, setSelectedPrice] = useState(0);
+  const [approving, setApproving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [empresa, setEmpresa] = useState('FW Planejados');
   const [cliente, setCliente] = useState('');
-  const [valorVenda, setValorVenda] = useState('');
+  const [margemDesejada, setMargemDesejada] = useState('30');
   const [prazoDias, setPrazoDias] = useState('');
   const [custoDiario, setCustoDiario] = useState('');
   const [funcionarios, setFuncionarios] = useState('');
@@ -56,10 +58,16 @@ export default function OrcamentistaProDialog() {
   const isFW = empresa === 'FW Planejados';
   const somaSocios = useMemo(() => socios.reduce((s, x) => s + n(x.percentual), 0), [socios]);
 
+  /** Valor de venda derivado da margem desejada (fallback quando a IA não retorna). */
+  const vendaOf = (r: any) =>
+    n(r?.resultado_financeiro?.valor_venda) ||
+    n(r?.recomendacao_comercial?.preco_recomendado) ||
+    n(r?.custos?.total) * (1 + n(margemDesejada) / 100);
+
   const missing = useMemo(() => {
     const m: string[] = [];
     if (!cliente.trim()) m.push('nome do cliente');
-    if (!n(valorVenda)) m.push('valor de venda');
+    if (!n(margemDesejada)) m.push('margem de lucro desejada');
     if (!n(prazoDias)) m.push('prazo de produção');
     if (!n(custoDiario)) m.push('custo diário da equipe');
     if (!n(funcionarios)) m.push('nº de funcionários');
@@ -67,7 +75,7 @@ export default function OrcamentistaProDialog() {
     if (!estado.trim()) m.push('estado');
     if (isFW && somaSocios !== 100) m.push('participação dos sócios (deve somar 100%)');
     return m;
-  }, [cliente, valorVenda, prazoDias, custoDiario, funcionarios, cidade, estado, isFW, somaSocios]);
+  }, [cliente, margemDesejada, prazoDias, custoDiario, funcionarios, cidade, estado, isFW, somaSocios]);
 
   const addFiles = async (list: FileList | null) => {
     if (!list) return;
@@ -89,7 +97,7 @@ export default function OrcamentistaProDialog() {
         body: {
           answers: {
             empresa, cliente,
-            valorVenda: n(valorVenda), prazoDias: n(prazoDias),
+            margemDesejada: n(margemDesejada), prazoDias: n(prazoDias),
             custoDiarioEquipe: n(custoDiario), funcionarios: n(funcionarios),
             cidade, estado, padrao, material,
             socios: isFW ? socios.filter(s => s.nome.trim()) : [],
@@ -101,6 +109,11 @@ export default function OrcamentistaProDialog() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setResult(data);
+      setSelectedPrice(
+        n(data?.recomendacao_comercial?.preco_ideal) ||
+        n(data?.recomendacao_comercial?.preco_recomendado) ||
+        n(data?.resultado_financeiro?.valor_venda),
+      );
       toast.success('Orçamento analisado pela IA');
     } catch (e) {
       console.error(e);
@@ -109,6 +122,81 @@ export default function OrcamentistaProDialog() {
       setLoading(false);
     }
   };
+
+  /* ---------- aprovar e criar orçamento (entra em "Em Aberto") ---------- */
+
+  const approveBudget = async () => {
+    if (!result) return;
+    const preco = selectedPrice || vendaOf(result);
+    if (preco <= 0) { toast.error('Selecione um preço válido.'); return; }
+    setApproving(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth?.user;
+      if (!user) throw new Error('Sessão expirada. Faça login novamente.');
+
+      // Cliente: reaproveita se já existir pelo nome
+      let clientId: string | null = null;
+      const { data: found } = await supabase
+        .from('clients').select('id').ilike('name', cliente.trim()).limit(1).maybeSingle();
+      if (found?.id) clientId = found.id;
+      else {
+        const { data: created } = await supabase
+          .from('clients')
+          .insert({ user_id: user.id, name: cliente.trim(), phone: '', city: cidade || null, state: estado || null })
+          .select('id').single();
+        clientId = created?.id ?? null;
+      }
+
+      const custo = n(result.custos?.total);
+      const margem = custo > 0 ? ((preco - custo) / custo) * 100 : 0;
+
+      const { data: budget, error } = await supabase.from('budgets').insert({
+        user_id: user.id,
+        code: 'TEMP',
+        status: 'pending',
+        client_id: clientId,
+        project_name: `${padrao} · ${material} — ${cliente.trim()}`,
+        client_description: result.resumo_executivo?.material || material,
+        total_cost: custo,
+        profit_margin: Number(margem.toFixed(2)),
+        final_price: preco,
+        finish_type: padrao,
+        source: 'Orçamentista IA',
+        notes: (result.recomendacao_comercial?.justificativa || '').slice(0, 1000),
+      } as any).select('id').single();
+      if (error || !budget) throw new Error(error?.message || 'Falha ao criar orçamento');
+
+      const itens = [
+        ...(result.ambientes || []).map((a: any) => ({
+          name: a.nome || 'Ambiente', quantity: 1,
+          material_cost: 0, labor_cost: 0, unit_price: 0, room_label: a.nome || null,
+        })),
+        ...(result.materiais || []).map((m: any) => ({
+          name: m.descricao || 'Material', quantity: Math.max(1, Math.round(n(m.quantidade)) || 1),
+          material_cost: n(m.valor_unitario), labor_cost: 0, unit_price: n(m.valor_unitario), room_label: null,
+        })),
+        ...(result.ferragens || []).map((f: any) => ({
+          name: f.item || 'Ferragem', quantity: Math.max(1, Math.round(n(f.quantidade)) || 1),
+          material_cost: n(f.valor_unitario), labor_cost: 0, unit_price: n(f.valor_unitario), room_label: 'Ferragens',
+        })),
+      ].filter(i => i.name.trim());
+
+      if (itens.length) {
+        await supabase.from('budget_items').insert(itens.map(i => ({ ...i, budget_id: budget.id })) as any);
+      }
+
+      toast.success('Orçamento criado e enviado para o pipeline "Em Aberto"');
+      setOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : 'Falha ao aprovar orçamento');
+    } finally {
+      setApproving(false);
+    }
+  };
+
+
 
   /* ---------- exportações ---------- */
 
@@ -155,7 +243,7 @@ export default function OrcamentistaProDialog() {
         <div class="kpi"><span>Operacional</span><b>${formatBRL(n(r.custos?.operacional))}</b></div>
         ${isFW ? `<div class="kpi"><span>Estrutura (10%)</span><b>${formatBRL(n(r.custos?.estrutura_marcenaria))}</b></div>` : ''}
         <div class="kpi"><span>Custo total</span><b>${formatBRL(n(r.custos?.total))}</b></div>
-        <div class="kpi"><span>Venda</span><b>${formatBRL(n(r.resultado_financeiro?.valor_venda) || n(valorVenda))}</b></div>
+        <div class="kpi"><span>Venda</span><b>${formatBRL(vendaOf(r))}</b></div>
         <div class="kpi"><span>Lucro líquido</span><b>${formatBRL(n(r.resultado_financeiro?.lucro_liquido))}</b></div>
         <div class="kpi"><span>Margem</span><b>${n(r.resultado_financeiro?.margem_pct).toFixed(1)}%</b></div>
       </div>
@@ -257,7 +345,7 @@ export default function OrcamentistaProDialog() {
       ['Estrutura Marcenaria (10%)', isFW ? { f: 'B2*0.1' } : 0],
       ['Operacional', { f: 'OPERACIONAL!F2' }],
       ['Custo Total', { f: 'B2+B3+B4' }],
-      ['Valor de Venda', n(valorVenda)],
+      ['Valor de Venda', vendaOf(r)],
       ['Lucro Bruto', { f: 'B6-B5' }],
       ['Impostos', n(r.resultado_financeiro?.impostos)],
       ['Lucro Líquido', { f: 'B7-B8' }],
@@ -319,7 +407,7 @@ export default function OrcamentistaProDialog() {
               </Select>
             ))}
             {field('Cliente', <Input value={cliente} onChange={e => setCliente(e.target.value)} placeholder="Nome do cliente" />)}
-            {field('Valor de venda desejado (R$)', <Input inputMode="decimal" value={valorVenda} onChange={e => setValorVenda(e.target.value)} placeholder="0,00" />)}
+            {field('Margem de lucro desejada (%)', <Input inputMode="decimal" value={margemDesejada} onChange={e => setMargemDesejada(e.target.value)} placeholder="30" />)}
             {field('Prazo de produção (dias)', <Input inputMode="numeric" value={prazoDias} onChange={e => setPrazoDias(e.target.value)} placeholder="30" />)}
             {field('Custo operacional diário da equipe (R$)', <Input inputMode="decimal" value={custoDiario} onChange={e => setCustoDiario(e.target.value)} placeholder="450" />)}
             {field('Funcionários no projeto', <Input inputMode="numeric" value={funcionarios} onChange={e => setFuncionarios(e.target.value)} placeholder="3" />)}
@@ -403,7 +491,7 @@ export default function OrcamentistaProDialog() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   ['Custo total', n(result.custos?.total)],
-                  ['Venda', n(result.resultado_financeiro?.valor_venda) || n(valorVenda)],
+                  ['Venda', vendaOf(result)],
                   ['Lucro líquido', n(result.resultado_financeiro?.lucro_liquido)],
                   ['Recomendado', n(result.recomendacao_comercial?.preco_recomendado)],
                 ].map(([label, v]) => (
@@ -412,6 +500,45 @@ export default function OrcamentistaProDialog() {
                     <p className="font-display text-lg font-bold">{formatBRL(Number(v))}</p>
                   </CardContent></Card>
                 ))}
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Sugestões de preço</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {([
+                    ['Mínimo', n(result.recomendacao_comercial?.preco_minimo), 'border-warning/40'],
+                    ['Ideal', n(result.recomendacao_comercial?.preco_ideal) || vendaOf(result), 'border-primary/60 ring-2 ring-primary/20'],
+                    ['Premium', n(result.recomendacao_comercial?.preco_premium), 'border-success/40'],
+                  ] as [string, number, string][]).map(([label, value, tone]) => {
+                    const custo = n(result.custos?.total);
+                    const margem = custo > 0 ? ((value - custo) / custo) * 100 : 0;
+                    const active = selectedPrice === value && value > 0;
+                    return (
+                      <Card key={label} className={`border-2 ${tone} ${active ? 'bg-primary/5' : ''}`}>
+                        <CardContent className="p-3 space-y-1.5">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                          <p className="font-display text-xl font-bold">{formatBRL(value)}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Lucro {formatBRL(value - custo)} · Margem {margem.toFixed(1)}%
+                          </p>
+                          <Button size="sm" variant={active ? 'default' : 'outline'} className="w-full"
+                            onClick={() => setSelectedPrice(value)}>
+                            {active ? 'Selecionado' : 'Selecionar'}
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+                {result.recomendacao_comercial?.justificativa && (
+                  <p className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    {result.recomendacao_comercial.justificativa}
+                  </p>
+                )}
+                <Button onClick={approveBudget} disabled={approving} className="w-full gap-2 gradient-primary shadow-primary border-0">
+                  {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Aprovar orçamento ({formatBRL(selectedPrice || vendaOf(result))}) e enviar para Em Aberto
+                </Button>
               </div>
 
               <div className="flex flex-wrap gap-2">

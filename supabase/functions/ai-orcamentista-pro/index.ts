@@ -13,7 +13,7 @@ interface Payload {
   answers: {
     empresa: string;
     cliente: string;
-    valorVenda: number;
+    margemDesejada: number;
     prazoDias: number;
     custoDiarioEquipe: number;
     funcionarios: number;
@@ -50,6 +50,7 @@ PRECIFICAÇÃO
 Apresente Material ×1, ×2 e ×3. Calcule também o valor por m² e compare com as faixas:
 Econômico R$700–1.200/m²; Médio R$1.200–2.000/m²; Alto padrão R$2.000–4.000/m²; Luxo acima de R$4.000/m².
 Indique qual método é mais rentável.
+SEMPRE preencha recomendacao_comercial com preco_minimo (margem mínima segura), preco_ideal (margem desejada informada), preco_premium (margem desejada + 20 p.p.), preco_recomendado e justificativa objetiva.
 
 REGRA ABSOLUTA
 Nunca responda de forma genérica. Sempre revise medidas, valide cálculos, confira materiais, estime desperdício, informe prazo, mostre lucro real, margem real e demonstre claramente onde está o dinheiro do projeto.
@@ -91,7 +92,8 @@ Deno.serve(async (req: Request) => {
     const briefing = `DADOS DO PROJETO
 - Empresa: ${a.empresa}
 - Cliente: ${a.cliente}
-- Valor de venda desejado: R$ ${Number(a.valorVenda || 0).toFixed(2)}
+- Margem de lucro desejada: ${Number(a.margemDesejada || 0).toFixed(1)}% sobre o custo total
+  (calcule o valor de venda a partir dessa margem: valor_venda = custo_total × (1 + margem/100) e use-o em resultado_financeiro.valor_venda)
 - Prazo de produção: ${a.prazoDias} dias
 - Custo operacional diário da equipe: R$ ${Number(a.custoDiarioEquipe || 0).toFixed(2)}
 - Funcionários no projeto: ${a.funcionarios}
