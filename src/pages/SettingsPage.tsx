@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Settings, User, Building, Users, Plus, Pencil, Trash2, LogOut, Shield, UserPlus, Copy, Link, CreditCard, Package2, Upload, Download, Wallet, Receipt, Calculator, Wrench, Activity, Factory } from 'lucide-react';
 import EngineeringCatalogSettings from '@/components/settings/EngineeringCatalogSettings';
 import AuditLogPanel from '@/components/settings/AuditLogPanel';
+import AIPromptSettings from '@/components/settings/AIPromptSettings';
 import CapacitySettings from '@/components/settings/CapacitySettings';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
@@ -457,10 +458,12 @@ export default function SettingsPage() {
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-1" /> Equipe</TabsTrigger>
           <TabsTrigger value="access"><Shield className="h-4 w-4 mr-1" /> Acessos</TabsTrigger>
           <TabsTrigger value="profile"><User className="h-4 w-4 mr-1" /> Perfil</TabsTrigger>
+          <TabsTrigger value="aiprompt"><Brain className="h-4 w-4 mr-1" /> Skill IA</TabsTrigger>
           <TabsTrigger value="audit"><Activity className="h-4 w-4 mr-1" /> Auditoria</TabsTrigger>
         </TabsList>
 
         <TabsContent value="capacity"><CapacitySettings /></TabsContent>
+        <TabsContent value="aiprompt"><AIPromptSettings /></TabsContent>
 
 
         {/* Company */}
