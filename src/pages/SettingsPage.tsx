@@ -13,7 +13,6 @@ import EngineeringCatalogSettings from '@/components/settings/EngineeringCatalog
 import AuditLogPanel from '@/components/settings/AuditLogPanel';
 import AIPromptSettings from '@/components/settings/AIPromptSettings';
 import CapacitySettings from '@/components/settings/CapacitySettings';
-import AIPromptSettings from '@/components/settings/AIPromptSettings';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
