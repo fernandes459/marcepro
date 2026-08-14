@@ -93,6 +93,14 @@ export default function OrcamentistaProDialog() {
     setLoading(true);
     setResult(null);
     try {
+      const { data: promptRow } = await supabase
+        .from('ai_prompts' as any)
+        .select('content')
+        .eq('key', 'orcamentista_pro')
+        .maybeSingle();
+      const stored = ((promptRow as any)?.content as string) || '';
+      const [customPrompt, extraRules] = stored.split('\n<<<REGRAS_EXTRAS>>>\n');
+
       const { data, error } = await supabase.functions.invoke('ai-orcamentista-pro', {
         body: {
           answers: {
@@ -104,6 +112,8 @@ export default function OrcamentistaProDialog() {
           },
           notes,
           files: files.map(f => ({ name: f.name, mime: f.mime, data: f.data })),
+          customPrompt: (customPrompt || '').trim() || undefined,
+          extraRules: (extraRules || '').trim() || undefined,
         },
       });
       if (error) throw error;

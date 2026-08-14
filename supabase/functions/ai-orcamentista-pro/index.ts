@@ -25,6 +25,8 @@ interface Payload {
   };
   notes?: string;
   files?: FileIn[];
+  customPrompt?: string;
+  extraRules?: string;
 }
 
 const SYSTEM_PROMPT = `Você é ORÇAMENTISTA PRO MARCENARIA AI.
@@ -127,6 +129,14 @@ ${payload.notes?.trim() || '(nenhuma — extraia tudo dos arquivos anexos)'}
 
 Analise os arquivos anexos (projeto/planta/render/foto com medidas), extraia ambientes, medidas, cores, materiais e ferragens, e gere o orçamento completo em JSON conforme o schema.`;
 
+    const schemaTail = SYSTEM_PROMPT.slice(SYSTEM_PROMPT.indexOf('FORMATO DE RESPOSTA'));
+    let systemPrompt = payload.customPrompt?.trim()
+      ? `${payload.customPrompt.trim()}\n\n${schemaTail}`
+      : SYSTEM_PROMPT;
+    if (payload.extraRules?.trim()) {
+      systemPrompt += `\n\nREGRAS OBRIGATÓRIAS DEFINIDAS PELA EMPRESA (prevalecem sobre qualquer estimativa própria):\n${payload.extraRules.trim()}`;
+    }
+
     const content: any[] = [{ type: 'text', text: briefing }];
     for (const f of payload.files || []) {
       if (!f?.data) continue;
@@ -146,7 +156,7 @@ Analise os arquivos anexos (projeto/planta/render/foto com medidas), extraia amb
       body: JSON.stringify({
         model: 'google/gemini-3.6-flash',
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content },
         ],
         temperature: 0.1,
