@@ -116,8 +116,20 @@ export default function OrcamentistaProDialog() {
           extraRules: (extraRules || '').trim() || undefined,
         },
       });
-      if (error) throw error;
+      if (error) {
+        // Lê o corpo real da resposta (invoke devolve mensagem genérica em não-2xx)
+        let detail = '';
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const body = await ctx.clone().json();
+            detail = body?.error || '';
+          }
+        } catch { /* ignore */ }
+        throw new Error(detail || error.message || 'Falha ao analisar o projeto');
+      }
       if (data?.error) throw new Error(data.error);
+
       setResult(data);
       setSelectedPrice(
         n(data?.recomendacao_comercial?.preco_ideal) ||
