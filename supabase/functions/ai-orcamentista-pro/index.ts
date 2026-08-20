@@ -96,12 +96,51 @@ Responda SOMENTE com JSON puro (sem markdown, sem crase), no schema:
 }
 Todos os valores monetários em número (BRL, sem símbolo). Se algo não for identificável no projeto, estime e explique a premissa em observacoes_tecnicas.`;
 
+const GEMINI_MODEL = 'gemini-2.5-flash';
+
+async function callGeminiDirect(
+  apiKey: string,
+  systemPrompt: string,
+  briefing: string,
+  files: FileIn[],
+): Promise<{ raw: string; model: string }> {
+  const parts: any[] = [{ text: briefing }];
+  for (const f of files) {
+    if (!f?.data) continue;
+    parts.push({ inlineData: { mimeType: f.mime || 'application/pdf', data: f.data } });
+  }
+
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts }],
+        generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+      }),
+    },
+  );
+
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`Gemini ${resp.status}: ${txt.slice(0, 300)}`);
+  }
+  const data = await resp.json();
+  const raw = (data?.candidates?.[0]?.content?.parts || [])
+    .map((p: any) => p?.text || '')
+    .join('') || '{}';
+  return { raw, model: `google/${GEMINI_MODEL}` };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
+    const geminiKey = Deno.env.get('GEMINI_API_KEY');
     const apiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!apiKey) throw new Error('LOVABLE_API_KEY ausente');
+    if (!geminiKey && !apiKey) throw new Error('Nenhuma chave de IA configurada (GEMINI_API_KEY / LOVABLE_API_KEY)');
 
     const payload = (await req.json()) as Payload;
     const a = payload?.answers;
@@ -137,56 +176,76 @@ Analise os arquivos anexos (projeto/planta/render/foto com medidas), extraia amb
       systemPrompt += `\n\nREGRAS OBRIGATÓRIAS DEFINIDAS PELA EMPRESA (prevalecem sobre qualquer estimativa própria):\n${payload.extraRules.trim()}`;
     }
 
-    const content: any[] = [{ type: 'text', text: briefing }];
-    for (const f of payload.files || []) {
-      if (!f?.data) continue;
-      if (f.mime?.startsWith('image/')) {
-        content.push({ type: 'image_url', image_url: { url: `data:${f.mime};base64,${f.data}` } });
-      } else {
-        content.push({
-          type: 'file',
-          file: { filename: f.name || 'projeto.pdf', file_data: `data:${f.mime || 'application/pdf'};base64,${f.data}` },
-        });
+    const files = payload.files || [];
+    let raw = '{}';
+    let usedModel = '';
+
+    // 1) Gemini direto (chave própria) — preferencial
+    if (geminiKey) {
+      try {
+        const r = await callGeminiDirect(geminiKey, systemPrompt, briefing, files);
+        raw = r.raw; usedModel = r.model;
+      } catch (e) {
+        console.error('Gemini direto falhou:', e instanceof Error ? e.message : String(e));
+        if (!apiKey) throw e;
       }
     }
 
-    const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'google/gemini-3.6-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content },
-        ],
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-      }),
-    });
+    // 2) Fallback: Lovable AI Gateway
+    if (!usedModel && apiKey) {
+      const content: any[] = [{ type: 'text', text: briefing }];
+      for (const f of files) {
+        if (!f?.data) continue;
+        if (f.mime?.startsWith('image/')) {
+          content.push({ type: 'image_url', image_url: { url: `data:${f.mime};base64,${f.data}` } });
+        } else {
+          content.push({
+            type: 'file',
+            file: { filename: f.name || 'projeto.pdf', file_data: `data:${f.mime || 'application/pdf'};base64,${f.data}` },
+          });
+        }
+      }
 
-    if (resp.status === 429) {
-      return new Response(JSON.stringify({ error: 'Limite de uso da IA atingido. Tente novamente em alguns minutos.' }), {
-        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'google/gemini-3.6-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content },
+          ],
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        }),
       });
-    }
-    if (resp.status === 402) {
-      return new Response(JSON.stringify({ error: 'Créditos da IA esgotados. Adicione créditos para continuar.' }), {
-        status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    if (!resp.ok) {
-      const txt = await resp.text();
-      console.error('AI gateway error', resp.status, txt.slice(0, 500));
-      throw new Error(`AI Gateway ${resp.status}: ${txt.slice(0, 300)}`);
+
+      if (resp.status === 429) {
+        return new Response(JSON.stringify({ error: 'Limite de uso da IA atingido. Tente novamente em alguns minutos.' }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (resp.status === 402) {
+        return new Response(JSON.stringify({ error: 'Créditos da IA esgotados. Configure a chave GEMINI_API_KEY ou adicione créditos.' }), {
+          status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (!resp.ok) {
+        const txt = await resp.text();
+        console.error('AI gateway error', resp.status, txt.slice(0, 500));
+        throw new Error(`AI Gateway ${resp.status}: ${txt.slice(0, 300)}`);
+      }
+
+      const data = await resp.json();
+      raw = data?.choices?.[0]?.message?.content ?? '{}';
+      usedModel = 'google/gemini-3.6-flash';
     }
 
-    const data = await resp.json();
-    const raw = data?.choices?.[0]?.message?.content ?? '{}';
     let parsed: any = {};
     try { parsed = JSON.parse(raw); }
     catch { const m = raw.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
 
-    return new Response(JSON.stringify({ ...parsed, model: 'google/gemini-3.6-flash' }), {
+    return new Response(JSON.stringify({ ...parsed, model: usedModel }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {
@@ -197,3 +256,4 @@ Analise os arquivos anexos (projeto/planta/render/foto com medidas), extraia amb
     });
   }
 });
+
