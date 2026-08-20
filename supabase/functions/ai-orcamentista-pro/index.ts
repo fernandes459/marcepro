@@ -96,7 +96,7 @@ Responda SOMENTE com JSON puro (sem markdown, sem crase), no schema:
 }
 Todos os valores monetários em número (BRL, sem símbolo). Se algo não for identificável no projeto, estime e explique a premissa em observacoes_tecnicas.`;
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODEL = 'gemini-3.6-flash';
 
 async function callGeminiDirect(
   apiKey: string,
