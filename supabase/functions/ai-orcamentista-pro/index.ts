@@ -96,7 +96,7 @@ Responda SOMENTE com JSON puro (sem markdown, sem crase), no schema:
 }
 Todos os valores monetários em número (BRL, sem símbolo). Se algo não for identificável no projeto, estime e explique a premissa em observacoes_tecnicas.`;
 
-const GEMINI_MODEL = 'gemini-3.6-flash';
+const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'];
 
 async function callGeminiDirect(
   apiKey: string,
@@ -110,29 +110,42 @@ async function callGeminiDirect(
     parts.push({ inlineData: { mimeType: f.mime || 'application/pdf', data: f.data } });
   }
 
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: 'user', parts }],
-        generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
-      }),
-    },
-  );
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role: 'user', parts }],
+    generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+  });
 
-  if (!resp.ok) {
-    const txt = await resp.text();
-    throw new Error(`Gemini ${resp.status}: ${txt.slice(0, 300)}`);
+  let lastErr = 'Gemini indisponível';
+  for (const model of GEMINI_MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body },
+      );
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const raw = (data?.candidates?.[0]?.content?.parts || [])
+          .map((p: any) => p?.text || '')
+          .join('') || '{}';
+        return { raw, model: `google/${model}` };
+      }
+
+      const txt = await resp.text();
+      lastErr = `Gemini ${resp.status}: ${txt.slice(0, 200)}`;
+      console.error(lastErr, `(modelo ${model}, tentativa ${attempt + 1})`);
+      // 503/429 = sobrecarga temporária -> espera e tenta de novo; outros erros -> próximo modelo
+      if (resp.status === 503 || resp.status === 429) {
+        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+        continue;
+      }
+      break;
+    }
   }
-  const data = await resp.json();
-  const raw = (data?.candidates?.[0]?.content?.parts || [])
-    .map((p: any) => p?.text || '')
-    .join('') || '{}';
-  return { raw, model: `google/${GEMINI_MODEL}` };
+  throw new Error(lastErr);
 }
+
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
