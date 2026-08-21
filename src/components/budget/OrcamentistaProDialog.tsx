@@ -119,35 +119,84 @@ export default function OrcamentistaProDialog() {
     setFiles(prev => [...prev, ...accepted].slice(0, 6));
   };
 
+  const buildBody = async (mode: 'orcamento' | 'perguntas') => {
+    const { data: promptRow } = await supabase
+      .from('ai_prompts' as any)
+      .select('content')
+      .eq('key', 'orcamentista_pro')
+      .maybeSingle();
+    const stored = ((promptRow as any)?.content as string) || '';
+    const [customPrompt, extraRules] = stored.split('\n<<<REGRAS_EXTRAS>>>\n');
+
+    const cleanSpecs = Object.fromEntries(Object.entries(specs).filter(([, v]) => v));
+    const clarifications = questions
+      .filter(q => answersQ[q.id])
+      .map(q => ({ pergunta: q.pergunta, resposta: answersQ[q.id] }));
+
+    return {
+      mode,
+      answers: {
+        empresa, cliente,
+        margemDesejada: n(margemDesejada), prazoDias: n(prazoDias),
+        custoDiarioEquipe: n(custoDiario), funcionarios: n(funcionarios),
+        cidade, estado, padrao, material,
+        comissaoVendedor: n(comissao), impostosPct: n(impostos),
+        freteInstalacao: n(frete), perdaTecnicaPct: n(perda),
+        socios: isFW ? socios.filter(s => s.nome.trim()) : [],
+      },
+      specs: cleanSpecs,
+      clarifications,
+      notes,
+      files: files.map(f => ({ name: f.name, mime: f.mime, data: f.data })),
+      customPrompt: (customPrompt || '').trim() || undefined,
+      extraRules: (extraRules || '').trim() || undefined,
+    };
+  };
+
+  const readError = async (error: any) => {
+    let detail = '';
+    try {
+      const ctx: any = error?.context;
+      if (ctx && typeof ctx.json === 'function') detail = (await ctx.clone().json())?.error || '';
+    } catch { /* ignore */ }
+    return detail || error?.message || 'Falha na IA';
+  };
+
+  const askQuestions = async () => {
+    if (!files.length && !notes.trim()) { toast.error('Anexe o projeto ou descreva as medidas primeiro.'); return; }
+    setAsking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-orcamentista-pro', {
+        body: await buildBody('perguntas'),
+      });
+      if (error) throw new Error(await readError(error));
+      if (data?.error) throw new Error(data.error);
+      const qs: AIQuestion[] = (data?.perguntas || []).filter((q: any) => q?.pergunta && q?.opcoes?.length);
+      if (!qs.length) { toast.info('A IA não encontrou dúvidas — pode gerar o orçamento.'); return; }
+      setQuestions(qs);
+      setAnswersQ(prev => {
+        const next = { ...prev };
+        qs.forEach(q => { if (!next[q.id] && q.sugerido) next[q.id] = q.sugerido; });
+        return next;
+      });
+      toast.success(`${qs.length} perguntas geradas — selecione as opções`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Falha ao gerar perguntas');
+    } finally {
+      setAsking(false);
+    }
+  };
+
   const analyze = async () => {
     if (missing.length) { toast.error(`Informe: ${missing.join(', ')}`); return; }
     if (!files.length && !notes.trim()) { toast.error('Anexe o projeto (PDF/imagem) ou descreva as medidas.'); return; }
     setLoading(true);
     setResult(null);
     try {
-      const { data: promptRow } = await supabase
-        .from('ai_prompts' as any)
-        .select('content')
-        .eq('key', 'orcamentista_pro')
-        .maybeSingle();
-      const stored = ((promptRow as any)?.content as string) || '';
-      const [customPrompt, extraRules] = stored.split('\n<<<REGRAS_EXTRAS>>>\n');
-
       const { data, error } = await supabase.functions.invoke('ai-orcamentista-pro', {
-        body: {
-          answers: {
-            empresa, cliente,
-            margemDesejada: n(margemDesejada), prazoDias: n(prazoDias),
-            custoDiarioEquipe: n(custoDiario), funcionarios: n(funcionarios),
-            cidade, estado, padrao, material,
-            socios: isFW ? socios.filter(s => s.nome.trim()) : [],
-          },
-          notes,
-          files: files.map(f => ({ name: f.name, mime: f.mime, data: f.data })),
-          customPrompt: (customPrompt || '').trim() || undefined,
-          extraRules: (extraRules || '').trim() || undefined,
-        },
+        body: await buildBody('orcamento'),
       });
+
       if (error) {
         // Lê o corpo real da resposta (invoke devolve mensagem genérica em não-2xx)
         let detail = '';
