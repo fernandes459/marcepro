@@ -17,10 +17,28 @@ import { formatBRL } from '@/lib/format';
 
 interface Socio { nome: string; percentual: number }
 interface FileIn { name: string; mime: string; data: string; size: number }
+interface AIQuestion { id: string; pergunta: string; opcoes: string[]; sugerido?: string; permite_outro?: boolean }
 
 const EMPRESAS = ['FW Planejados', 'PlanejadoSousa'];
 const PADROES = ['Econômico', 'Médio padrão', 'Alto padrão', 'Luxo'];
 const MATERIAIS = ['MDF', 'MDP', 'Compensado', 'Madeira Maciça', 'Outro'];
+
+/** Especificações técnicas rápidas — clique para selecionar. */
+const SPEC_GROUPS: { key: string; label: string; options: string[] }[] = [
+  { key: 'Espessura da caixa', label: 'Espessura da caixa', options: ['15mm', '18mm', '25mm'] },
+  { key: 'Espessura das portas', label: 'Espessura das portas', options: ['15mm', '18mm', '25mm'] },
+  { key: 'Espessura do fundo', label: 'Espessura do fundo', options: ['3mm', '6mm', '15mm', '18mm'] },
+  { key: 'Espessura das prateleiras', label: 'Prateleiras', options: ['15mm', '18mm', '25mm'] },
+  { key: 'Fita de borda', label: 'Fita de borda', options: ['0,45mm', '1mm', '2mm', 'Sem fita'] },
+  { key: 'Corrediças', label: 'Corrediças', options: ['Roldana', 'Telescópica', 'Soft-close', 'Oculta soft-close'] },
+  { key: 'Dobradiças', label: 'Dobradiças', options: ['Comum', 'Soft-close', 'Importada premium'] },
+  { key: 'Puxadores', label: 'Puxadores', options: ['Perfil embutido', 'Alumínio', 'Cava usinada', 'Sem puxador'] },
+  { key: 'Acabamento', label: 'Acabamento', options: ['MDF TX', 'Laca fosca', 'Laca brilho', 'Lâmina natural'] },
+  { key: 'Iluminação LED', label: 'Iluminação LED', options: ['Não', 'Fita LED simples', 'LED com sensor'] },
+  { key: 'Vidros/Espelhos', label: 'Vidros / Espelhos', options: ['Não', 'Espelho', 'Vidro reflecta', 'Vidro comum'] },
+  { key: 'Instalação inclusa', label: 'Instalação', options: ['Inclusa', 'Não inclusa'] },
+];
+
 
 const n = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
