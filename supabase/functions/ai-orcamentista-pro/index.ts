@@ -10,6 +10,7 @@ const corsHeaders = {
 interface FileIn { name: string; mime: string; data: string } // data = base64 puro
 
 interface Payload {
+  mode?: 'orcamento' | 'perguntas';
   answers: {
     empresa: string;
     cliente: string;
@@ -21,13 +22,32 @@ interface Payload {
     estado: string;
     padrao: string;
     material: string;
+    comissaoVendedor?: number;
+    impostosPct?: number;
+    freteInstalacao?: number;
+    perdaTecnicaPct?: number;
     socios?: { nome: string; percentual: number }[];
   };
+  specs?: Record<string, string>;
+  clarifications?: { pergunta: string; resposta: string }[];
   notes?: string;
   files?: FileIn[];
   customPrompt?: string;
   extraRules?: string;
 }
+
+const QUESTIONS_PROMPT = `Você é ORÇAMENTISTA PRO MARCENARIA AI em modo LEVANTAMENTO.
+Analise os arquivos e as observações do projeto e liste APENAS as informações que ainda faltam para orçar com precisão máxima
+(espessuras de MDF por componente, fundo, fitas de borda, tipo/marca de corrediças e dobradiças, puxadores, iluminação, vidros/espelhos,
+tamponamentos, rodapé, acabamento, instalação/frete, prazo, etc.).
+Regras:
+- Máximo 12 perguntas, ordenadas por impacto no custo.
+- Cada pergunta DEVE ter de 2 a 5 opções objetivas e clicáveis (ex.: "15mm", "18mm", "25mm").
+- Sempre sugira a opção mais provável em "sugerido" com base no padrão do projeto e nos arquivos.
+- Nunca pergunte algo que já esteja claro nos arquivos ou nas observações.
+Responda SOMENTE JSON puro:
+{"perguntas":[{"id":"espessura_caixa","pergunta":"Qual espessura do MDF da caixa?","opcoes":["15mm","18mm","25mm"],"sugerido":"18mm","permite_outro":true}]}`;
+
 
 const SYSTEM_PROMPT = `Você é ORÇAMENTISTA PRO MARCENARIA AI.
 Especialidade: orçamentos profissionais, precisos e altamente detalhados para móveis planejados, marcenaria residencial, comercial e corporativa.
