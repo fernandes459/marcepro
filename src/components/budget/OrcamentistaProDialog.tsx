@@ -17,10 +17,28 @@ import { formatBRL } from '@/lib/format';
 
 interface Socio { nome: string; percentual: number }
 interface FileIn { name: string; mime: string; data: string; size: number }
+interface AIQuestion { id: string; pergunta: string; opcoes: string[]; sugerido?: string; permite_outro?: boolean }
 
 const EMPRESAS = ['FW Planejados', 'PlanejadoSousa'];
 const PADROES = ['Econômico', 'Médio padrão', 'Alto padrão', 'Luxo'];
 const MATERIAIS = ['MDF', 'MDP', 'Compensado', 'Madeira Maciça', 'Outro'];
+
+/** Especificações técnicas rápidas — clique para selecionar. */
+const SPEC_GROUPS: { key: string; label: string; options: string[] }[] = [
+  { key: 'Espessura da caixa', label: 'Espessura da caixa', options: ['15mm', '18mm', '25mm'] },
+  { key: 'Espessura das portas', label: 'Espessura das portas', options: ['15mm', '18mm', '25mm'] },
+  { key: 'Espessura do fundo', label: 'Espessura do fundo', options: ['3mm', '6mm', '15mm', '18mm'] },
+  { key: 'Espessura das prateleiras', label: 'Prateleiras', options: ['15mm', '18mm', '25mm'] },
+  { key: 'Fita de borda', label: 'Fita de borda', options: ['0,45mm', '1mm', '2mm', 'Sem fita'] },
+  { key: 'Corrediças', label: 'Corrediças', options: ['Roldana', 'Telescópica', 'Soft-close', 'Oculta soft-close'] },
+  { key: 'Dobradiças', label: 'Dobradiças', options: ['Comum', 'Soft-close', 'Importada premium'] },
+  { key: 'Puxadores', label: 'Puxadores', options: ['Perfil embutido', 'Alumínio', 'Cava usinada', 'Sem puxador'] },
+  { key: 'Acabamento', label: 'Acabamento', options: ['MDF TX', 'Laca fosca', 'Laca brilho', 'Lâmina natural'] },
+  { key: 'Iluminação LED', label: 'Iluminação LED', options: ['Não', 'Fita LED simples', 'LED com sensor'] },
+  { key: 'Vidros/Espelhos', label: 'Vidros / Espelhos', options: ['Não', 'Espelho', 'Vidro reflecta', 'Vidro comum'] },
+  { key: 'Instalação inclusa', label: 'Instalação', options: ['Inclusa', 'Não inclusa'] },
+];
+
 
 const n = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
@@ -51,12 +69,26 @@ export default function OrcamentistaProDialog() {
   const [estado, setEstado] = useState('');
   const [padrao, setPadrao] = useState('Alto padrão');
   const [material, setMaterial] = useState('MDF');
+  const [comissao, setComissao] = useState('0');
+  const [impostos, setImpostos] = useState('0');
+  const [frete, setFrete] = useState('0');
+  const [perda, setPerda] = useState('15');
   const [socios, setSocios] = useState<Socio[]>([{ nome: '', percentual: 50 }, { nome: '', percentual: 50 }]);
   const [notes, setNotes] = useState('');
   const [files, setFiles] = useState<FileIn[]>([]);
 
+  // Especificações técnicas rápidas (chips clicáveis)
+  const [specs, setSpecs] = useState<Record<string, string>>({});
+  const setSpec = (k: string, v: string) => setSpecs(p => ({ ...p, [k]: p[k] === v ? '' : v }));
+
+  // Perguntas geradas pela IA
+  const [questions, setQuestions] = useState<AIQuestion[]>([]);
+  const [answersQ, setAnswersQ] = useState<Record<string, string>>({});
+  const [asking, setAsking] = useState(false);
+
   const isFW = empresa === 'FW Planejados';
   const somaSocios = useMemo(() => socios.reduce((s, x) => s + n(x.percentual), 0), [socios]);
+
 
   /** Valor de venda derivado da margem desejada (fallback quando a IA não retorna). */
   const vendaOf = (r: any) =>
@@ -87,35 +119,84 @@ export default function OrcamentistaProDialog() {
     setFiles(prev => [...prev, ...accepted].slice(0, 6));
   };
 
+  const buildBody = async (mode: 'orcamento' | 'perguntas') => {
+    const { data: promptRow } = await supabase
+      .from('ai_prompts' as any)
+      .select('content')
+      .eq('key', 'orcamentista_pro')
+      .maybeSingle();
+    const stored = ((promptRow as any)?.content as string) || '';
+    const [customPrompt, extraRules] = stored.split('\n<<<REGRAS_EXTRAS>>>\n');
+
+    const cleanSpecs = Object.fromEntries(Object.entries(specs).filter(([, v]) => v));
+    const clarifications = questions
+      .filter(q => answersQ[q.id])
+      .map(q => ({ pergunta: q.pergunta, resposta: answersQ[q.id] }));
+
+    return {
+      mode,
+      answers: {
+        empresa, cliente,
+        margemDesejada: n(margemDesejada), prazoDias: n(prazoDias),
+        custoDiarioEquipe: n(custoDiario), funcionarios: n(funcionarios),
+        cidade, estado, padrao, material,
+        comissaoVendedor: n(comissao), impostosPct: n(impostos),
+        freteInstalacao: n(frete), perdaTecnicaPct: n(perda),
+        socios: isFW ? socios.filter(s => s.nome.trim()) : [],
+      },
+      specs: cleanSpecs,
+      clarifications,
+      notes,
+      files: files.map(f => ({ name: f.name, mime: f.mime, data: f.data })),
+      customPrompt: (customPrompt || '').trim() || undefined,
+      extraRules: (extraRules || '').trim() || undefined,
+    };
+  };
+
+  const readError = async (error: any) => {
+    let detail = '';
+    try {
+      const ctx: any = error?.context;
+      if (ctx && typeof ctx.json === 'function') detail = (await ctx.clone().json())?.error || '';
+    } catch { /* ignore */ }
+    return detail || error?.message || 'Falha na IA';
+  };
+
+  const askQuestions = async () => {
+    if (!files.length && !notes.trim()) { toast.error('Anexe o projeto ou descreva as medidas primeiro.'); return; }
+    setAsking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-orcamentista-pro', {
+        body: await buildBody('perguntas'),
+      });
+      if (error) throw new Error(await readError(error));
+      if (data?.error) throw new Error(data.error);
+      const qs: AIQuestion[] = (data?.perguntas || []).filter((q: any) => q?.pergunta && q?.opcoes?.length);
+      if (!qs.length) { toast.info('A IA não encontrou dúvidas — pode gerar o orçamento.'); return; }
+      setQuestions(qs);
+      setAnswersQ(prev => {
+        const next = { ...prev };
+        qs.forEach(q => { if (!next[q.id] && q.sugerido) next[q.id] = q.sugerido; });
+        return next;
+      });
+      toast.success(`${qs.length} perguntas geradas — selecione as opções`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Falha ao gerar perguntas');
+    } finally {
+      setAsking(false);
+    }
+  };
+
   const analyze = async () => {
     if (missing.length) { toast.error(`Informe: ${missing.join(', ')}`); return; }
     if (!files.length && !notes.trim()) { toast.error('Anexe o projeto (PDF/imagem) ou descreva as medidas.'); return; }
     setLoading(true);
     setResult(null);
     try {
-      const { data: promptRow } = await supabase
-        .from('ai_prompts' as any)
-        .select('content')
-        .eq('key', 'orcamentista_pro')
-        .maybeSingle();
-      const stored = ((promptRow as any)?.content as string) || '';
-      const [customPrompt, extraRules] = stored.split('\n<<<REGRAS_EXTRAS>>>\n');
-
       const { data, error } = await supabase.functions.invoke('ai-orcamentista-pro', {
-        body: {
-          answers: {
-            empresa, cliente,
-            margemDesejada: n(margemDesejada), prazoDias: n(prazoDias),
-            custoDiarioEquipe: n(custoDiario), funcionarios: n(funcionarios),
-            cidade, estado, padrao, material,
-            socios: isFW ? socios.filter(s => s.nome.trim()) : [],
-          },
-          notes,
-          files: files.map(f => ({ name: f.name, mime: f.mime, data: f.data })),
-          customPrompt: (customPrompt || '').trim() || undefined,
-          extraRules: (extraRules || '').trim() || undefined,
-        },
+        body: await buildBody('orcamento'),
       });
+
       if (error) {
         // Lê o corpo real da resposta (invoke devolve mensagem genérica em não-2xx)
         let detail = '';
@@ -558,7 +639,42 @@ export default function OrcamentistaProDialog() {
                 <SelectContent>{MATERIAIS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
               </Select>
             ))}
+            {field('Comissão do vendedor (%)', <Input inputMode="decimal" value={comissao} onChange={e => setComissao(e.target.value)} placeholder="5" />)}
+            {field('Impostos sobre a venda (%)', <Input inputMode="decimal" value={impostos} onChange={e => setImpostos(e.target.value)} placeholder="6" />)}
+            {field('Frete / instalação (R$)', <Input inputMode="decimal" value={frete} onChange={e => setFrete(e.target.value)} placeholder="800" />)}
+            {field('Perda técnica de chapas (%)', <Input inputMode="decimal" value={perda} onChange={e => setPerda(e.target.value)} placeholder="15" />)}
           </div>
+
+          {/* Especificações técnicas — chips clicáveis */}
+          <div className="rounded-lg border p-3 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Especificações técnicas (clique para definir — quanto mais preencher, mais preciso o cálculo)
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {SPEC_GROUPS.map(g => (
+                <div key={g.key} className="space-y-1.5">
+                  <Label className="text-[11px] text-muted-foreground">{g.label}</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {g.options.map(o => (
+                      <button
+                        key={o}
+                        type="button"
+                        onClick={() => setSpec(g.key, o)}
+                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                          specs[g.key] === o
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        {o}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
 
           {isFW && (
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
@@ -613,10 +729,54 @@ export default function OrcamentistaProDialog() {
             )}
           </div>
 
+          <Button variant="outline" onClick={askQuestions} disabled={asking || loading} className="w-full gap-2 border-primary/40 text-primary">
+            {asking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {asking ? 'A IA está analisando o projeto...' : 'Perguntar à IA o que falta definir'}
+          </Button>
+
+          {questions.length > 0 && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Perguntas da IA — escolha as opções</p>
+                <span className="text-[11px] text-muted-foreground">
+                  {Object.values(answersQ).filter(Boolean).length}/{questions.length} respondidas
+                </span>
+              </div>
+              {questions.map(q => (
+                <div key={q.id} className="space-y-1.5">
+                  <p className="text-xs font-medium">{q.pergunta}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {q.opcoes.map(o => (
+                      <button
+                        key={o}
+                        type="button"
+                        onClick={() => setAnswersQ(p => ({ ...p, [q.id]: p[q.id] === o ? '' : o }))}
+                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                          answersQ[q.id] === o
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border bg-background hover:border-primary/50'
+                        }`}
+                      >
+                        {o}{q.sugerido === o ? ' ★' : ''}
+                      </button>
+                    ))}
+                  </div>
+                  <Input
+                    className="h-8 text-xs"
+                    placeholder="Outra resposta (opcional)"
+                    value={q.opcoes.includes(answersQ[q.id]) ? '' : (answersQ[q.id] || '')}
+                    onChange={e => setAnswersQ(p => ({ ...p, [q.id]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
           <Button onClick={analyze} disabled={loading} className="w-full gradient-primary shadow-primary border-0 gap-2">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
             {loading ? 'Analisando projeto...' : 'Analisar e gerar orçamento'}
           </Button>
+
           {missing.length > 0 && <p className="text-[11px] text-muted-foreground">Faltam: {missing.join(', ')}.</p>}
 
           {result && (
