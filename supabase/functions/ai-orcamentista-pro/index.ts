@@ -180,12 +180,29 @@ Deno.serve(async (req: Request) => {
     if (!a?.empresa || !a?.cliente) throw new Error('Dados obrigatórios ausentes (empresa/cliente)');
 
     const socios = (a.socios || []).filter(s => s.nome || s.percentual);
+    const isQuestions = payload.mode === 'perguntas';
 
-    const briefing = `DADOS DO PROJETO
+    const specLines = Object.entries(payload.specs || {})
+      .filter(([, v]) => String(v || '').trim())
+      .map(([k, v]) => `- ${k}: ${v}`).join('\n');
+    const clarLines = (payload.clarifications || [])
+      .filter(c => c?.resposta)
+      .map(c => `- ${c.pergunta} -> ${c.resposta}`).join('\n');
+
+    const comissao = Number(a.comissaoVendedor || 0);
+    const impostos = Number(a.impostosPct || 0);
+    const frete = Number(a.freteInstalacao || 0);
+    const perda = Number(a.perdaTecnicaPct || 0);
+
+    const contexto = `DADOS DO PROJETO
 - Empresa: ${a.empresa}
 - Cliente: ${a.cliente}
 - Margem de lucro desejada: ${Number(a.margemDesejada || 0).toFixed(1)}% sobre o custo total
   (calcule o valor de venda a partir dessa margem: valor_venda = custo_total × (1 + margem/100) e use-o em resultado_financeiro.valor_venda)
+- Comissão do vendedor: ${comissao.toFixed(2)}% sobre o valor de venda (inclua como custo comercial e desconte do lucro líquido)
+- Impostos: ${impostos.toFixed(2)}% sobre o valor de venda
+- Frete/instalação (valor fixo): R$ ${frete.toFixed(2)} (inclua no custo operacional)
+- Perda técnica de chapas: ${perda > 0 ? `${perda.toFixed(1)}% (obrigatório usar este índice)` : 'estimar conforme complexidade'}
 - Prazo de produção: ${a.prazoDias} dias
 - Custo operacional diário da equipe: R$ ${Number(a.custoDiarioEquipe || 0).toFixed(2)}
 - Funcionários no projeto: ${a.funcionarios}
@@ -196,10 +213,18 @@ ${a.empresa === 'FW Planejados'
   ? `- Sócios (${socios.length}): ${socios.map(s => `${s.nome} ${s.percentual}%`).join(', ') || 'não informado'}`
   : '- Sem divisão societária (PlanejadoSousa)'}
 
-OBSERVAÇÕES / MEDIDAS INFORMADAS:
-${payload.notes?.trim() || '(nenhuma — extraia tudo dos arquivos anexos)'}
+ESPECIFICAÇÕES TÉCNICAS DEFINIDAS PELO USUÁRIO (obrigatórias, prevalecem sobre estimativa):
+${specLines || '(nenhuma informada)'}
 
-Analise os arquivos anexos (projeto/planta/render/foto com medidas), extraia ambientes, medidas, cores, materiais e ferragens, e gere o orçamento completo em JSON conforme o schema.`;
+RESPOSTAS DO USUÁRIO ÀS PERGUNTAS DA IA (obrigatórias):
+${clarLines || '(nenhuma)'}
+
+OBSERVAÇÕES / MEDIDAS INFORMADAS:
+${payload.notes?.trim() || '(nenhuma — extraia tudo dos arquivos anexos)'}`;
+
+    const briefing = isQuestions
+      ? `${contexto}\n\nGere a lista de perguntas com opções clicáveis para eliminar toda incerteza antes de orçar.`
+      : `${contexto}\n\nAnalise os arquivos anexos (projeto/planta/render/foto com medidas), extraia ambientes, medidas, cores, materiais e ferragens, e gere o orçamento completo em JSON conforme o schema.`;
 
     const schemaTail = SYSTEM_PROMPT.slice(SYSTEM_PROMPT.indexOf('FORMATO DE RESPOSTA'));
     let systemPrompt = payload.customPrompt?.trim()
@@ -208,6 +233,8 @@ Analise os arquivos anexos (projeto/planta/render/foto com medidas), extraia amb
     if (payload.extraRules?.trim()) {
       systemPrompt += `\n\nREGRAS OBRIGATÓRIAS DEFINIDAS PELA EMPRESA (prevalecem sobre qualquer estimativa própria):\n${payload.extraRules.trim()}`;
     }
+    if (isQuestions) systemPrompt = QUESTIONS_PROMPT;
+
 
     const files = payload.files || [];
     let raw = '{}';
