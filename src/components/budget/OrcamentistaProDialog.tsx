@@ -639,7 +639,42 @@ export default function OrcamentistaProDialog() {
                 <SelectContent>{MATERIAIS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
               </Select>
             ))}
+            {field('Comissão do vendedor (%)', <Input inputMode="decimal" value={comissao} onChange={e => setComissao(e.target.value)} placeholder="5" />)}
+            {field('Impostos sobre a venda (%)', <Input inputMode="decimal" value={impostos} onChange={e => setImpostos(e.target.value)} placeholder="6" />)}
+            {field('Frete / instalação (R$)', <Input inputMode="decimal" value={frete} onChange={e => setFrete(e.target.value)} placeholder="800" />)}
+            {field('Perda técnica de chapas (%)', <Input inputMode="decimal" value={perda} onChange={e => setPerda(e.target.value)} placeholder="15" />)}
           </div>
+
+          {/* Especificações técnicas — chips clicáveis */}
+          <div className="rounded-lg border p-3 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Especificações técnicas (clique para definir — quanto mais preencher, mais preciso o cálculo)
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {SPEC_GROUPS.map(g => (
+                <div key={g.key} className="space-y-1.5">
+                  <Label className="text-[11px] text-muted-foreground">{g.label}</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {g.options.map(o => (
+                      <button
+                        key={o}
+                        type="button"
+                        onClick={() => setSpec(g.key, o)}
+                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                          specs[g.key] === o
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        {o}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
 
           {isFW && (
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
