@@ -729,10 +729,54 @@ export default function OrcamentistaProDialog() {
             )}
           </div>
 
+          <Button variant="outline" onClick={askQuestions} disabled={asking || loading} className="w-full gap-2 border-primary/40 text-primary">
+            {asking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {asking ? 'A IA está analisando o projeto...' : 'Perguntar à IA o que falta definir'}
+          </Button>
+
+          {questions.length > 0 && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Perguntas da IA — escolha as opções</p>
+                <span className="text-[11px] text-muted-foreground">
+                  {Object.values(answersQ).filter(Boolean).length}/{questions.length} respondidas
+                </span>
+              </div>
+              {questions.map(q => (
+                <div key={q.id} className="space-y-1.5">
+                  <p className="text-xs font-medium">{q.pergunta}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {q.opcoes.map(o => (
+                      <button
+                        key={o}
+                        type="button"
+                        onClick={() => setAnswersQ(p => ({ ...p, [q.id]: p[q.id] === o ? '' : o }))}
+                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                          answersQ[q.id] === o
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border bg-background hover:border-primary/50'
+                        }`}
+                      >
+                        {o}{q.sugerido === o ? ' ★' : ''}
+                      </button>
+                    ))}
+                  </div>
+                  <Input
+                    className="h-8 text-xs"
+                    placeholder="Outra resposta (opcional)"
+                    value={q.opcoes.includes(answersQ[q.id]) ? '' : (answersQ[q.id] || '')}
+                    onChange={e => setAnswersQ(p => ({ ...p, [q.id]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
           <Button onClick={analyze} disabled={loading} className="w-full gradient-primary shadow-primary border-0 gap-2">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
             {loading ? 'Analisando projeto...' : 'Analisar e gerar orçamento'}
           </Button>
+
           {missing.length > 0 && <p className="text-[11px] text-muted-foreground">Faltam: {missing.join(', ')}.</p>}
 
           {result && (
