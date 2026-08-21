@@ -51,12 +51,26 @@ export default function OrcamentistaProDialog() {
   const [estado, setEstado] = useState('');
   const [padrao, setPadrao] = useState('Alto padrão');
   const [material, setMaterial] = useState('MDF');
+  const [comissao, setComissao] = useState('0');
+  const [impostos, setImpostos] = useState('0');
+  const [frete, setFrete] = useState('0');
+  const [perda, setPerda] = useState('15');
   const [socios, setSocios] = useState<Socio[]>([{ nome: '', percentual: 50 }, { nome: '', percentual: 50 }]);
   const [notes, setNotes] = useState('');
   const [files, setFiles] = useState<FileIn[]>([]);
 
+  // Especificações técnicas rápidas (chips clicáveis)
+  const [specs, setSpecs] = useState<Record<string, string>>({});
+  const setSpec = (k: string, v: string) => setSpecs(p => ({ ...p, [k]: p[k] === v ? '' : v }));
+
+  // Perguntas geradas pela IA
+  const [questions, setQuestions] = useState<AIQuestion[]>([]);
+  const [answersQ, setAnswersQ] = useState<Record<string, string>>({});
+  const [asking, setAsking] = useState(false);
+
   const isFW = empresa === 'FW Planejados';
   const somaSocios = useMemo(() => socios.reduce((s, x) => s + n(x.percentual), 0), [socios]);
+
 
   /** Valor de venda derivado da margem desejada (fallback quando a IA não retorna). */
   const vendaOf = (r: any) =>
