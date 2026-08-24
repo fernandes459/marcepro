@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
+import { computeCosts, vendaForMargin, type CostBreakdown } from '@/lib/orcamento-costs';
+import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 interface Socio { nome: string; percentual: number }
 interface FileIn { name: string; mime: string; data: string; size: number }
@@ -70,6 +72,7 @@ export default function OrcamentistaProDialog() {
   const [padrao, setPadrao] = useState('Alto padrão');
   const [material, setMaterial] = useState('MDF');
   const [comissao, setComissao] = useState('0');
+  const [montador, setMontador] = useState('0');
   const [impostos, setImpostos] = useState('0');
   const [frete, setFrete] = useState('0');
   const [perda, setPerda] = useState('15');
@@ -90,10 +93,50 @@ export default function OrcamentistaProDialog() {
   const somaSocios = useMemo(() => socios.reduce((s, x) => s + n(x.percentual), 0), [socios]);
 
 
-  /** Valor de venda derivado da margem desejada (fallback quando a IA não retorna). */
+  /** Somatórios dos itens devolvidos pela IA (fonte da verdade dos materiais). */
+  const sumList = (arr: any[] | undefined, qty: string, unit: string, total: string) =>
+    (arr || []).reduce((s, i) => s + (n(i?.[total]) || n(i?.[qty]) * n(i?.[unit])), 0);
+
+  /**
+   * Composição de custos calculada localmente (decimal.js) — a IA sugere quantidades,
+   * mas quem fecha os números é o motor: comissões, montador, impostos e frete SEMPRE entram.
+   */
+  const costs: CostBreakdown | null = useMemo(() => {
+    if (!result) return null;
+    const mat = sumList(result.materiais, 'quantidade', 'valor_unitario', 'valor_total')
+      || n(result.custos?.material);
+    const fer = sumList(result.ferragens, 'quantidade', 'valor_unitario', 'valor_total');
+    return computeCosts({
+      material: mat,
+      ferragens: fer,
+      estruturaPct: isFW ? 10 : 0,
+      custoDiario: n(custoDiario),
+      dias: n(prazoDias),
+      overheadPct: 7,
+      frete: n(frete),
+      comissaoPct: n(comissao),
+      montadorPct: n(montador),
+      impostosPct: n(impostos),
+      margemPct: n(margemDesejada),
+    });
+  }, [result, isFW, custoDiario, prazoDias, frete, comissao, montador, impostos, margemDesejada]);
+
+  const varPct = n(comissao) + n(montador) + n(impostos);
+
+  /** Faixas de preço recalculadas com a mesma engine (mínimo 15%, ideal, premium +20 p.p.). */
+  const tiers = useMemo(() => {
+    if (!costs) return { minimo: 0, ideal: 0, premium: 0 };
+    return {
+      minimo: vendaForMargin(costs.custoDireto, 15, varPct),
+      ideal: costs.venda,
+      premium: vendaForMargin(costs.custoDireto, n(margemDesejada) + 20, varPct),
+    };
+  }, [costs, varPct, margemDesejada]);
+
+  /** Valor de venda oficial = engine local (mantém coerência com o Excel e o PDF). */
   const vendaOf = (r: any) =>
+    costs?.venda ||
     n(r?.resultado_financeiro?.valor_venda) ||
-    n(r?.recomendacao_comercial?.preco_recomendado) ||
     n(r?.custos?.total) * (1 + n(margemDesejada) / 100);
 
   const missing = useMemo(() => {
@@ -140,7 +183,7 @@ export default function OrcamentistaProDialog() {
         margemDesejada: n(margemDesejada), prazoDias: n(prazoDias),
         custoDiarioEquipe: n(custoDiario), funcionarios: n(funcionarios),
         cidade, estado, padrao, material,
-        comissaoVendedor: n(comissao), impostosPct: n(impostos),
+        comissaoVendedor: n(comissao), montadorPct: n(montador), impostosPct: n(impostos),
         freteInstalacao: n(frete), perdaTecnicaPct: n(perda),
         socios: isFW ? socios.filter(s => s.nome.trim()) : [],
       },
@@ -212,11 +255,7 @@ export default function OrcamentistaProDialog() {
       if (data?.error) throw new Error(data.error);
 
       setResult(data);
-      setSelectedPrice(
-        n(data?.recomendacao_comercial?.preco_ideal) ||
-        n(data?.recomendacao_comercial?.preco_recomendado) ||
-        n(data?.resultado_financeiro?.valor_venda),
-      );
+      setSelectedPrice(0); // 0 = usa o preço ideal calculado pela engine local
       toast.success('Orçamento analisado pela IA');
     } catch (e) {
       console.error(e);
@@ -251,7 +290,7 @@ export default function OrcamentistaProDialog() {
         clientId = created?.id ?? null;
       }
 
-      const custo = n(result.custos?.total);
+      const custo = costs?.custoTotal || n(result.custos?.total);
       const margem = custo > 0 ? ((preco - custo) / custo) * 100 : 0;
 
       const { data: budget, error } = await supabase.from('budgets').insert({
@@ -342,13 +381,16 @@ export default function OrcamentistaProDialog() {
     <div class="page">
       <h2>Resumo Executivo</h2>
       <div class="kpis">
-        <div class="kpi"><span>Material</span><b>${formatBRL(n(r.custos?.material))}</b></div>
-        <div class="kpi"><span>Operacional</span><b>${formatBRL(n(r.custos?.operacional))}</b></div>
-        ${isFW ? `<div class="kpi"><span>Estrutura (10%)</span><b>${formatBRL(n(r.custos?.estrutura_marcenaria))}</b></div>` : ''}
-        <div class="kpi"><span>Custo total</span><b>${formatBRL(n(r.custos?.total))}</b></div>
+        <div class="kpi"><span>Material + ferragens</span><b>${formatBRL((costs?.material || 0) + (costs?.ferragens || 0))}</b></div>
+        <div class="kpi"><span>Mão de obra + overhead</span><b>${formatBRL((costs?.maoObra || 0) + (costs?.overhead || 0))}</b></div>
+        ${isFW ? `<div class="kpi"><span>Estrutura (10%)</span><b>${formatBRL(costs?.estrutura || 0)}</b></div>` : ''}
+        <div class="kpi"><span>Comissão vendedor</span><b>${formatBRL(costs?.comissao || 0)}</b></div>
+        <div class="kpi"><span>Montagem/instalação</span><b>${formatBRL(costs?.montador || 0)}</b></div>
+        <div class="kpi"><span>Impostos</span><b>${formatBRL(costs?.impostos || 0)}</b></div>
+        <div class="kpi"><span>Custo total</span><b>${formatBRL(costs?.custoTotal || 0)}</b></div>
         <div class="kpi"><span>Venda</span><b>${formatBRL(vendaOf(r))}</b></div>
-        <div class="kpi"><span>Lucro líquido</span><b>${formatBRL(n(r.resultado_financeiro?.lucro_liquido))}</b></div>
-        <div class="kpi"><span>Margem</span><b>${n(r.resultado_financeiro?.margem_pct).toFixed(1)}%</b></div>
+        <div class="kpi"><span>Lucro líquido</span><b>${formatBRL(costs?.lucroLiquido || 0)}</b></div>
+        <div class="kpi"><span>Margem s/ venda</span><b>${(costs?.margemSobreVenda || 0).toFixed(1)}%</b></div>
       </div>
 
       <h2>Levantamento Técnico</h2>
@@ -412,7 +454,7 @@ export default function OrcamentistaProDialog() {
   };
 
   const exportXlsx = () => {
-    if (!result) return;
+    if (!result || !costs) return;
     const r = result;
     const wb = XLSX.utils.book_new();
 
@@ -420,11 +462,11 @@ export default function OrcamentistaProDialog() {
     const PCT = '0.0%';
     const NUM = '#,##0.00';
 
-    /** Cria a aba já aplicando larguras e formatos numéricos por coluna. */
+    /** Cria a aba aplicando larguras, formatos por coluna e formatos por célula. */
     const sheet = (
       name: string,
       aoa: any[][],
-      opts: { widths: number[]; formats?: Record<string, string>; merges?: string[] },
+      opts: { widths: number[]; formats?: Record<string, string>; cells?: Record<string, string>; merges?: string[] },
     ) => {
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       ws['!cols'] = opts.widths.map((w) => ({ wch: w }));
@@ -436,6 +478,7 @@ export default function OrcamentistaProDialog() {
           if (cell && (cell.t === 'n' || cell.f)) cell.z = fmt;
         }
       });
+      Object.entries(opts.cells || {}).forEach(([ref, fmt]) => { if (ws[ref]) ws[ref].z = fmt; });
       if (opts.merges) ws['!merges'] = opts.merges.map((m) => XLSX.utils.decode_range(m));
       XLSX.utils.book_append_sheet(wb, ws, name);
       return ws;
@@ -443,39 +486,9 @@ export default function OrcamentistaProDialog() {
 
     const lt = r.levantamento_tecnico || {};
     const ambientes = (r.ambientes || []) as any[];
+    const area = n(lt.area_total_m2);
 
-    /* ---------- RESUMO ---------- */
-    const resumo: any[][] = [
-      [`ORÇAMENTO — ${empresa.toUpperCase()}`],
-      [],
-      ['Cliente', cliente],
-      ['Empresa', empresa],
-      ['Projeto', ambientes.map((a) => a.nome).filter(Boolean).join(' + ') || '—'],
-      ['Cidade / UF', `${cidade} / ${estado}`],
-      ['Data do orçamento', new Date().toLocaleDateString('pt-BR')],
-      ['Prazo de produção (dias)', n(prazoDias)],
-      ['Funcionários no projeto', n(funcionarios)],
-      ['Custo operacional diário da equipe (R$)', n(custoDiario)],
-      ['Margem de lucro aplicada', n(margemDesejada) / 100],
-      [],
-      ['ESPECIFICAÇÕES TÉCNICAS'],
-      ['Material principal', material],
-      ['Padrão', padrao],
-      ['Área total (m²)', n(lt.area_total_m2)],
-      ['Chapas estimadas', n(lt.chapas)],
-      ['Perda técnica (%)', n(lt.perda_tecnica_pct) / 100],
-      ['Portas / Gavetas / Prateleiras', `${n(lt.portas)} / ${n(lt.gavetas)} / ${n(lt.prateleiras)}`],
-      ['Complexidade', lt.complexidade || '—'],
-      [],
-      ['AMBIENTES'],
-      ['Ambiente', 'Medidas', 'Área (m²)', 'Descrição'],
-      ...ambientes.map((a) => [a.nome, a.medidas, n(a.area_m2), a.descricao]),
-      [],
-      ['Observações', lt.observacoes || 'Valores estimados com base em preços médios de mercado.'],
-    ];
-    sheet('RESUMO', resumo, { widths: [42, 34, 14, 60], merges: ['A1:D1'] });
-
-    /* ---------- MATERIAIS ---------- */
+    /* ---------- 1. MATERIAIS ---------- */
     const mats = (r.materiais || []) as any[];
     const matsAoa: any[][] = [
       ['MATERIAIS — CHAPAS E INSUMOS'],
@@ -487,7 +500,7 @@ export default function OrcamentistaProDialog() {
     const matTotalRow = mats.length + 4;
     sheet('MATERIAIS', matsAoa, { widths: [56, 8, 10, 18, 18], formats: { D: BRL, E: BRL, B: NUM }, merges: ['A1:E1'] });
 
-    /* ---------- FERRAGENS ---------- */
+    /* ---------- 2. FERRAGENS ---------- */
     const ferr = (r.ferragens || []) as any[];
     const ferrAoa: any[][] = [
       ['FERRAGENS E ACESSÓRIOS'],
@@ -502,91 +515,146 @@ export default function OrcamentistaProDialog() {
     const MAT = `MATERIAIS!E${matTotalRow}`;
     const FER = `FERRAGENS!D${ferrTotalRow}`;
 
-    /* ---------- OPERACIONAL ---------- */
-    sheet('OPERACIONAL', [
-      ['CUSTO OPERACIONAL'],
-      ['Descrição', 'Funcionários', 'Dias', 'Custo Diário (R$)'],
-      ['Equipe de produção', n(funcionarios), { f: 'RESUMO!B8', t: 'n' }, { f: 'RESUMO!B10', t: 'n' }],
-      [],
-      ['Mão de obra (dias × custo diário)', '', '', { f: 'C3*D3', t: 'n' }],
-      ['Overhead operacional (7% sobre materiais)', '', '', { f: `0.07*(${MAT}+${FER})`, t: 'n' }],
-      [],
-      ['TOTAL OPERACIONAL', '', '', { f: 'D5+D6', t: 'n' }],
-    ], { widths: [46, 14, 10, 20], formats: { D: BRL }, merges: ['A1:D1'] });
+    /* ---------- 3. CUSTOS (motor de cálculo, tudo editável) ---------- */
+    // Parâmetros: B3 margem, B4 comissão, B5 montador, B6 impostos, B7 estrutura, B8 overhead,
+    // B9 custo diário, B10 dias, B11 frete. Custos: B14..B20. Variáveis: B23..B26. B28 total, B30 venda.
+    const VARS = '(CUSTOS!$B$4+CUSTOS!$B$5+CUSTOS!$B$6)';
+    const pctOf = (row: number) => ({ f: `IF($B$28=0,0,B${row}/$B$28)`, t: 'n' } as any);
+    const bar = (row: number) => ({ f: `REPT("|",ROUND(C${row}*60,0))` } as any);
 
-    /* ---------- FINANCEIRO ---------- */
-    const estrutura = isFW ? { f: `0.10*(${MAT}+${FER})`, t: 'n' } : 0;
-    sheet('FINANCEIRO', [
-      ['RESUMO FINANCEIRO'],
-      ['Componente', 'Valor (R$)', '% do custo'],
-      ['Material (chapas + insumos)', { f: MAT, t: 'n' }, { f: 'IF($B$8=0,0,B3/$B$8)', t: 'n' }],
-      ['Ferragens e acessórios', { f: FER, t: 'n' }, { f: 'IF($B$8=0,0,B4/$B$8)', t: 'n' }],
-      ['Estrutura de marcenaria (10% s/ material)', estrutura, { f: 'IF($B$8=0,0,B5/$B$8)', t: 'n' }],
-      ['Operacional (mão de obra + overhead)', { f: 'OPERACIONAL!D8', t: 'n' }, { f: 'IF($B$8=0,0,B6/$B$8)', t: 'n' }],
-      ['Impostos', n(r.resultado_financeiro?.impostos), { f: 'IF($B$8=0,0,B7/$B$8)', t: 'n' }],
-      ['CUSTO REAL DO PROJETO', { f: 'SUM(B3:B7)', t: 'n' }],
+    sheet('CUSTOS', [
+      ['COMPOSIÇÃO DE CUSTOS — MOTOR DE CÁLCULO'],
+      ['PARÂMETROS EDITÁVEIS (altere e a planilha recalcula tudo)'],
+      ['Margem de lucro desejada', n(margemDesejada) / 100],
+      ['Comissão do vendedor', n(comissao) / 100],
+      ['Comissão do montador / instalação', n(montador) / 100],
+      ['Impostos sobre a venda', n(impostos) / 100],
+      ['Estrutura de marcenaria (s/ material)', isFW ? 0.1 : 0],
+      ['Overhead operacional (s/ material)', 0.07],
+      ['Custo diário da equipe (R$)', n(custoDiario)],
+      ['Dias de produção', n(prazoDias)],
+      ['Frete / instalação (R$)', n(frete)],
       [],
-      ['Margem de lucro desejada', { f: 'RESUMO!B11', t: 'n' }],
-      ['PREÇO DE VENDA (Custo × (1 + margem))', { f: 'B8*(1+B10)', t: 'n' }],
-      ['Lucro bruto', { f: 'B11-B8', t: 'n' }],
-      ['Margem sobre a venda', { f: 'IF(B11=0,0,B12/B11)', t: 'n' }],
-    ], { widths: [42, 20, 14], formats: { B: BRL, C: PCT }, merges: ['A1:C1'] });
-    // margem em % (linhas 10 e 13)
-    const fin = wb.Sheets['FINANCEIRO'];
-    ['B10'].forEach((ref) => { if (fin[ref]) fin[ref].z = PCT; });
+      ['CUSTOS DIRETOS', 'Valor (R$)', '% do custo', 'Peso'],
+      ['Material (chapas e insumos)', { f: MAT, t: 'n' }, pctOf(14), bar(14)],
+      ['Ferragens e acessórios', { f: FER, t: 'n' }, pctOf(15), bar(15)],
+      ['Estrutura de marcenaria', { f: '(B14+B15)*B7', t: 'n' }, pctOf(16), bar(16)],
+      ['Mão de obra (dias × custo diário)', { f: 'B9*B10', t: 'n' }, pctOf(17), bar(17)],
+      ['Overhead operacional', { f: '(B14+B15)*B8', t: 'n' }, pctOf(18), bar(18)],
+      ['Frete / instalação', { f: 'B11', t: 'n' }, pctOf(19), bar(19)],
+      ['SUBTOTAL CUSTO DIRETO', { f: 'SUM(B14:B19)', t: 'n' }, pctOf(20)],
+      [],
+      ['CUSTOS VARIÁVEIS (incidem sobre a venda)', 'Valor (R$)', '% do custo', 'Peso'],
+      ['Comissão do vendedor', { f: 'B30*B4', t: 'n' }, pctOf(23), bar(23)],
+      ['Comissão do montador / instalação', { f: 'B30*B5', t: 'n' }, pctOf(24), bar(24)],
+      ['Impostos', { f: 'B30*B6', t: 'n' }, pctOf(25), bar(25)],
+      ['SUBTOTAL VARIÁVEIS', { f: 'SUM(B23:B25)', t: 'n' }, pctOf(26)],
+      [],
+      ['CUSTO TOTAL DO PROJETO', { f: 'B20+B26', t: 'n' }],
+      [],
+      ['PREÇO DE VENDA', { f: `B20*(1+B3)/(1-${VARS})`, t: 'n' }],
+      ['LUCRO LÍQUIDO', { f: 'B30-B28', t: 'n' }],
+      ['Margem sobre a venda', { f: 'IF(B30=0,0,B31/B30)', t: 'n' }],
+      ['Margem sobre o custo', { f: 'IF(B28=0,0,B31/B28)', t: 'n' }],
+      [],
+      ['Conferência', { f: 'IF(ROUND(B30-B28-B31,2)=0,"OK — números fechados","⚠ revisar")' }],
+    ], {
+      widths: [42, 20, 14, 26],
+      formats: { B: BRL, C: PCT },
+      cells: { B3: PCT, B4: PCT, B5: PCT, B6: PCT, B7: PCT, B8: PCT, B10: NUM, B32: PCT, B33: PCT },
+      merges: ['A1:D1', 'A2:D2'],
+    });
 
-    /* ---------- DIVISÃO DE SÓCIOS ---------- */
+    /* ---------- 4. PREÇOS ---------- */
+    const priceRow = (label: string, margem: string, row: number) => [
+      label,
+      { f: `CUSTOS!$B$20*(1+${margem})/(1-${VARS})`, t: 'n' },
+      { f: `B${row}-CUSTOS!$B$20-B${row}*${VARS}`, t: 'n' },
+      { f: `IF(B${row}=0,0,C${row}/B${row})`, t: 'n' },
+      { f: `IF(${area}=0,"—",B${row}/${area})`, t: 'n' },
+    ];
+    sheet('PRECOS', [
+      ['FAIXAS DE PREÇO — ESCOLHA COMERCIAL'],
+      ['Faixa', 'Preço (R$)', 'Lucro líquido (R$)', 'Margem s/ venda', 'R$ / m²'],
+      priceRow('Mínimo aceitável (15%)', '0.15', 3),
+      priceRow('Ideal (margem desejada)', 'CUSTOS!$B$3', 4),
+      priceRow('Premium (margem + 20 p.p.)', 'CUSTOS!$B$3+0.2', 5),
+      [],
+      ['COMPARATIVO POR MULTIPLICADOR DE MATERIAL'],
+      ['Material × 1,0', { f: `${MAT}+${FER}`, t: 'n' }],
+      ['Material × 2,0', { f: `2*(${MAT}+${FER})`, t: 'n' }],
+      ['Material × 3,0', { f: `3*(${MAT}+${FER})`, t: 'n' }],
+      [],
+      ['Área total do projeto (m²)', area],
+      ['Faixa de mercado', r.analise_m2?.faixa_referencia || '—'],
+      ['Método mais rentável', r.analise_m2?.metodo_mais_rentavel || '—'],
+      [],
+      ['Justificativa da IA', r.recomendacao_comercial?.justificativa || '—'],
+      ['Alerta', { f: 'IF(B3<CUSTOS!$B$28,"⚠ preço mínimo abaixo do custo total","Todas as faixas cobrem o custo total")' }],
+    ], {
+      widths: [40, 20, 22, 18, 16],
+      formats: { B: BRL, C: BRL, D: PCT, E: BRL },
+      cells: { B13: NUM },
+      merges: ['A1:E1', 'A7:E7'],
+    });
+
+    /* ---------- 5. RESUMO (capa executiva) ---------- */
+    sheet('RESUMO', [
+      [`ORÇAMENTO — ${empresa.toUpperCase()}`],
+      [],
+      ['Cliente', cliente],
+      ['Projeto', ambientes.map((a) => a.nome).filter(Boolean).join(' + ') || '—'],
+      ['Cidade / UF', `${cidade} / ${estado}`],
+      ['Data', new Date().toLocaleDateString('pt-BR')],
+      ['Padrão / Material', `${padrao} · ${material}`],
+      ['Prazo de produção (dias)', n(prazoDias)],
+      ['Funcionários no projeto', n(funcionarios)],
+      [],
+      ['INDICADORES', 'Valor'],
+      ['Custo direto', { f: 'CUSTOS!B20', t: 'n' }],
+      ['Custos variáveis (comissões + impostos)', { f: 'CUSTOS!B26', t: 'n' }],
+      ['Custo total', { f: 'CUSTOS!B28', t: 'n' }],
+      ['Preço de venda', { f: 'CUSTOS!B30', t: 'n' }],
+      ['Lucro líquido', { f: 'CUSTOS!B31', t: 'n' }],
+      ['Margem sobre a venda', { f: 'CUSTOS!B32', t: 'n' }],
+      [],
+      ['LEVANTAMENTO TÉCNICO', 'Valor'],
+      ['Área total (m²)', area],
+      ['Chapas estimadas', n(lt.chapas)],
+      ['Perda técnica', n(lt.perda_tecnica_pct) / 100],
+      ['Portas / Gavetas / Prateleiras', `${n(lt.portas)} / ${n(lt.gavetas)} / ${n(lt.prateleiras)}`],
+      ['Complexidade', lt.complexidade || '—'],
+      [],
+      ['AMBIENTES', 'Medidas', 'Área (m²)', 'Descrição'],
+      ...ambientes.map((a) => [a.nome, a.medidas, n(a.area_m2), a.descricao]),
+      [],
+      ['Observações', lt.observacoes || 'Valores estimados com base em preços médios de mercado.'],
+    ], {
+      widths: [42, 30, 14, 60],
+      formats: {},
+      cells: {
+        B12: BRL, B13: BRL, B14: BRL, B15: BRL, B16: BRL, B17: PCT,
+        B20: NUM, B22: PCT,
+      },
+      merges: ['A1:D1'],
+    });
+
+    /* ---------- 6. SÓCIOS ---------- */
     if (isFW) {
       const ss = (r.divisao_socios || []).length
         ? r.divisao_socios
         : socios.map((s) => ({ nome: s.nome, participacao_pct: s.percentual }));
-      sheet('DIVISAO DE SOCIOS', [
-        ['DIVISÃO DE SÓCIOS'],
+      sheet('SOCIOS', [
+        ['DIVISÃO DE SÓCIOS — SOBRE O LUCRO LÍQUIDO'],
         ['Sócio', 'Participação', 'Valor (R$)'],
-        ...ss.map((s: any, i: number) => [s.nome || `Sócio ${i + 1}`, n(s.participacao_pct) / 100, { f: `FINANCEIRO!$B$12*B${i + 3}`, t: 'n' }]),
-      ], { widths: [32, 16, 20], formats: { B: PCT, C: BRL }, merges: ['A1:C1'] });
-    } else {
-      sheet('DIVISAO DE SOCIOS', [
-        ['DIVISÃO DE SÓCIOS'],
+        ...ss.map((s: any, i: number) => [s.nome || `Sócio ${i + 1}`, n(s.participacao_pct) / 100, { f: `CUSTOS!$B$31*B${i + 3}`, t: 'n' }]),
         [],
-        ['N/A — PlanejadoSousa não possui divisão societária.'],
-      ], { widths: [60], merges: ['A1:C1'] });
+        ['TOTAL DISTRIBUÍDO', { f: `SUM(B3:B${ss.length + 2})`, t: 'n' }, { f: `SUM(C3:C${ss.length + 2})`, t: 'n' }],
+      ], { widths: [32, 16, 20], formats: { B: PCT, C: BRL }, merges: ['A1:C1'] });
     }
 
-    /* ---------- FORMAÇÃO DE PREÇO ---------- */
-    const rec = r.recomendacao_comercial || {};
-    const area = n(lt.area_total_m2);
-    const alerta = 'IF(B{r}<FINANCEIRO!$B$8,"⚠ PREJUÍZO — abaixo do custo real","Cobre o custo real")';
-    const linha = (label: string, formula: string, row: number) => [
-      label,
-      { f: formula, t: 'n' },
-      { f: `B${row}-FINANCEIRO!$B$8`, t: 'n' },
-      { f: alerta.replace('{r}', String(row)) },
-    ];
-    sheet('FORMACAO DE PRECO', [
-      ['FORMAÇÃO DE PREÇO — COMPARATIVO'],
-      ['Método', 'Valor (R$)', 'vs. Custo Real', 'Observação'],
-      linha('Material × 1,0', `${MAT}+${FER}`, 3),
-      linha('Material × 2,0', `2*(${MAT}+${FER})`, 4),
-      linha('Material × 3,0', `3*(${MAT}+${FER})`, 5),
-      [],
-      ['Área do projeto (m²)', area],
-      linha('Margem mínima (15%)', 'FINANCEIRO!$B$8*1.15', 8),
-      linha('Margem desejada', 'FINANCEIRO!$B$11', 9),
-      linha('Margem premium (+20 p.p.)', 'FINANCEIRO!$B$8*(1+RESUMO!B11+0.2)', 10),
-      [],
-      ['PREÇO MÍNIMO ACEITÁVEL', n(rec.preco_minimo) || { f: 'B8', t: 'n' }],
-      ['PREÇO IDEAL (RECOMENDADO)', n(rec.preco_ideal) || { f: 'B9', t: 'n' }],
-      ['PREÇO PREMIUM', n(rec.preco_premium) || { f: 'B10', t: 'n' }],
-      ['Valor por m² (preço ideal ÷ área)', { f: 'IF(B7=0,0,B13/B7)', t: 'n' }],
-      [],
-      ['Justificativa', rec.justificativa || '—'],
-    ], { widths: [40, 20, 18, 46], formats: { B: BRL, C: BRL }, merges: ['A1:D1'] });
-    const fp = wb.Sheets['FORMACAO DE PRECO'];
-    if (fp['B7']) fp['B7'].z = NUM;
-
     XLSX.writeFile(wb, `Orcamento_${(cliente || 'projeto').replace(/\s+/g, '_')}_${empresa.replace(/\s+/g, '')}.xlsx`);
-    toast.success('Planilha gerada com fórmulas editáveis');
+    toast.success('Planilha gerada com todos os custos e fórmulas editáveis');
   };
 
 
