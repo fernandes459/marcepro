@@ -183,7 +183,7 @@ export default function OrcamentistaProDialog() {
         margemDesejada: n(margemDesejada), prazoDias: n(prazoDias),
         custoDiarioEquipe: n(custoDiario), funcionarios: n(funcionarios),
         cidade, estado, padrao, material,
-        comissaoVendedor: n(comissao), impostosPct: n(impostos),
+        comissaoVendedor: n(comissao), montadorPct: n(montador), impostosPct: n(impostos),
         freteInstalacao: n(frete), perdaTecnicaPct: n(perda),
         socios: isFW ? socios.filter(s => s.nome.trim()) : [],
       },
