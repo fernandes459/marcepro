@@ -255,11 +255,7 @@ export default function OrcamentistaProDialog() {
       if (data?.error) throw new Error(data.error);
 
       setResult(data);
-      setSelectedPrice(
-        n(data?.recomendacao_comercial?.preco_ideal) ||
-        n(data?.recomendacao_comercial?.preco_recomendado) ||
-        n(data?.resultado_financeiro?.valor_venda),
-      );
+      setSelectedPrice(0); // 0 = usa o preço ideal calculado pela engine local
       toast.success('Orçamento analisado pela IA');
     } catch (e) {
       console.error(e);
