@@ -290,7 +290,7 @@ export default function OrcamentistaProDialog() {
         clientId = created?.id ?? null;
       }
 
-      const custo = n(result.custos?.total);
+      const custo = costs?.custoTotal || n(result.custos?.total);
       const margem = custo > 0 ? ((preco - custo) / custo) * 100 : 0;
 
       const { data: budget, error } = await supabase.from('budgets').insert({
