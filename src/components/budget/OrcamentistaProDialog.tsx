@@ -93,10 +93,50 @@ export default function OrcamentistaProDialog() {
   const somaSocios = useMemo(() => socios.reduce((s, x) => s + n(x.percentual), 0), [socios]);
 
 
-  /** Valor de venda derivado da margem desejada (fallback quando a IA não retorna). */
+  /** Somatórios dos itens devolvidos pela IA (fonte da verdade dos materiais). */
+  const sumList = (arr: any[] | undefined, qty: string, unit: string, total: string) =>
+    (arr || []).reduce((s, i) => s + (n(i?.[total]) || n(i?.[qty]) * n(i?.[unit])), 0);
+
+  /**
+   * Composição de custos calculada localmente (decimal.js) — a IA sugere quantidades,
+   * mas quem fecha os números é o motor: comissões, montador, impostos e frete SEMPRE entram.
+   */
+  const costs: CostBreakdown | null = useMemo(() => {
+    if (!result) return null;
+    const mat = sumList(result.materiais, 'quantidade', 'valor_unitario', 'valor_total')
+      || n(result.custos?.material);
+    const fer = sumList(result.ferragens, 'quantidade', 'valor_unitario', 'valor_total');
+    return computeCosts({
+      material: mat,
+      ferragens: fer,
+      estruturaPct: isFW ? 10 : 0,
+      custoDiario: n(custoDiario),
+      dias: n(prazoDias),
+      overheadPct: 7,
+      frete: n(frete),
+      comissaoPct: n(comissao),
+      montadorPct: n(montador),
+      impostosPct: n(impostos),
+      margemPct: n(margemDesejada),
+    });
+  }, [result, isFW, custoDiario, prazoDias, frete, comissao, montador, impostos, margemDesejada]);
+
+  const varPct = n(comissao) + n(montador) + n(impostos);
+
+  /** Faixas de preço recalculadas com a mesma engine (mínimo 15%, ideal, premium +20 p.p.). */
+  const tiers = useMemo(() => {
+    if (!costs) return { minimo: 0, ideal: 0, premium: 0 };
+    return {
+      minimo: vendaForMargin(costs.custoDireto, 15, varPct),
+      ideal: costs.venda,
+      premium: vendaForMargin(costs.custoDireto, n(margemDesejada) + 20, varPct),
+    };
+  }, [costs, varPct, margemDesejada]);
+
+  /** Valor de venda oficial = engine local (mantém coerência com o Excel e o PDF). */
   const vendaOf = (r: any) =>
+    costs?.venda ||
     n(r?.resultado_financeiro?.valor_venda) ||
-    n(r?.recomendacao_comercial?.preco_recomendado) ||
     n(r?.custos?.total) * (1 + n(margemDesejada) / 100);
 
   const missing = useMemo(() => {
