@@ -72,6 +72,7 @@ export default function OrcamentistaProDialog() {
   const [padrao, setPadrao] = useState('Alto padrão');
   const [material, setMaterial] = useState('MDF');
   const [comissao, setComissao] = useState('0');
+  const [montador, setMontador] = useState('0');
   const [impostos, setImpostos] = useState('0');
   const [frete, setFrete] = useState('0');
   const [perda, setPerda] = useState('15');
