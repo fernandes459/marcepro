@@ -381,13 +381,16 @@ export default function OrcamentistaProDialog() {
     <div class="page">
       <h2>Resumo Executivo</h2>
       <div class="kpis">
-        <div class="kpi"><span>Material</span><b>${formatBRL(n(r.custos?.material))}</b></div>
-        <div class="kpi"><span>Operacional</span><b>${formatBRL(n(r.custos?.operacional))}</b></div>
-        ${isFW ? `<div class="kpi"><span>Estrutura (10%)</span><b>${formatBRL(n(r.custos?.estrutura_marcenaria))}</b></div>` : ''}
-        <div class="kpi"><span>Custo total</span><b>${formatBRL(n(r.custos?.total))}</b></div>
+        <div class="kpi"><span>Material + ferragens</span><b>${formatBRL((costs?.material || 0) + (costs?.ferragens || 0))}</b></div>
+        <div class="kpi"><span>Mão de obra + overhead</span><b>${formatBRL((costs?.maoObra || 0) + (costs?.overhead || 0))}</b></div>
+        ${isFW ? `<div class="kpi"><span>Estrutura (10%)</span><b>${formatBRL(costs?.estrutura || 0)}</b></div>` : ''}
+        <div class="kpi"><span>Comissão vendedor</span><b>${formatBRL(costs?.comissao || 0)}</b></div>
+        <div class="kpi"><span>Montagem/instalação</span><b>${formatBRL(costs?.montador || 0)}</b></div>
+        <div class="kpi"><span>Impostos</span><b>${formatBRL(costs?.impostos || 0)}</b></div>
+        <div class="kpi"><span>Custo total</span><b>${formatBRL(costs?.custoTotal || 0)}</b></div>
         <div class="kpi"><span>Venda</span><b>${formatBRL(vendaOf(r))}</b></div>
-        <div class="kpi"><span>Lucro líquido</span><b>${formatBRL(n(r.resultado_financeiro?.lucro_liquido))}</b></div>
-        <div class="kpi"><span>Margem</span><b>${n(r.resultado_financeiro?.margem_pct).toFixed(1)}%</b></div>
+        <div class="kpi"><span>Lucro líquido</span><b>${formatBRL(costs?.lucroLiquido || 0)}</b></div>
+        <div class="kpi"><span>Margem s/ venda</span><b>${(costs?.margemSobreVenda || 0).toFixed(1)}%</b></div>
       </div>
 
       <h2>Levantamento Técnico</h2>
