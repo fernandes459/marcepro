@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
+import { computeCosts, vendaForMargin, type CostBreakdown } from '@/lib/orcamento-costs';
+import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 interface Socio { nome: string; percentual: number }
 interface FileIn { name: string; mime: string; data: string; size: number }
