@@ -50,9 +50,14 @@ export interface BudgetPdfData {
     showPaymentTerms?: boolean;
     showContractClauses?: boolean;
   };
+  /** % de entrada exibido na seção "Investimento e condições". */
+  downPaymentPct?: number;
+  /** Texto da condição do saldo (ex: "no cartão de crédito em até 18x sem juros"). */
+  balanceTerms?: string;
   /** legacy: mantém compat */
   simplified?: boolean;
 }
+
 
 function addBusinessDays(startDate: Date, numDays: number): Date {
   const result = new Date(startDate);
