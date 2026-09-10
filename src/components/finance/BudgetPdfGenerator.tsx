@@ -87,160 +87,176 @@ function groupByRoom(items: BudgetPdfItem[]) {
 function renderClientPdf(data: BudgetPdfData): string {
   const grouped = groupByRoom(data.items);
   const deliveryDate = addBusinessDays(new Date(data.createdAt), data.deliveryDays);
+  const esc = (s: any) => String(s ?? '').replace(/</g, '&lt;');
 
-  // Calcula subtotal "bruto" de cada ambiente e escala proporcionalmente ao preço final,
-  // para que a soma dos ambientes seja exatamente igual ao Investimento Total exibido.
+  // Valor por ambiente escalado para fechar exatamente com o preço final.
   const roomSubtotals = grouped.map(([room, list]) => ({
     room,
     raw: list.reduce((s, i) => s + i.unit_price * i.quantity, 0),
   }));
   const rawTotal = roomSubtotals.reduce((s, r) => s + r.raw, 0);
-  const scaled = roomSubtotals.map((r, idx) => {
-    if (rawTotal <= 0) {
-      // distribui igualmente se não houver base
-      return { ...r, value: data.finalPrice / Math.max(1, roomSubtotals.length) };
-    }
-    return { ...r, value: (r.raw / rawTotal) * data.finalPrice };
-  });
-  // Ajuste de arredondamento: força a soma a bater com finalPrice no último item
+  const scaled = roomSubtotals.map((r) =>
+    rawTotal <= 0
+      ? { ...r, value: data.finalPrice / Math.max(1, roomSubtotals.length) }
+      : { ...r, value: (r.raw / rawTotal) * data.finalPrice },
+  );
   const sumScaled = scaled.reduce((s, r) => s + r.value, 0);
-  if (scaled.length > 0) {
-    scaled[scaled.length - 1].value += data.finalPrice - sumScaled;
-  }
+  if (scaled.length > 0) scaled[scaled.length - 1].value += data.finalPrice - sumScaled;
 
-  const roomsHtml = scaled
-    .map(({ room, value }) => `
-        <div class="room">
-          <div class="room-head">
-            <div class="room-name">${room}</div>
-            <div class="room-value">${formatBRL(value)}</div>
-          </div>
-        </div>`)
-    .join('');
+  const ambientes = scaled.map(s => s.room).filter(Boolean);
+  const escopoTxt = ambientes.length
+    ? `Desenvolvimento e execução ${ambientes.length > 1 ? 'dos projetos' : 'do projeto'} de ${ambientes.join(', ').replace(/, ([^,]*)$/, ' e $1')}, contemplando as etapas descritas nesta proposta, desde o levantamento inicial até a fabricação e instalação dos móveis planejados.`
+    : 'Desenvolvimento e execução do projeto de marcenaria planejada, contemplando as etapas descritas nesta proposta, desde o levantamento inicial até a fabricação e instalação.';
 
-  const addressLine = data.client
-    ? [data.client.city, data.client.state].filter(Boolean).join(' / ')
-    : '';
+  const etapas: [string, string][] = [
+    ['Visita técnica', 'Levantamento das medidas e avaliação do ambiente.'],
+    ['Briefing e definição do projeto', 'Entendimento das necessidades, preferências e soluções desejadas.'],
+    ['Projeto 3D', 'Desenvolvimento da proposta visual dos ambientes e apresentação do projeto.'],
+    ['Detalhamento', 'Definição de medidas, divisões, acabamentos e demais especificações necessárias.'],
+    ['Fabricação', 'Produção dos móveis planejados após a aprovação final do projeto.'],
+    ['Instalação', 'Montagem e instalação dos móveis planejados no local definido.'],
+  ];
+
+  const pct = Math.min(100, Math.max(0, data.downPaymentPct ?? 50));
+  const entrada = (data.finalPrice * pct) / 100;
+  const saldo = data.finalPrice - entrada;
+  const saldoTexto = (data.balanceTerms || data.paymentMethod || '').trim();
+
+  const cityLine = data.client ? [data.client.city, data.client.state].filter(Boolean).join(' / ') : '';
+  const company = esc(data.companyName || 'Marcenaria');
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Orçamento ${data.code}</title>
+<title>Proposta Comercial ${esc(data.code)}</title>
 <style>
-  @page { size: A4; margin: 22mm 18mm; }
+  @page { size: A4; margin: 16mm 16mm 18mm; }
   * { box-sizing: border-box; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Inter, sans-serif;
-    color: #1d1d1f; margin: 0; padding: 24px;
-    -webkit-font-smoothing: antialiased; letter-spacing: -0.01em;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    color: #1f2933; margin: 0; padding: 0; font-size: 12.5px; line-height: 1.55;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .page { max-width: 720px; margin: 0 auto; }
-  .brand { font-size: 13px; color: #86868b; letter-spacing: 0.4px; text-transform: uppercase; }
-  .hero { margin: 48px 0 64px; }
-  .hero h1 { font-size: 56px; font-weight: 600; margin: 8px 0 12px; line-height: 1.05; letter-spacing: -0.02em; }
-  .hero p { font-size: 19px; color: #515154; margin: 0; max-width: 560px; }
-  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 48px; margin: 56px 0; }
-  .meta-label { font-size: 11px; color: #86868b; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
-  .meta-value { font-size: 17px; color: #1d1d1f; font-weight: 500; }
-  .section-title { font-size: 13px; color: #86868b; text-transform: uppercase; letter-spacing: 0.8px; margin: 64px 0 16px; }
-  .room { padding: 22px 0; border-bottom: 1px solid #f2f2f4; }
-  .room:last-child { border-bottom: none; }
-  .room-head { display: flex; justify-content: space-between; align-items: baseline; }
-  .room-name { font-size: 22px; font-weight: 500; }
-  .room-value { font-size: 22px; font-weight: 500; color: #1d1d1f; }
-  .room-sub { font-size: 13px; color: #86868b; margin-top: 6px; line-height: 1.5; }
-  .total-card {
-    margin: 64px 0 40px; padding: 40px 32px; background: #f5f5f7; border-radius: 24px;
-    text-align: center;
+  .cover {
+    min-height: 250mm; display: flex; flex-direction: column; justify-content: center;
+    text-align: center; padding: 40px; page-break-after: always;
   }
-  .total-card .label { font-size: 13px; color: #86868b; text-transform: uppercase; letter-spacing: 0.8px; }
-  .total-card .value { font-size: 56px; font-weight: 600; margin-top: 6px; letter-spacing: -0.02em; }
-  .pay { font-size: 16px; color: #515154; line-height: 1.6; max-width: 580px; }
-  .footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid #f2f2f4; text-align: center; font-size: 12px; color: #86868b; }
-  .signature-area { margin-top: 80px; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; }
-  .sig { border-top: 1px solid #1d1d1f; padding-top: 8px; font-size: 12px; color: #86868b; text-align: center; }
-  @media print {
-    body { padding: 0; }
-    .no-print { display: none !important; }
-  }
-  .no-print {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-    background: #1d1d1f; color: #fff; padding: 14px 28px; border-radius: 980px;
-    border: none; font-size: 15px; font-weight: 500; cursor: pointer;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.18); z-index: 9999;
-  }
+  .cover .brand { font-size: 13px; letter-spacing: 5px; text-transform: uppercase; color: #8a6d1f; font-weight: 700; }
+  .cover .kicker { font-size: 11px; letter-spacing: 4px; text-transform: uppercase; color: #8f9aa5; margin-top: 6px; }
+  .cover h1 { font-size: 34px; font-weight: 600; margin: 60px auto 8px; max-width: 460px; line-height: 1.25; }
+  .cover .client { font-size: 14px; color: #5b6672; }
+  .cover .box { margin: 60px auto 0; max-width: 420px; border: 1px solid #e3e6ea; border-radius: 14px; padding: 26px 20px; }
+  .cover .box .lbl { font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: #8f9aa5; }
+  .cover .box .val { font-size: 34px; font-weight: 700; margin-top: 8px; }
+  .cover .foot { margin-top: 70px; font-size: 11px; color: #8f9aa5; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; color: #1f2933;
+       border-bottom: 2px solid #b8860b; padding-bottom: 6px; margin: 26px 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; background: #f4f5f7; color: #5b6672; font-size: 10.5px; text-transform: uppercase;
+       letter-spacing: 0.8px; padding: 8px 10px; }
+  td { padding: 8px 10px; border-bottom: 1px solid #edeff2; vertical-align: top; }
+  td.step { width: 46px; color: #8a6d1f; font-weight: 700; }
+  td.svc { width: 34%; font-weight: 600; }
+  td.num { text-align: right; white-space: nowrap; }
+  .pay td:first-child { width: 34%; font-weight: 600; }
+  .pay tr:last-child td { border-bottom: none; }
+  .total-row td { background: #1f2933; color: #fff; font-weight: 700; font-size: 14px; }
+  ul { padding-left: 18px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  .sig { margin-top: 56px; display: grid; grid-template-columns: 1fr 1fr; gap: 56px; }
+  .sig div { border-top: 1px solid #1f2933; padding-top: 8px; text-align: center; font-size: 11px; }
+  .sig strong { display: block; font-size: 12px; }
+  .footer { margin-top: 32px; padding-top: 10px; border-top: 1px solid #edeff2; font-size: 10.5px; color: #8f9aa5; text-align: center; }
+  .no-print { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #1f2933; color: #fff; padding: 12px 26px; border-radius: 999px; border: none;
+    font-size: 14px; cursor: pointer; z-index: 9999; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
+  @media print { .no-print { display: none !important; } }
 </style></head><body>
-<div class="page">
-  <div class="brand">${data.companyName || 'Marcenaria'}</div>
 
-  <div class="hero">
-    <h1>${data.projectName || 'Seu projeto'}</h1>
-    <p>Proposta exclusiva preparada para ${data.client?.name || 'você'}.</p>
+<section class="cover">
+  <div class="brand">${company}</div>
+  <div class="kicker">Proposta Comercial</div>
+  <h1>${esc(data.projectName || (ambientes.length ? `Projeto de ${ambientes.join(' + ')}` : 'Projeto de Marcenaria'))}</h1>
+  <div class="client">Cliente: ${esc(data.client?.name || '—')}${cityLine ? ` · ${esc(cityLine)}` : ''}</div>
+  <div class="box">
+    <div class="lbl">Investimento total</div>
+    <div class="val">${formatBRL(data.finalPrice)}</div>
   </div>
-
-  <div class="meta-grid">
-    <div>
-      <div class="meta-label">Cliente</div>
-      <div class="meta-value">${data.client?.name || '—'}</div>
-    </div>
-    <div>
-      <div class="meta-label">Cidade</div>
-      <div class="meta-value">${addressLine || '—'}</div>
-    </div>
-    <div>
-      <div class="meta-label">Proposta</div>
-      <div class="meta-value">${data.code}</div>
-    </div>
-    <div>
-      <div class="meta-label">Entrega prevista</div>
-      <div class="meta-value">${deliveryDate.toLocaleDateString('pt-BR')} <span style="color:#86868b;font-weight:400">(${data.deliveryDays} dias úteis)</span></div>
-    </div>
+  <div class="foot">
+    Proposta ${esc(data.code)} · ${new Date(data.createdAt).toLocaleDateString('pt-BR')}<br/>
+    ${company}${data.companyPhone ? ` • ${esc(data.companyPhone)}` : ''}
   </div>
+</section>
 
-  ${(data.clientPdfOptions?.showDescription ?? true) && data.clientDescription ? `
-    <div class="section-title">Descrição do projeto</div>
-    <div class="pay" style="white-space:pre-wrap;">${data.clientDescription.replace(/</g, '&lt;')}</div>
-  ` : ''}
+<h2>1. Escopo da proposta</h2>
+<p>${escopoTxt}</p>
+${(data.clientPdfOptions?.showDescription ?? true) && data.clientDescription
+  ? `<p style="white-space:pre-wrap">${esc(data.clientDescription)}</p>` : ''}
 
-  <div class="section-title">O que está incluso</div>
-  ${roomsHtml || '<div class="room"><div class="room-head"><div class="room-name">Projeto</div><div class="room-value">' + formatBRL(data.finalPrice) + '</div></div></div>'}
+<h2>2. O que está incluso</h2>
+<table>
+  <thead><tr><th>Etapa</th><th>Serviço</th><th>Descrição</th></tr></thead>
+  <tbody>
+    ${etapas.map(([s, d], i) => `<tr><td class="step">${String(i + 1).padStart(2, '0')}</td><td class="svc">${s}</td><td>${d}</td></tr>`).join('')}
+  </tbody>
+</table>
 
-  ${(data.clientPdfOptions?.showItemsList ?? false) && data.items.length ? `
-    <div class="section-title">Itens detalhados</div>
-    <ul style="padding-left:0;list-style:none;font-size:14px;color:#515154;line-height:1.7;">
-      ${data.items.map(i => `<li style="display:flex;justify-content:space-between;border-bottom:1px solid #f2f2f4;padding:8px 0;"><span>${i.room_label ? `<strong style="color:#1d1d1f">${i.room_label}</strong> · ` : ''}${i.name} <span style="color:#86868b">×${i.quantity}</span></span></li>`).join('')}
-    </ul>
-  ` : ''}
+${ambientes.length ? `
+<h2>3. Ambientes contemplados</h2>
+<table>
+  <thead><tr><th>Ambiente</th><th class="num">Investimento</th></tr></thead>
+  <tbody>
+    ${scaled.map(({ room, value }) => `<tr><td>${esc(room)}</td><td class="num">${formatBRL(value)}</td></tr>`).join('')}
+  </tbody>
+</table>` : ''}
 
-  <div class="total-card">
-    <div class="label">Investimento total</div>
-    <div class="value">${formatBRL(data.finalPrice)}</div>
-  </div>
+${(data.clientPdfOptions?.showItemsList ?? false) && data.items.length ? `
+<h2>Itens detalhados</h2>
+<table>
+  <thead><tr><th>Ambiente</th><th>Item</th><th class="num">Qtd</th></tr></thead>
+  <tbody>
+    ${data.items.map(i => `<tr><td>${esc(i.room_label || 'Geral')}</td><td>${esc(i.name)}</td><td class="num">${i.quantity}</td></tr>`).join('')}
+  </tbody>
+</table>` : ''}
 
-  ${(data.clientPdfOptions?.showPaymentTerms ?? true) && data.paymentMethod ? `
-    <div class="section-title">Condições de pagamento</div>
-    <div class="pay">${data.paymentMethod.replace(/\s*\(taxa[^)]*\)/gi, '').replace(/\s*taxa[^.+]*/gi, '').trim()}</div>
-  ` : ''}
+<h2>${ambientes.length ? '4' : '3'}. Investimento e condições de pagamento</h2>
+<table class="pay">
+  <tbody>
+    <tr class="total-row"><td>Valor total</td><td class="num">${formatBRL(data.finalPrice)}</td></tr>
+    ${(data.clientPdfOptions?.showPaymentTerms ?? true) ? `
+      <tr><td>Entrada (${pct}%)</td><td class="num">${formatBRL(entrada)}</td></tr>
+      <tr><td>Saldo</td><td class="num">${formatBRL(saldo)}${saldoTexto ? ` — ${esc(saldoTexto)}` : ''}</td></tr>
+    ` : ''}
+  </tbody>
+</table>
 
-  ${(data.clientPdfOptions?.showContractClauses ?? true) && data.contractClauses.length ? `
-    <div class="section-title">Termos e condições</div>
-    <ul style="padding-left:0;list-style:none;font-size:14px;color:#515154;line-height:1.7;">
-      ${data.contractClauses.map((c, i) => `<li style="margin:10px 0;"><strong style="color:#1d1d1f;">${i + 1}.</strong> ${c}</li>`).join('')}
-    </ul>
-  ` : ''}
+<h2>${ambientes.length ? '5' : '4'}. Prazo</h2>
+<p>Prazo estimado de entrega: <strong>${data.deliveryDays} dias úteis</strong> (previsão: ${deliveryDate.toLocaleDateString('pt-BR')}), contado a partir da confirmação do pagamento da entrada e da aprovação das informações necessárias para o desenvolvimento do projeto.</p>
 
-  <div class="signature-area">
-    <div class="sig">${data.companyName || 'Contratada'}</div>
-    <div class="sig">${data.client?.name || 'Cliente'}</div>
-  </div>
+<h2>${ambientes.length ? '6' : '5'}. Aprovação e início da fabricação</h2>
+<p>A fabricação será iniciada somente após a aprovação final do projeto pelo cliente. Alterações solicitadas após a aprovação poderão gerar revisão de prazo e/ou valores, quando envolverem mudanças relevantes no projeto ou nos materiais.</p>
 
-  <div class="footer">
-    ${data.companyName || 'Marcenaria'}${data.companyPhone ? ` · ${data.companyPhone}` : ''}${data.companyEmail ? ` · ${data.companyEmail}` : ''}<br/>
-    Documento gerado em ${new Date().toLocaleDateString('pt-BR')}.
-  </div>
+<h2>${ambientes.length ? '7' : '6'}. Observações</h2>
+<ul>
+  ${(data.clientPdfOptions?.showContractClauses ?? true) && data.contractClauses.length
+    ? data.contractClauses.map(c => `<li>${esc(c)}</li>`).join('')
+    : `<li>Medidas e condições do local serão verificadas na visita técnica.</li>
+       <li>A execução seguirá o projeto aprovado pelo cliente.</li>
+       <li>Eventuais serviços ou itens não descritos nesta proposta serão orçados separadamente.</li>`}
+</ul>
+
+<div class="sig">
+  <div><strong>${company}</strong>Responsável pela proposta</div>
+  <div><strong>${esc(data.client?.name || 'Cliente')}</strong>Aprovação da proposta</div>
 </div>
+
+<div class="footer">
+  ${company}${data.companyCnpj ? ` · CNPJ ${esc(data.companyCnpj)}` : ''}${data.companyPhone ? ` · ${esc(data.companyPhone)}` : ''}${data.companyEmail ? ` · ${esc(data.companyEmail)}` : ''}<br/>
+  Documento gerado em ${new Date().toLocaleDateString('pt-BR')}.
+</div>
+
 <button class="no-print" onclick="window.print()">Imprimir / Salvar PDF</button>
 </body></html>`;
 }
+
 
 /* ===========================================================
    MODO INTERNO — Completo, com custos, margem e contrato.
