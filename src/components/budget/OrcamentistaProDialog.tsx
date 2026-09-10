@@ -852,36 +852,125 @@ export default function OrcamentistaProDialog() {
             <div className="space-y-4 pt-2 border-t">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  ['Custo total', n(result.custos?.total)],
-                  ['Venda', vendaOf(result)],
-                  ['Lucro líquido', n(result.resultado_financeiro?.lucro_liquido)],
-                  ['Recomendado', n(result.recomendacao_comercial?.preco_recomendado)],
-                ].map(([label, v]) => (
+                  ['Custo total', costs?.custoTotal || 0],
+                  ['Preço de venda', costs?.venda || 0],
+                  ['Lucro líquido', costs?.lucroLiquido || 0],
+                  ['Margem s/ venda', costs?.margemSobreVenda || 0, true],
+                ].map(([label, v, isPct]) => (
                   <Card key={String(label)}><CardContent className="p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-                    <p className="font-display text-lg font-bold">{formatBRL(Number(v))}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{String(label)}</p>
+                    <p className="font-display text-lg font-bold">
+                      {isPct ? `${Number(v).toFixed(1)}%` : formatBRL(Number(v))}
+                    </p>
                   </CardContent></Card>
                 ))}
               </div>
+
+              {costs && (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {/* Composição do custo */}
+                  <Card><CardContent className="p-3 space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary">Composição do custo</p>
+                    <div className="h-[220px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          layout="vertical"
+                          data={[
+                            { nome: 'Material', valor: costs.material },
+                            { nome: 'Ferragens', valor: costs.ferragens },
+                            ...(isFW ? [{ nome: 'Estrutura 10%', valor: costs.estrutura }] : []),
+                            { nome: 'Mão de obra', valor: costs.maoObra },
+                            { nome: 'Overhead 7%', valor: costs.overhead },
+                            { nome: 'Frete/instal.', valor: costs.frete },
+                            { nome: 'Comissão vend.', valor: costs.comissao },
+                            { nome: 'Montador', valor: costs.montador },
+                            { nome: 'Impostos', valor: costs.impostos },
+                          ].filter(d => d.valor > 0)}
+                          margin={{ left: 8, right: 16 }}
+                        >
+                          <XAxis type="number" hide />
+                          <YAxis type="category" dataKey="nome" width={92} tick={{ fontSize: 11 }} />
+                          <Tooltip formatter={(v: any) => formatBRL(Number(v))} />
+                          <Bar dataKey="valor" radius={[0, 4, 4, 0]} fill="hsl(var(--primary))" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent></Card>
+
+                  {/* Onde está o dinheiro */}
+                  <Card><CardContent className="p-3 space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary">Onde está o dinheiro da venda</p>
+                    <div className="h-[220px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { nome: 'Custo direto', valor: costs.custoDireto },
+                              { nome: 'Comissões + impostos', valor: costs.variaveis },
+                              { nome: 'Lucro líquido', valor: Math.max(0, costs.lucroLiquido) },
+                            ].filter(d => d.valor > 0)}
+                            dataKey="valor" nameKey="nome" innerRadius={45} outerRadius={80} paddingAngle={2}
+                          >
+                            {['hsl(var(--muted-foreground))', 'hsl(var(--destructive))', 'hsl(var(--primary))']
+                              .map((c, i) => <Cell key={i} fill={c} />)}
+                          </Pie>
+                          <Tooltip formatter={(v: any) => formatBRL(Number(v))} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+                      <div><p className="text-muted-foreground">Custo direto</p><p className="font-semibold">{formatBRL(costs.custoDireto)}</p></div>
+                      <div><p className="text-muted-foreground">Comissões + impostos</p><p className="font-semibold">{formatBRL(costs.variaveis)}</p></div>
+                      <div><p className="text-muted-foreground">Lucro</p><p className="font-semibold">{formatBRL(costs.lucroLiquido)}</p></div>
+                    </div>
+                  </CardContent></Card>
+                </div>
+              )}
+
+              {costs && (
+                <Card><CardContent className="p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">Detalhamento de custos</p>
+                  <div className="divide-y text-xs">
+                    {[
+                      ['Material (chapas e insumos)', costs.material],
+                      ['Ferragens e acessórios', costs.ferragens],
+                      ...(isFW ? [['Estrutura de marcenaria (10%)', costs.estrutura] as [string, number]] : []),
+                      ['Mão de obra (dias × custo diário)', costs.maoObra],
+                      ['Overhead operacional (7%)', costs.overhead],
+                      ['Frete / instalação', costs.frete],
+                      [`Comissão do vendedor (${n(comissao)}%)`, costs.comissao],
+                      [`Comissão do montador (${n(montador)}%)`, costs.montador],
+                      [`Impostos (${n(impostos)}%)`, costs.impostos],
+                      ['CUSTO TOTAL', costs.custoTotal],
+                    ].map(([label, value]) => (
+                      <div key={String(label)} className="flex items-center justify-between py-1.5">
+                        <span className={String(label).startsWith('CUSTO') ? 'font-semibold' : 'text-muted-foreground'}>{String(label)}</span>
+                        <span className={String(label).startsWith('CUSTO') ? 'font-semibold' : ''}>{formatBRL(Number(value))}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent></Card>
+              )}
 
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary">Sugestões de preço</p>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {([
-                    ['Mínimo', n(result.recomendacao_comercial?.preco_minimo), 'border-warning/40'],
-                    ['Ideal', n(result.recomendacao_comercial?.preco_ideal) || vendaOf(result), 'border-primary/60 ring-2 ring-primary/20'],
-                    ['Premium', n(result.recomendacao_comercial?.preco_premium), 'border-success/40'],
+                    ['Mínimo', tiers.minimo, 'border-warning/40'],
+                    ['Ideal', tiers.ideal, 'border-primary/60 ring-2 ring-primary/20'],
+                    ['Premium', tiers.premium, 'border-success/40'],
                   ] as [string, number, string][]).map(([label, value, tone]) => {
-                    const custo = n(result.custos?.total);
-                    const margem = custo > 0 ? ((value - custo) / custo) * 100 : 0;
-                    const active = selectedPrice === value && value > 0;
+                    const custoDir = costs?.custoDireto || 0;
+                    const lucro = value - custoDir - value * (varPct / 100);
+                    const margem = value > 0 ? (lucro / value) * 100 : 0;
+                    const active = (selectedPrice || tiers.ideal) === value && value > 0;
                     return (
                       <Card key={label} className={`border-2 ${tone} ${active ? 'bg-primary/5' : ''}`}>
                         <CardContent className="p-3 space-y-1.5">
                           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
                           <p className="font-display text-xl font-bold">{formatBRL(value)}</p>
                           <p className="text-[11px] text-muted-foreground">
-                            Lucro {formatBRL(value - custo)} · Margem {margem.toFixed(1)}%
+                            Lucro {formatBRL(lucro)} · Margem {margem.toFixed(1)}%
                           </p>
                           <Button size="sm" variant={active ? 'default' : 'outline'} className="w-full"
                             onClick={() => setSelectedPrice(value)}>
