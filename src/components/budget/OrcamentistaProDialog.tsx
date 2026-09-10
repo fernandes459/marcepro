@@ -708,6 +708,7 @@ export default function OrcamentistaProDialog() {
               </Select>
             ))}
             {field('Comissão do vendedor (%)', <Input inputMode="decimal" value={comissao} onChange={e => setComissao(e.target.value)} placeholder="5" />)}
+            {field('Comissão do montador / instalador (%)', <Input inputMode="decimal" value={montador} onChange={e => setMontador(e.target.value)} placeholder="8" />)}
             {field('Impostos sobre a venda (%)', <Input inputMode="decimal" value={impostos} onChange={e => setImpostos(e.target.value)} placeholder="6" />)}
             {field('Frete / instalação (R$)', <Input inputMode="decimal" value={frete} onChange={e => setFrete(e.target.value)} placeholder="800" />)}
             {field('Perda técnica de chapas (%)', <Input inputMode="decimal" value={perda} onChange={e => setPerda(e.target.value)} placeholder="15" />)}
