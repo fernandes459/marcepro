@@ -23,6 +23,7 @@ interface Payload {
     padrao: string;
     material: string;
     comissaoVendedor?: number;
+    montadorPct?: number;
     impostosPct?: number;
     freteInstalacao?: number;
     perdaTecnicaPct?: number;
@@ -69,7 +70,8 @@ Antes de calcular, faça uma varredura completa de CADA arquivo enviado (PDF, pl
 
 CONFERÊNCIA FINAL (obrigatória antes de responder)
 1. Recalcule todos os totais: valor_total = quantidade × valor_unitario em cada linha; soma dos materiais e ferragens confere com custos.material.
-2. custos.total = material + estrutura_marcenaria + operacional. resultado_financeiro.valor_venda = custos.total × (1 + margem/100).
+2. custos.total = material + ferragens + estrutura_marcenaria + operacional + comissao_vendedor + comissao_montador + impostos + frete_instalacao.
+2b. Comissões (vendedor e montador) e impostos incidem sobre o VALOR DE VENDA: use valor_venda = custo_direto x (1 + margem/100) / (1 - (comissao% + montador% + impostos%)/100) e detalhe cada um em custos. resultado_financeiro.valor_venda = custos.total × (1 + margem/100).
 3. lucro_bruto = valor_venda − custos.total; margem_pct coerente; divisão de sócios soma 100% do lucro líquido.
 4. Área total = soma das áreas dos ambientes; chapas ≈ área com perda ÷ 5,09 m² (2750×1850mm), arredondado para cima.
 5. Se algum número não fechar, corrija antes de responder. Zero inconsistências.
@@ -104,7 +106,7 @@ Responda SOMENTE com JSON puro (sem markdown, sem crase), no schema:
   "materiais": [{"descricao":"","quantidade":0,"unidade":"","valor_unitario":0,"valor_total":0}],
   "ferragens": [{"item":"","quantidade":0,"valor_unitario":0,"valor_total":0}],
   "operacional": {"funcionarios":0,"dias":0,"custo_diario":0,"total_equipe":0,"percentual_materiais":0,"total":0},
-  "custos": {"material":0,"estrutura_marcenaria":0,"operacional":0,"total":0},
+  "custos": {"material":0,"ferragens":0,"estrutura_marcenaria":0,"operacional":0,"comissao_vendedor":0,"comissao_montador":0,"impostos":0,"frete_instalacao":0,"total":0},
   "simulacao_venda": {"material_1x":0,"material_2x":0,"material_3x":0},
   "analise_m2": {"valor_por_m2":0,"faixa_referencia":"","comparativo":"","metodo_mais_rentavel":""},
   "resultado_financeiro": {"valor_venda":0,"lucro_bruto":0,"impostos":0,"lucro_liquido":0,"margem_pct":0},
@@ -190,6 +192,7 @@ Deno.serve(async (req: Request) => {
       .map(c => `- ${c.pergunta} -> ${c.resposta}`).join('\n');
 
     const comissao = Number(a.comissaoVendedor || 0);
+    const montadorPct = Number(a.montadorPct || 0);
     const impostos = Number(a.impostosPct || 0);
     const frete = Number(a.freteInstalacao || 0);
     const perda = Number(a.perdaTecnicaPct || 0);
@@ -200,6 +203,7 @@ Deno.serve(async (req: Request) => {
 - Margem de lucro desejada: ${Number(a.margemDesejada || 0).toFixed(1)}% sobre o custo total
   (calcule o valor de venda a partir dessa margem: valor_venda = custo_total × (1 + margem/100) e use-o em resultado_financeiro.valor_venda)
 - Comissão do vendedor: ${comissao.toFixed(2)}% sobre o valor de venda (inclua como custo comercial e desconte do lucro líquido)
+- Comissão do montador/instalador: ${montadorPct.toFixed(2)}% sobre o valor de venda (custo variável, desconte do lucro)
 - Impostos: ${impostos.toFixed(2)}% sobre o valor de venda
 - Frete/instalação (valor fixo): R$ ${frete.toFixed(2)} (inclua no custo operacional)
 - Perda técnica de chapas: ${perda > 0 ? `${perda.toFixed(1)}% (obrigatório usar este índice)` : 'estimar conforme complexidade'}
