@@ -888,6 +888,25 @@ export default function BudgetsPage() {
               </p>
             </div>
 
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Entrada (%)</Label>
+                <Input type="number" min={0} max={100} value={downPaymentPct}
+                  onChange={e => setDownPaymentPct(Number(e.target.value))} />
+                {selectedBudget && (
+                  <p className="text-xs text-muted-foreground">
+                    Entrada: <strong>{formatBRL(selectedBudget.final_price * downPaymentPct / 100)}</strong> ·
+                    Saldo: <strong>{formatBRL(selectedBudget.final_price * (100 - downPaymentPct) / 100)}</strong>
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Condição do saldo</Label>
+                <Input value={balanceTerms} onChange={e => setBalanceTerms(e.target.value)}
+                  placeholder="no cartão de crédito em até 18x sem juros" />
+              </div>
+            </div>
+
             {pdfSimplified && (
               <div className="space-y-2 border border-border rounded-xl p-4">
                 <Label className="text-sm font-semibold">Blocos exibidos no PDF do cliente</Label>
