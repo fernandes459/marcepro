@@ -58,8 +58,10 @@ export default function OrcamentistaProDialog() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [selectedPrice, setSelectedPrice] = useState(0);
+  const [precoManual, setPrecoManual] = useState('');
   const [approving, setApproving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const xlsxRef = useRef<HTMLInputElement>(null);
 
   const [empresa, setEmpresa] = useState('FW Planejados');
   const [cliente, setCliente] = useState('');
