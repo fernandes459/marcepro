@@ -330,7 +330,7 @@ export default function BudgetsPage() {
     }
     const { error } = await supabase.from('budgets').update(patch).eq('id', id);
     if (error) { toast.error(`Erro: ${error.message}`); return; }
-    if (status === 'approved' && budget && user) {
+    if (status === 'approved' && budget && budget.status !== 'approved' && user) {
       await generateReceivablesAndCommission({ ...budget, approved_at: patch.approved_at } as any);
     }
     toast.success(`Status: ${statusConfig[status]?.label || status}`);
