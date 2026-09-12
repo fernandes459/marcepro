@@ -357,7 +357,7 @@ export default function OrcamentistaProDialog() {
 
   const approveBudget = async () => {
     if (!result) return;
-    const preco = selectedPrice || vendaOf(result);
+    const preco = precoFinal;
     if (preco <= 0) { toast.error('Selecione um preço válido.'); return; }
     setApproving(true);
     try {
