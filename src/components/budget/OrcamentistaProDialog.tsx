@@ -408,9 +408,11 @@ export default function OrcamentistaProDialog() {
       if (error || !budget) throw new Error(error?.message || 'Falha ao criar orçamento');
 
       const itens = [
-        ...(result.ambientes || []).map((a: any) => ({
-          name: a.nome || 'Ambiente', quantity: 1,
-          material_cost: 0, labor_cost: 0, unit_price: 0, room_label: a.nome || null,
+        ...ambientesArr.map((a: any) => ({
+          name: a.descricao || a.nome || 'Ambiente', quantity: 1,
+          material_cost: 0, labor_cost: 0,
+          unit_price: Number(valorAmbiente(a).toFixed(2)),
+          room_label: a.nome || 'Projeto',
         })),
         ...(result.materiais || []).map((m: any) => ({
           name: m.descricao || 'Material', quantity: Math.max(1, Math.round(n(m.quantidade)) || 1),
