@@ -1141,7 +1141,7 @@ export default function OrcamentistaProDialog() {
                 )}
                 <Button onClick={approveBudget} disabled={approving} className="w-full gap-2 gradient-primary shadow-primary border-0">
                   {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  Aprovar orçamento ({formatBRL(selectedPrice || vendaOf(result))}) e enviar para Em Aberto
+                  Aprovar orçamento ({formatBRL(precoFinal)}) e enviar para Em Aberto
                 </Button>
               </div>
 
