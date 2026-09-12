@@ -90,10 +90,13 @@ function renderClientPdf(data: BudgetPdfData): string {
   const esc = (s: any) => String(s ?? '').replace(/</g, '&lt;');
 
   // Valor por ambiente escalado para fechar exatamente com o preço final.
-  const roomSubtotals = grouped.map(([room, list]) => ({
+  const allRooms = grouped.map(([room, list]) => ({
     room,
     raw: list.reduce((s, i) => s + i.unit_price * i.quantity, 0),
   }));
+  // Ignora agrupamentos sem valor (insumos internos) quando existe ambiente valorizado.
+  const withValue = allRooms.filter(r => r.raw > 0);
+  const roomSubtotals = withValue.length ? withValue : allRooms;
   const rawTotal = roomSubtotals.reduce((s, r) => s + r.raw, 0);
   const scaled = roomSubtotals.map((r) =>
     rawTotal <= 0
