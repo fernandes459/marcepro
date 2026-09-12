@@ -1052,6 +1052,59 @@ export default function OrcamentistaProDialog() {
                 </CardContent></Card>
               )}
 
+              {/* ---- Correção de valores: edite aqui ou importe a planilha ---- */}
+              <Card><CardContent className="p-3 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                    Corrigir valores (recalcula o preço na hora)
+                  </p>
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => xlsxRef.current?.click()}>
+                    <FileSpreadsheet className="h-3.5 w-3.5" /> Importar planilha editada
+                  </Button>
+                  <input ref={xlsxRef} type="file" accept=".xlsx,.xls" className="hidden"
+                    onChange={e => { importXlsx(e.target.files?.[0]); e.target.value = ''; }} />
+                </div>
+
+                {(['materiais', 'ferragens'] as const).map(list => (
+                  <div key={list} className="space-y-1.5">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {list === 'materiais' ? 'Materiais' : 'Ferragens e acessórios'}
+                    </p>
+                    {((result[list] || []) as any[]).map((it: any, i: number) => (
+                      <div key={i} className="flex items-center gap-1.5">
+                        <Input className="h-8 flex-1 text-xs" value={it.descricao ?? it.item ?? ''}
+                          onChange={e => updateItem(list, i, list === 'materiais' ? 'descricao' : 'item', e.target.value)} />
+                        <Input className="h-8 w-16 text-xs" inputMode="decimal" value={it.quantidade ?? 0}
+                          onChange={e => updateItem(list, i, 'quantidade', e.target.value)} />
+                        <Input className="h-8 w-24 text-xs" inputMode="decimal" value={it.valor_unitario ?? 0}
+                          onChange={e => updateItem(list, i, 'valor_unitario', e.target.value)} />
+                        <span className="w-24 shrink-0 text-right text-xs text-muted-foreground">
+                          {formatBRL(n(it.quantidade) * n(it.valor_unitario))}
+                        </span>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(list, i)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" className="gap-1" onClick={() => addItem(list)}>
+                      <Plus className="h-3.5 w-3.5" /> Adicionar {list === 'materiais' ? 'material' : 'ferragem'}
+                    </Button>
+                  </div>
+                ))}
+
+                <div className="grid gap-2 sm:grid-cols-2 pt-1">
+                  {field('Preço final manual (R$) — sobrepõe as faixas', (
+                    <Input inputMode="decimal" value={precoManual} placeholder={String(Math.round(vendaOf(result)))}
+                      onChange={e => setPrecoManual(e.target.value)} />
+                  ))}
+                  <div className="flex items-end">
+                    <Button variant="ghost" size="sm" onClick={() => { setPrecoManual(''); setSelectedPrice(0); }}>
+                      Voltar ao preço calculado
+                    </Button>
+                  </div>
+                </div>
+              </CardContent></Card>
+
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary">Sugestões de preço</p>
                 <div className="grid gap-3 sm:grid-cols-3">
