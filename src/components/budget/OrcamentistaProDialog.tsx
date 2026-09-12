@@ -141,6 +141,92 @@ export default function OrcamentistaProDialog() {
     n(r?.resultado_financeiro?.valor_venda) ||
     n(r?.custos?.total) * (1 + n(margemDesejada) / 100);
 
+  /** Preço que será usado na aprovação: manual > faixa selecionada > ideal calculado. */
+  const precoFinal = n(precoManual) || selectedPrice || (result ? vendaOf(result) : 0);
+
+  /** Edita um item (material/ferragem) recalculando o total e, em cascata, todo o custo. */
+  const updateItem = (list: 'materiais' | 'ferragens', idx: number, field: string, value: string) => {
+    setResult((prev: any) => {
+      if (!prev) return prev;
+      const arr = [...(prev[list] || [])];
+      const item = { ...arr[idx] };
+      item[field] = field === 'descricao' || field === 'item' || field === 'unidade' ? value : n(value);
+      item.valor_total = n(item.quantidade) * n(item.valor_unitario);
+      arr[idx] = item;
+      return { ...prev, [list]: arr };
+    });
+  };
+
+  const removeItem = (list: 'materiais' | 'ferragens', idx: number) => {
+    setResult((prev: any) => prev
+      ? { ...prev, [list]: (prev[list] || []).filter((_: any, i: number) => i !== idx) }
+      : prev);
+  };
+
+  const addItem = (list: 'materiais' | 'ferragens') => {
+    setResult((prev: any) => {
+      if (!prev) return prev;
+      const novo = list === 'materiais'
+        ? { descricao: '', quantidade: 1, unidade: 'un', valor_unitario: 0, valor_total: 0 }
+        : { item: '', quantidade: 1, valor_unitario: 0, valor_total: 0 };
+      return { ...prev, [list]: [...(prev[list] || []), novo] };
+    });
+  };
+
+  /** Reimporta a planilha editada: materiais, ferragens e parâmetros voltam para o app. */
+  const importXlsx = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const grid = (name: string): any[][] =>
+        wb.Sheets[name] ? XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true }) as any[][] : [];
+
+      const mats = grid('MATERIAIS').slice(2)
+        .filter(r => r?.[0] && !String(r[0]).startsWith('SUBTOTAL'))
+        .map(r => ({
+          descricao: String(r[0]), quantidade: n(r[1]), unidade: String(r[2] || 'un'),
+          valor_unitario: n(r[3]), valor_total: n(r[1]) * n(r[3]),
+        }));
+      const ferr = grid('FERRAGENS').slice(2)
+        .filter(r => r?.[0] && !String(r[0]).startsWith('SUBTOTAL'))
+        .map(r => ({
+          item: String(r[0]), quantidade: n(r[1]),
+          valor_unitario: n(r[2]), valor_total: n(r[1]) * n(r[2]),
+        }));
+
+      const custos = grid('CUSTOS');
+      const par = (row: number) => n(custos[row - 1]?.[1]);
+      const asPct = (v: number) => (v > 0 && v <= 1 ? v * 100 : v);
+      if (custos.length) {
+        if (par(3)) setMargemDesejada(String(asPct(par(3))));
+        setComissao(String(asPct(par(4))));
+        setMontador(String(asPct(par(5))));
+        setImpostos(String(asPct(par(6))));
+        if (par(9)) setCustoDiario(String(par(9)));
+        if (par(10)) setPrazoDias(String(par(10)));
+        setFrete(String(par(11)));
+      }
+
+      if (!mats.length && !ferr.length && !custos.length) {
+        toast.error('Planilha sem as abas MATERIAIS / FERRAGENS / CUSTOS.');
+        return;
+      }
+
+      setResult((prev: any) => ({
+        ...(prev || {}),
+        materiais: mats.length ? mats : prev?.materiais || [],
+        ferragens: ferr.length ? ferr : prev?.ferragens || [],
+      }));
+      setSelectedPrice(0);
+      setPrecoManual('');
+      toast.success('Planilha importada — preço recalculado com os valores editados');
+    } catch (e) {
+      console.error(e);
+      toast.error('Não foi possível ler a planilha.');
+    }
+  };
+
+
   const missing = useMemo(() => {
     const m: string[] = [];
     if (!cliente.trim()) m.push('nome do cliente');
