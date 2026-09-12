@@ -110,6 +110,8 @@ export default function BudgetsPage() {
   const [pdfClientOpts, setPdfClientOpts] = useState({
     showDescription: true, showItemsList: false, showPaymentTerms: true, showContractClauses: true,
   });
+  const [downPaymentPct, setDownPaymentPct] = useState(50);
+  const [balanceTerms, setBalanceTerms] = useState('no cartão de crédito em até 18x sem juros');
 
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes, opCostsRes, prodRes] = await Promise.all([
