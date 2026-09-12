@@ -58,8 +58,10 @@ export default function OrcamentistaProDialog() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [selectedPrice, setSelectedPrice] = useState(0);
+  const [precoManual, setPrecoManual] = useState('');
   const [approving, setApproving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const xlsxRef = useRef<HTMLInputElement>(null);
 
   const [empresa, setEmpresa] = useState('FW Planejados');
   const [cliente, setCliente] = useState('');
@@ -138,6 +140,92 @@ export default function OrcamentistaProDialog() {
     costs?.venda ||
     n(r?.resultado_financeiro?.valor_venda) ||
     n(r?.custos?.total) * (1 + n(margemDesejada) / 100);
+
+  /** Preço que será usado na aprovação: manual > faixa selecionada > ideal calculado. */
+  const precoFinal = n(precoManual) || selectedPrice || (result ? vendaOf(result) : 0);
+
+  /** Edita um item (material/ferragem) recalculando o total e, em cascata, todo o custo. */
+  const updateItem = (list: 'materiais' | 'ferragens', idx: number, field: string, value: string) => {
+    setResult((prev: any) => {
+      if (!prev) return prev;
+      const arr = [...(prev[list] || [])];
+      const item = { ...arr[idx] };
+      item[field] = field === 'descricao' || field === 'item' || field === 'unidade' ? value : n(value);
+      item.valor_total = n(item.quantidade) * n(item.valor_unitario);
+      arr[idx] = item;
+      return { ...prev, [list]: arr };
+    });
+  };
+
+  const removeItem = (list: 'materiais' | 'ferragens', idx: number) => {
+    setResult((prev: any) => prev
+      ? { ...prev, [list]: (prev[list] || []).filter((_: any, i: number) => i !== idx) }
+      : prev);
+  };
+
+  const addItem = (list: 'materiais' | 'ferragens') => {
+    setResult((prev: any) => {
+      if (!prev) return prev;
+      const novo = list === 'materiais'
+        ? { descricao: '', quantidade: 1, unidade: 'un', valor_unitario: 0, valor_total: 0 }
+        : { item: '', quantidade: 1, valor_unitario: 0, valor_total: 0 };
+      return { ...prev, [list]: [...(prev[list] || []), novo] };
+    });
+  };
+
+  /** Reimporta a planilha editada: materiais, ferragens e parâmetros voltam para o app. */
+  const importXlsx = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const grid = (name: string): any[][] =>
+        wb.Sheets[name] ? XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true }) as any[][] : [];
+
+      const mats = grid('MATERIAIS').slice(2)
+        .filter(r => r?.[0] && !String(r[0]).startsWith('SUBTOTAL'))
+        .map(r => ({
+          descricao: String(r[0]), quantidade: n(r[1]), unidade: String(r[2] || 'un'),
+          valor_unitario: n(r[3]), valor_total: n(r[1]) * n(r[3]),
+        }));
+      const ferr = grid('FERRAGENS').slice(2)
+        .filter(r => r?.[0] && !String(r[0]).startsWith('SUBTOTAL'))
+        .map(r => ({
+          item: String(r[0]), quantidade: n(r[1]),
+          valor_unitario: n(r[2]), valor_total: n(r[1]) * n(r[2]),
+        }));
+
+      const custos = grid('CUSTOS');
+      const par = (row: number) => n(custos[row - 1]?.[1]);
+      const asPct = (v: number) => (v > 0 && v <= 1 ? v * 100 : v);
+      if (custos.length) {
+        if (par(3)) setMargemDesejada(String(asPct(par(3))));
+        setComissao(String(asPct(par(4))));
+        setMontador(String(asPct(par(5))));
+        setImpostos(String(asPct(par(6))));
+        if (par(9)) setCustoDiario(String(par(9)));
+        if (par(10)) setPrazoDias(String(par(10)));
+        setFrete(String(par(11)));
+      }
+
+      if (!mats.length && !ferr.length && !custos.length) {
+        toast.error('Planilha sem as abas MATERIAIS / FERRAGENS / CUSTOS.');
+        return;
+      }
+
+      setResult((prev: any) => ({
+        ...(prev || {}),
+        materiais: mats.length ? mats : prev?.materiais || [],
+        ferragens: ferr.length ? ferr : prev?.ferragens || [],
+      }));
+      setSelectedPrice(0);
+      setPrecoManual('');
+      toast.success('Planilha importada — preço recalculado com os valores editados');
+    } catch (e) {
+      console.error(e);
+      toast.error('Não foi possível ler a planilha.');
+    }
+  };
+
 
   const missing = useMemo(() => {
     const m: string[] = [];
@@ -269,7 +357,7 @@ export default function OrcamentistaProDialog() {
 
   const approveBudget = async () => {
     if (!result) return;
-    const preco = selectedPrice || vendaOf(result);
+    const preco = precoFinal;
     if (preco <= 0) { toast.error('Selecione um preço válido.'); return; }
     setApproving(true);
     try {
@@ -293,12 +381,22 @@ export default function OrcamentistaProDialog() {
       const custo = costs?.custoTotal || n(result.custos?.total);
       const margem = custo > 0 ? ((preco - custo) / custo) * 100 : 0;
 
+      // Rateio do preço entre os ambientes (por área) para o PDF do cliente sair preenchido
+      const ambientesArr = (result.ambientes || []) as any[];
+      const ambienteNomes = ambientesArr.map((a: any) => a?.nome).filter(Boolean);
+      const areaTotal = ambientesArr.reduce((s, a) => s + n(a.area_m2), 0);
+      const valorAmbiente = (a: any) =>
+        areaTotal > 0 ? (n(a.area_m2) / areaTotal) * preco : preco / Math.max(1, ambientesArr.length);
+
+
       const { data: budget, error } = await supabase.from('budgets').insert({
         user_id: user.id,
         code: 'TEMP',
         status: 'pending',
         client_id: clientId,
-        project_name: `${padrao} · ${material} — ${cliente.trim()}`,
+        project_name: ambienteNomes.length
+          ? `Projeto de ${ambienteNomes.join(' + ')}`
+          : `${padrao} · ${material} — ${cliente.trim()}`,
         client_description: result.resumo_executivo?.material || material,
         total_cost: custo,
         profit_margin: Number(margem.toFixed(2)),
@@ -310,9 +408,11 @@ export default function OrcamentistaProDialog() {
       if (error || !budget) throw new Error(error?.message || 'Falha ao criar orçamento');
 
       const itens = [
-        ...(result.ambientes || []).map((a: any) => ({
-          name: a.nome || 'Ambiente', quantity: 1,
-          material_cost: 0, labor_cost: 0, unit_price: 0, room_label: a.nome || null,
+        ...ambientesArr.map((a: any) => ({
+          name: a.descricao || a.nome || 'Ambiente', quantity: 1,
+          material_cost: 0, labor_cost: 0,
+          unit_price: Number(valorAmbiente(a).toFixed(2)),
+          room_label: a.nome || 'Projeto',
         })),
         ...(result.materiais || []).map((m: any) => ({
           name: m.descricao || 'Material', quantity: Math.max(1, Math.round(n(m.quantidade)) || 1),
@@ -952,6 +1052,59 @@ export default function OrcamentistaProDialog() {
                 </CardContent></Card>
               )}
 
+              {/* ---- Correção de valores: edite aqui ou importe a planilha ---- */}
+              <Card><CardContent className="p-3 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                    Corrigir valores (recalcula o preço na hora)
+                  </p>
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => xlsxRef.current?.click()}>
+                    <FileSpreadsheet className="h-3.5 w-3.5" /> Importar planilha editada
+                  </Button>
+                  <input ref={xlsxRef} type="file" accept=".xlsx,.xls" className="hidden"
+                    onChange={e => { importXlsx(e.target.files?.[0]); e.target.value = ''; }} />
+                </div>
+
+                {(['materiais', 'ferragens'] as const).map(list => (
+                  <div key={list} className="space-y-1.5">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {list === 'materiais' ? 'Materiais' : 'Ferragens e acessórios'}
+                    </p>
+                    {((result[list] || []) as any[]).map((it: any, i: number) => (
+                      <div key={i} className="flex items-center gap-1.5">
+                        <Input className="h-8 flex-1 text-xs" value={it.descricao ?? it.item ?? ''}
+                          onChange={e => updateItem(list, i, list === 'materiais' ? 'descricao' : 'item', e.target.value)} />
+                        <Input className="h-8 w-16 text-xs" inputMode="decimal" value={it.quantidade ?? 0}
+                          onChange={e => updateItem(list, i, 'quantidade', e.target.value)} />
+                        <Input className="h-8 w-24 text-xs" inputMode="decimal" value={it.valor_unitario ?? 0}
+                          onChange={e => updateItem(list, i, 'valor_unitario', e.target.value)} />
+                        <span className="w-24 shrink-0 text-right text-xs text-muted-foreground">
+                          {formatBRL(n(it.quantidade) * n(it.valor_unitario))}
+                        </span>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(list, i)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" className="gap-1" onClick={() => addItem(list)}>
+                      <Plus className="h-3.5 w-3.5" /> Adicionar {list === 'materiais' ? 'material' : 'ferragem'}
+                    </Button>
+                  </div>
+                ))}
+
+                <div className="grid gap-2 sm:grid-cols-2 pt-1">
+                  {field('Preço final manual (R$) — sobrepõe as faixas', (
+                    <Input inputMode="decimal" value={precoManual} placeholder={String(Math.round(vendaOf(result)))}
+                      onChange={e => setPrecoManual(e.target.value)} />
+                  ))}
+                  <div className="flex items-end">
+                    <Button variant="ghost" size="sm" onClick={() => { setPrecoManual(''); setSelectedPrice(0); }}>
+                      Voltar ao preço calculado
+                    </Button>
+                  </div>
+                </div>
+              </CardContent></Card>
+
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary">Sugestões de preço</p>
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -988,7 +1141,7 @@ export default function OrcamentistaProDialog() {
                 )}
                 <Button onClick={approveBudget} disabled={approving} className="w-full gap-2 gradient-primary shadow-primary border-0">
                   {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  Aprovar orçamento ({formatBRL(selectedPrice || vendaOf(result))}) e enviar para Em Aberto
+                  Aprovar orçamento ({formatBRL(precoFinal)}) e enviar para Em Aberto
                 </Button>
               </div>
 

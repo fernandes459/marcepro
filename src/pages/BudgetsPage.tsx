@@ -110,6 +110,8 @@ export default function BudgetsPage() {
   const [pdfClientOpts, setPdfClientOpts] = useState({
     showDescription: true, showItemsList: false, showPaymentTerms: true, showContractClauses: true,
   });
+  const [downPaymentPct, setDownPaymentPct] = useState(50);
+  const [balanceTerms, setBalanceTerms] = useState('no cartão de crédito em até 18x sem juros');
 
   const fetchData = async () => {
     const [budgetsRes, clientsRes, settingsRes, employeesRes, materialsRes, opCostsRes, prodRes] = await Promise.all([
@@ -551,6 +553,8 @@ export default function BudgetsPage() {
       mode: pdfSimplified ? 'client' : 'internal',
       clientDescription: (selectedBudget as any).client_description || null,
       clientPdfOptions: pdfClientOpts,
+      downPaymentPct,
+      balanceTerms,
     });
     setPdfDialogOpen(false);
   };
@@ -882,6 +886,25 @@ export default function BudgetsPage() {
               <p className="text-xs text-muted-foreground">
                 Data prevista: <strong>{deliveryDate.toLocaleDateString('pt-BR')}</strong>
               </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Entrada (%)</Label>
+                <Input type="number" min={0} max={100} value={downPaymentPct}
+                  onChange={e => setDownPaymentPct(Number(e.target.value))} />
+                {selectedBudget && (
+                  <p className="text-xs text-muted-foreground">
+                    Entrada: <strong>{formatBRL(selectedBudget.final_price * downPaymentPct / 100)}</strong> ·
+                    Saldo: <strong>{formatBRL(selectedBudget.final_price * (100 - downPaymentPct) / 100)}</strong>
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Condição do saldo</Label>
+                <Input value={balanceTerms} onChange={e => setBalanceTerms(e.target.value)}
+                  placeholder="no cartão de crédito em até 18x sem juros" />
+              </div>
             </div>
 
             {pdfSimplified && (
