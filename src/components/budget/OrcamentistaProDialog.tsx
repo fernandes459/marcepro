@@ -386,7 +386,9 @@ export default function OrcamentistaProDialog() {
         code: 'TEMP',
         status: 'pending',
         client_id: clientId,
-        project_name: `${padrao} · ${material} — ${cliente.trim()}`,
+        project_name: ambienteNomes.length
+          ? `Projeto de ${ambienteNomes.join(' + ')}`
+          : `${padrao} · ${material} — ${cliente.trim()}`,
         client_description: result.resumo_executivo?.material || material,
         total_cost: custo,
         profit_margin: Number(margem.toFixed(2)),
