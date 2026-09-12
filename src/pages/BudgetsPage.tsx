@@ -330,7 +330,7 @@ export default function BudgetsPage() {
     }
     const { error } = await supabase.from('budgets').update(patch).eq('id', id);
     if (error) { toast.error(`Erro: ${error.message}`); return; }
-    if (status === 'approved' && budget && user) {
+    if (status === 'approved' && budget && budget.status !== 'approved' && user) {
       await generateReceivablesAndCommission({ ...budget, approved_at: patch.approved_at } as any);
     }
     toast.success(`Status: ${statusConfig[status]?.label || status}`);
@@ -789,10 +789,17 @@ export default function BudgetsPage() {
                         <td className="px-4 py-3 text-sm">{b.project_name || '—'}</td>
                         <td className="px-4 py-3 text-sm font-medium hidden sm:table-cell">{(b.clients as any)?.name || '—'}</td>
                         <td className="px-4 py-3 text-sm text-right font-semibold">{formatBRL(b.final_price)}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${statusConfig[b.status]?.className || ''}`}>
-                            {statusConfig[b.status]?.label || b.status}
-                          </span>
+                        <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+                          <Select value={b.status} onValueChange={(v) => updateBudgetStatus(b.id, v)}>
+                            <SelectTrigger className={`h-7 w-auto mx-auto gap-1 rounded-full border-0 px-2.5 py-0.5 text-[10px] font-semibold focus:ring-0 ${statusConfig[b.status]?.className || ''}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(statusConfig).map(([key, cfg]) => (
+                                <SelectItem key={key} value={key} className="text-xs">{cfg.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </td>
                         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1 flex-wrap">
