@@ -381,6 +381,14 @@ export default function OrcamentistaProDialog() {
       const custo = costs?.custoTotal || n(result.custos?.total);
       const margem = custo > 0 ? ((preco - custo) / custo) * 100 : 0;
 
+      // Rateio do preço entre os ambientes (por área) para o PDF do cliente sair preenchido
+      const ambientesArr = (result.ambientes || []) as any[];
+      const ambienteNomes = ambientesArr.map((a: any) => a?.nome).filter(Boolean);
+      const areaTotal = ambientesArr.reduce((s, a) => s + n(a.area_m2), 0);
+      const valorAmbiente = (a: any) =>
+        areaTotal > 0 ? (n(a.area_m2) / areaTotal) * preco : preco / Math.max(1, ambientesArr.length);
+
+
       const { data: budget, error } = await supabase.from('budgets').insert({
         user_id: user.id,
         code: 'TEMP',
