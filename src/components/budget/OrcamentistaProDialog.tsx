@@ -173,38 +173,58 @@ export default function OrcamentistaProDialog() {
     });
   };
 
-  /** Reimporta a planilha editada: materiais, ferragens e parâmetros voltam para o app. */
+  /** Reimporta a planilha editada: materiais, ferragens, parâmetros e preço voltam para o app. */
   const importXlsx = async (file: File | undefined) => {
     if (!file) return;
     try {
       const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-      const grid = (name: string): any[][] =>
-        wb.Sheets[name] ? XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true }) as any[][] : [];
+      const findSheet = (needle: string) =>
+        wb.SheetNames.find(s => s.toUpperCase().replace(/[ÇÃÉ]/g, c => ({ 'Ç': 'C', 'Ã': 'A', 'É': 'E' } as any)[c])
+          .includes(needle));
+      const grid = (needle: string): any[][] => {
+        const name = findSheet(needle);
+        return name ? (XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true }) as any[][]) : [];
+      };
+      const norm = (v: any) => String(v ?? '').trim().toLowerCase();
+      /** Encontra a linha do cabeçalho e retorna as linhas de dados. */
+      const rows = (g: any[][], firstHeader: string) => {
+        const idx = g.findIndex(r => norm(r?.[0]) === firstHeader);
+        return g.slice(idx >= 0 ? idx + 1 : 2).filter(r => {
+          const a = norm(r?.[0]);
+          return a && !a.startsWith('subtotal') && !a.startsWith('total');
+        });
+      };
 
-      const mats = grid('MATERIAIS').slice(2)
-        .filter(r => r?.[0] && !String(r[0]).startsWith('SUBTOTAL'))
-        .map(r => ({
-          descricao: String(r[0]), quantidade: n(r[1]), unidade: String(r[2] || 'un'),
-          valor_unitario: n(r[3]), valor_total: n(r[1]) * n(r[3]),
-        }));
-      const ferr = grid('FERRAGENS').slice(2)
-        .filter(r => r?.[0] && !String(r[0]).startsWith('SUBTOTAL'))
-        .map(r => ({
-          item: String(r[0]), quantidade: n(r[1]),
-          valor_unitario: n(r[2]), valor_total: n(r[1]) * n(r[2]),
-        }));
+      const gMat = grid('MATERIA');
+      const gFer = grid('FERRAGEN');
+      const mats = rows(gMat, 'descrição').map(r => ({
+        descricao: String(r[0]), quantidade: n(r[1]), unidade: String(r[2] || 'un'),
+        valor_unitario: n(r[3]), valor_total: n(r[1]) * n(r[3]),
+      }));
+      const ferr = rows(gFer, 'item').map(r => ({
+        item: String(r[0]), quantidade: n(r[1]),
+        valor_unitario: n(r[2]), valor_total: n(r[1]) * n(r[2]),
+      }));
 
-      const custos = grid('CUSTOS');
-      const par = (row: number) => n(custos[row - 1]?.[1]);
+      const custos = grid('CUSTO');
+      /** Busca um parâmetro pelo rótulo (não depende da posição da linha). */
+      const byLabel = (...keys: string[]) => {
+        const row = custos.find(r => keys.some(k => norm(r?.[0]).includes(k)));
+        return row ? n(row[1]) : NaN;
+      };
       const asPct = (v: number) => (v > 0 && v <= 1 ? v * 100 : v);
+      const setIf = (v: number, set: (s: string) => void, pct = false) => {
+        if (Number.isFinite(v) && v !== 0) set(String(pct ? asPct(v) : v));
+      };
       if (custos.length) {
-        if (par(3)) setMargemDesejada(String(asPct(par(3))));
-        setComissao(String(asPct(par(4))));
-        setMontador(String(asPct(par(5))));
-        setImpostos(String(asPct(par(6))));
-        if (par(9)) setCustoDiario(String(par(9)));
-        if (par(10)) setPrazoDias(String(par(10)));
-        setFrete(String(par(11)));
+        setIf(byLabel('margem de lucro'), setMargemDesejada, true);
+        setIf(byLabel('comissão do vendedor'), setComissao, true);
+        setIf(byLabel('comissão do montador'), setMontador, true);
+        setIf(byLabel('imposto'), setImpostos, true);
+        setIf(byLabel('custo diário'), setCustoDiario);
+        setIf(byLabel('dias de produção'), setPrazoDias);
+        const fr = byLabel('frete');
+        if (Number.isFinite(fr)) setFrete(String(fr));
       }
 
       if (!mats.length && !ferr.length && !custos.length) {
@@ -218,8 +238,19 @@ export default function OrcamentistaProDialog() {
         ferragens: ferr.length ? ferr : prev?.ferragens || [],
       }));
       setSelectedPrice(0);
-      setPrecoManual('');
-      toast.success('Planilha importada — preço recalculado com os valores editados');
+
+      // Se a planilha traz o preço de venda já calculado, adota como preço final.
+      const venda = byLabel('preço de venda');
+      if (Number.isFinite(venda) && venda > 0) setPrecoManual(String(Math.round(venda)));
+      else setPrecoManual('');
+
+      const partes = [
+        mats.length ? `${mats.length} materiais` : '',
+        ferr.length ? `${ferr.length} ferragens` : '',
+        custos.length ? 'parâmetros de custo' : '',
+        Number.isFinite(venda) && venda > 0 ? `preço ${formatBRL(venda)}` : '',
+      ].filter(Boolean).join(' · ');
+      toast.success(`Planilha importada — ${partes}`);
     } catch (e) {
       console.error(e);
       toast.error('Não foi possível ler a planilha.');
