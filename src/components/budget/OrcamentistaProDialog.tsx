@@ -320,6 +320,30 @@ export default function OrcamentistaProDialog() {
     return () => document.removeEventListener('paste', onPaste);
   }, [open]);
 
+  /** Carrega clientes cadastrados para busca/seleção. */
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    (async () => {
+      const { data } = await supabase
+        .from('clients')
+        .select('id,name,phone,email,city,cpf_cnpj,address,neighborhood,state,cep,address_number,complement')
+        .order('name');
+      if (alive && data) setClientsList(data as any);
+    })();
+    return () => { alive = false; };
+  }, [open]);
+
+  const handleSelectClient = (id: string) => {
+    setClientId(id);
+    const c = clientsList.find(x => x.id === id);
+    if (c) {
+      setCliente(c.name);
+      if (c.city) setCidade(c.city);
+      if (c.state) setEstado(c.state);
+    }
+  };
+
   const buildBody = async (mode: 'orcamento' | 'perguntas') => {
     const { data: promptRow } = await supabase
       .from('ai_prompts' as any)
