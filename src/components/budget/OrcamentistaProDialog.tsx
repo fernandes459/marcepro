@@ -918,16 +918,36 @@ export default function OrcamentistaProDialog() {
               className="cursor-pointer rounded-lg border-2 border-dashed border-border/60 p-6 text-center hover:border-primary/50 transition-colors"
             >
               <Upload className="h-5 w-5 mx-auto text-muted-foreground" />
-              <p className="text-xs text-muted-foreground mt-2">Clique ou arraste até 6 arquivos (PDF / JPG / PNG · máx. 15MB cada)</p>
+              <p className="text-xs text-muted-foreground mt-2">Clique, arraste ou cole (Ctrl+V) até 6 arquivos (PDF / JPG / PNG · máx. 15MB cada)</p>
+              <p className="text-[11px] text-muted-foreground/80 mt-1">Dica: dê um print da tela e cole aqui com Ctrl+V (Cmd+V no Mac).</p>
             </div>
+            <textarea
+              onPaste={e => {
+                const cd = e.clipboardData;
+                if (cd && Array.from(cd.items || []).some(i => i.kind === 'file')) {
+                  e.preventDefault();
+                  void handlePasteFiles(cd.items, cd.files);
+                }
+              }}
+              readOnly
+              value=""
+              placeholder="Cole o print aqui (Ctrl+V)"
+              className="w-full h-9 resize-none rounded-md border border-dashed border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-primary/40"
+            />
             <input ref={inputRef} type="file" multiple accept="application/pdf,image/*" className="hidden"
               onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
             {files.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {files.map((f, i) => (
-                  <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs">
-                    <FileText className="h-3 w-3" /> {f.name}
-                    <button onClick={() => setFiles(p => p.filter((_, j) => j !== i))}><X className="h-3 w-3" /></button>
+                  <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-1 text-xs">
+                    {f.mime.startsWith('image/') ? (
+                      <img src={`data:${f.mime};base64,${f.data}`} alt={f.name}
+                        className="h-8 w-8 rounded object-cover" />
+                    ) : (
+                      <FileText className="h-3 w-3" />
+                    )}
+                    <span className="max-w-[160px] truncate">{f.name}</span>
+                    <button type="button" onClick={() => setFiles(p => p.filter((_, j) => j !== i))}><X className="h-3 w-3" /></button>
                   </span>
                 ))}
               </div>
