@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
 import { computeCosts, vendaForMargin, type CostBreakdown } from '@/lib/orcamento-costs';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import ClientPicker, { type ClientLite } from '@/components/budget/ClientPicker';
 
 interface Socio { nome: string; percentual: number }
 interface FileIn { name: string; mime: string; data: string; size: number }
@@ -65,6 +66,8 @@ export default function OrcamentistaProDialog() {
 
   const [empresa, setEmpresa] = useState('FW Planejados');
   const [cliente, setCliente] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [clientsList, setClientsList] = useState<ClientLite[]>([]);
   const [margemDesejada, setMargemDesejada] = useState('30');
   const [prazoDias, setPrazoDias] = useState('');
   const [custoDiario, setCustoDiario] = useState('');
@@ -316,6 +319,30 @@ export default function OrcamentistaProDialog() {
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
   }, [open]);
+
+  /** Carrega clientes cadastrados para busca/seleção. */
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    (async () => {
+      const { data } = await supabase
+        .from('clients')
+        .select('id,name,phone,email,city,cpf_cnpj,address,neighborhood,state,cep,address_number,complement')
+        .order('name');
+      if (alive && data) setClientsList(data as any);
+    })();
+    return () => { alive = false; };
+  }, [open]);
+
+  const handleSelectClient = (id: string) => {
+    setClientId(id);
+    const c = clientsList.find(x => x.id === id);
+    if (c) {
+      setCliente(c.name);
+      if (c.city) setCidade(c.city);
+      if (c.state) setEstado(c.state);
+    }
+  };
 
   const buildBody = async (mode: 'orcamento' | 'perguntas') => {
     const { data: promptRow } = await supabase
