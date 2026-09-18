@@ -240,15 +240,51 @@ export default function OrcamentistaProDialog() {
     return m;
   }, [cliente, margemDesejada, prazoDias, custoDiario, funcionarios, cidade, estado, isFW, somaSocios]);
 
-  const addFiles = async (list: FileList | null) => {
+  const addFiles = async (list: FileList | File[] | null) => {
     if (!list) return;
     const accepted: FileIn[] = [];
     for (const f of Array.from(list)) {
       if (f.size > 15 * 1024 * 1024) { toast.error(`${f.name}: máximo 15MB`); continue; }
-      accepted.push({ name: f.name, mime: f.type || 'application/pdf', data: await fileToBase64(f), size: f.size });
+      const isImg = (f.type || '').startsWith('image/');
+      const name = f.name && f.name !== 'image.png'
+        ? f.name
+        : `print-${new Date().toLocaleTimeString('pt-BR').replace(/\D/g, '')}.${isImg ? (f.type.split('/')[1] || 'png') : 'pdf'}`;
+      accepted.push({ name, mime: f.type || 'application/pdf', data: await fileToBase64(f), size: f.size });
     }
+    if (!accepted.length) return;
     setFiles(prev => [...prev, ...accepted].slice(0, 6));
+    toast.success(accepted.length === 1 ? `${accepted[0].name} anexado` : `${accepted.length} arquivos anexados`);
   };
+
+  /** Colar print (Ctrl+V / Cmd+V) em qualquer lugar do diálogo. */
+  const handlePasteFiles = async (items: DataTransferItemList | null, clipFiles?: FileList | null) => {
+    const picked: File[] = [];
+    if (clipFiles?.length) picked.push(...Array.from(clipFiles));
+    if (!picked.length && items) {
+      for (const it of Array.from(items)) {
+        if (it.kind === 'file') {
+          const f = it.getAsFile();
+          if (f) picked.push(f);
+        }
+      }
+    }
+    const valid = picked.filter(f => (f.type || '').startsWith('image/') || f.type === 'application/pdf');
+    if (valid.length) await addFiles(valid);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const cd = e.clipboardData;
+      if (!cd) return;
+      const hasFile = Array.from(cd.items || []).some(i => i.kind === 'file');
+      if (!hasFile) return;
+      e.preventDefault();
+      void handlePasteFiles(cd.items, cd.files);
+    };
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [open]);
 
   const buildBody = async (mode: 'orcamento' | 'perguntas') => {
     const { data: promptRow } = await supabase
