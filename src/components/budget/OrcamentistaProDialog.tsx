@@ -66,6 +66,8 @@ export default function OrcamentistaProDialog() {
 
   const [empresa, setEmpresa] = useState('FW Planejados');
   const [cliente, setCliente] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [clientsList, setClientsList] = useState<ClientLite[]>([]);
   const [margemDesejada, setMargemDesejada] = useState('30');
   const [prazoDias, setPrazoDias] = useState('');
   const [custoDiario, setCustoDiario] = useState('');
