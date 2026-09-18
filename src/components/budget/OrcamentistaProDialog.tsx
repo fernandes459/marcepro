@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Brain, Loader2, Upload, X, FileText, FileSpreadsheet, Sparkles, Plus, Trash2, CheckCircle2,
 } from 'lucide-react';
