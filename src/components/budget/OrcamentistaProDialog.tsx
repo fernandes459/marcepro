@@ -471,7 +471,7 @@ export default function OrcamentistaProDialog() {
           .from('clients')
           .insert({ user_id: user.id, name: cliente.trim(), phone: '', city: cidade || null, state: estado || null })
           .select('id').single();
-        clientId = created?.id ?? null;
+        clientIdFinal = created?.id ?? null;
       }
 
       const custo = costs?.custoTotal || n(result.custos?.total);
@@ -489,7 +489,7 @@ export default function OrcamentistaProDialog() {
         user_id: user.id,
         code: 'TEMP',
         status: 'pending',
-        client_id: clientId,
+        client_id: clientIdFinal,
         project_name: ambienteNomes.length
           ? `Projeto de ${ambienteNomes.join(' + ')}`
           : `${padrao} · ${material} — ${cliente.trim()}`,
