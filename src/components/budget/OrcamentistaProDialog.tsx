@@ -882,7 +882,22 @@ export default function OrcamentistaProDialog() {
                 <SelectContent>{EMPRESAS.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
               </Select>
             ))}
-            {field('Cliente', <Input value={cliente} onChange={e => setCliente(e.target.value)} placeholder="Nome do cliente" />)}
+            <div className="space-y-1.5">
+              <ClientPicker
+                clients={clientsList}
+                selectedId={clientId}
+                onSelect={handleSelectClient}
+                onClientCreated={(c) => setClientsList(prev => [...prev, c])}
+              />
+              {!clientId && (
+                <Input
+                  value={cliente}
+                  onChange={e => setCliente(e.target.value)}
+                  placeholder="Ou digite o nome sem cadastrar"
+                  className="h-9 text-xs"
+                />
+              )}
+            </div>
             {field('Margem de lucro desejada (%)', <Input inputMode="decimal" value={margemDesejada} onChange={e => setMargemDesejada(e.target.value)} placeholder="30" />)}
             {field('Prazo de produção (dias)', <Input inputMode="numeric" value={prazoDias} onChange={e => setPrazoDias(e.target.value)} placeholder="30" />)}
             {field('Custo operacional diário da equipe (R$)', <Input inputMode="decimal" value={custoDiario} onChange={e => setCustoDiario(e.target.value)} placeholder="450" />)}
