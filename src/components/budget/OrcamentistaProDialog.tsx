@@ -459,12 +459,14 @@ export default function OrcamentistaProDialog() {
       const user = auth?.user;
       if (!user) throw new Error('Sessão expirada. Faça login novamente.');
 
-      // Cliente: reaproveita se já existir pelo nome
-      let clientId: string | null = null;
-      const { data: found } = await supabase
-        .from('clients').select('id').ilike('name', cliente.trim()).limit(1).maybeSingle();
-      if (found?.id) clientId = found.id;
-      else {
+      // Cliente: usa o selecionado, senão reaproveita pelo nome ou cria
+      let clientIdFinal: string | null = clientId || null;
+      if (!clientIdFinal) {
+        const { data: found } = await supabase
+          .from('clients').select('id').ilike('name', cliente.trim()).limit(1).maybeSingle();
+        if (found?.id) clientIdFinal = found.id;
+      }
+      if (!clientIdFinal) {
         const { data: created } = await supabase
           .from('clients')
           .insert({ user_id: user.id, name: cliente.trim(), phone: '', city: cidade || null, state: estado || null })
