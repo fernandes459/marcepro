@@ -24,6 +24,7 @@ import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { TransactionDialog } from '@/components/finance/TransactionDialog';
 import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
+import BudgetReceiptsHistory from '@/components/finance/BudgetReceiptsHistory';
 import ReceivableDetailDialog from '@/components/finance/ReceivableDetailDialog';
 import PartialPaymentDialog from '@/components/finance/PartialPaymentDialog';
 import CollaboratorTab from '@/components/finance/CollaboratorTab';
@@ -86,7 +87,7 @@ const EXPENSE_COLORS = ['hsl(28, 85%, 56%)', 'hsl(0, 72%, 51%)', 'hsl(38, 92%, 5
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.06 } } };
 const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } };
 
-type Section = 'home' | 'lancamentos' | 'dre' | 'despesas' | 'vencer' | 'recebidos' | 'relatorio' | 'contas' | 'marcos' | 'colaboradores';
+type Section = 'home' | 'lancamentos' | 'dre' | 'despesas' | 'vencer' | 'recebidos' | 'relatorio' | 'contas' | 'marcos' | 'recebimentos' | 'colaboradores';
 
 export default function FinancePage() {
   const { user } = useAuth();
@@ -503,6 +504,7 @@ export default function FinancePage() {
     { id: 'relatorio' as Section, title: 'Relatório', icon: FileBarChart, value: String(clientProfitData.length), sub: 'clientes', color: 'text-info' },
     { id: 'contas' as Section, title: 'Contas', icon: Building2, value: formatBRL(totalBankBalance), sub: `${bankAccounts.length} conta(s)`, color: 'text-primary' },
     { id: 'marcos' as Section, title: 'Marcos', icon: Milestone, value: '—', sub: 'recebimentos', color: 'text-accent' },
+    { id: 'recebimentos' as Section, title: 'Recebimentos', icon: Receipt, value: '—', sub: 'por orçamento', color: 'text-success' },
     { id: 'colaboradores' as Section, title: 'Colaboradores', icon: Users, value: formatBRL(pendingWorkLogsTotal), sub: 'horas a pagar', color: 'text-info' },
   ];
   function renderSection() {
@@ -515,6 +517,7 @@ export default function FinancePage() {
       case 'relatorio': return renderRelatorio();
       case 'contas': return renderContas();
       case 'marcos': return <MilestoneReceivables />;
+      case 'recebimentos': return <BudgetReceiptsHistory />;
       case 'colaboradores':
         return (
           <CollaboratorTab
@@ -543,6 +546,7 @@ export default function FinancePage() {
       { id: 'despesas', label: 'Despesas', icon: PieChartIcon, onClick: () => setActiveSection('despesas') },
       { id: 'relatorio', label: 'Relatório', icon: FileBarChart, onClick: () => setActiveSection('relatorio') },
       { id: 'marcos', label: 'Marcos', icon: Milestone, onClick: () => setActiveSection('marcos') },
+      { id: 'recebimentos', label: 'Recebimentos', icon: Receipt, onClick: () => setActiveSection('recebimentos') },
       { id: 'colaboradores', label: 'Colaboradores', icon: Users, onClick: () => setActiveSection('colaboradores') },
       { id: 'lancamentos', label: 'Histórico', icon: Receipt, onClick: () => setActiveSection('lancamentos') },
     ];
