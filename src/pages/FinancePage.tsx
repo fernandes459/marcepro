@@ -24,6 +24,7 @@ import { formatBRL } from '@/lib/format';
 import { CurrencyInput } from '@/components/CurrencyInput';
 import { TransactionDialog } from '@/components/finance/TransactionDialog';
 import MilestoneReceivables from '@/components/finance/MilestoneReceivables';
+import BudgetReceiptsHistory from '@/components/finance/BudgetReceiptsHistory';
 import ReceivableDetailDialog from '@/components/finance/ReceivableDetailDialog';
 import PartialPaymentDialog from '@/components/finance/PartialPaymentDialog';
 import CollaboratorTab from '@/components/finance/CollaboratorTab';
