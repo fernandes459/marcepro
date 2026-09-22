@@ -7,12 +7,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ChevronDown, ChevronRight, CheckCircle2, Clock, CreditCard, Calendar,
-  FileText, User, History, Search, Receipt,
+  FileText, User, History, Search, Receipt, Printer,
 } from 'lucide-react';
 import Decimal from 'decimal.js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
+import { generateReceiptPdf } from './ReceiptPdfGenerator';
 
 interface PaymentRow {
   id: string;
@@ -54,6 +55,7 @@ interface BudgetGroup {
   code: string;
   project: string | null;
   clientName: string | null;
+  clientDoc: string | null;
   contratado: number;
   recebido: number;
   saldo: number;
@@ -71,15 +73,19 @@ export default function BudgetReceiptsHistory() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [txs, setTxs] = useState<TxRow[]>([]);
   const [budgets, setBudgets] = useState<BudgetLite[]>([]);
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string; cpf_cnpj: string | null }[]>([]);
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [company, setCompany] = useState<{
+    company_name: string | null; cnpj: string | null; city: string | null;
+    state: string | null; phone: string | null; email: string | null;
+  } | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'done'>('all');
   const [openKeys, setOpenKeys] = useState<Record<string, boolean>>({});
 
   async function fetchAll() {
     if (!user) return;
-    const [phRes, txRes, bRes, cRes, aRes] = await Promise.all([
+    const [phRes, txRes, bRes, cRes, aRes, csRes] = await Promise.all([
       supabase.from('payment_history').select('*').order('data', { ascending: false }),
       supabase
         .from('financial_transactions')
@@ -87,14 +93,16 @@ export default function BudgetReceiptsHistory() {
         .eq('type', 'income')
         .neq('status', 'cancelled'),
       supabase.from('budgets').select('id, code, project_name, client_id, final_price'),
-      supabase.from('clients').select('id, name'),
+      supabase.from('clients').select('id, name, cpf_cnpj'),
       supabase.from('bank_accounts').select('id, name'),
+      supabase.from('company_settings').select('company_name, cnpj, city, state, phone, email').maybeSingle(),
     ]);
     setPayments((phRes.data as any) || []);
     setTxs((txRes.data as any) || []);
     setBudgets((bRes.data as any) || []);
     setClients((cRes.data as any) || []);
     setAccounts((aRes.data as any) || []);
+    setCompany((csRes.data as any) || null);
     setLoading(false);
   }
 
@@ -164,6 +172,7 @@ export default function BudgetReceiptsHistory() {
         code: budget.code,
         project: budget.project_name,
         clientName,
+        clientDoc: budget.client_id ? clients.find(c => c.id === budget.client_id)?.cpf_cnpj || null : null,
         contratado: contratado.toNumber(),
         recebido: recebido.toNumber(),
         saldo: saldo.toNumber(),
@@ -349,7 +358,38 @@ export default function BudgetReceiptsHistory() {
                                         {acc && <span className="text-muted-foreground"> · {acc}</span>}
                                         {p.notes && <span className="text-muted-foreground block truncate">{p.notes}</span>}
                                       </div>
-                                      <span className="font-bold text-success whitespace-nowrap">{formatBRL(p.valor)}</span>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="font-bold text-success whitespace-nowrap">{formatBRL(p.valor)}</span>
+                                        <button
+                                          type="button"
+                                          title="Gerar recibo em PDF"
+                                          onClick={() => generateReceiptPdf({
+                                            receiptNumber: `${g.code}-${p.id.slice(0, 6).toUpperCase()}`,
+                                            clientName: g.clientName,
+                                            clientDoc: g.clientDoc,
+                                            budgetCode: g.code,
+                                            projectName: g.project,
+                                            installmentLabel: t.description,
+                                            amount: Number(p.valor),
+                                            date: p.data,
+                                            paymentMethod: p.forma_pagamento,
+                                            accountName: acc,
+                                            notes: p.notes,
+                                            contracted: g.contratado,
+                                            received: g.recebido,
+                                            remaining: g.saldo,
+                                            companyName: company?.company_name,
+                                            companyDoc: company?.cnpj,
+                                            companyCity: company?.city,
+                                            companyState: company?.state,
+                                            companyPhone: company?.phone,
+                                            companyEmail: company?.email,
+                                          })}
+                                          className="h-6 w-6 rounded flex items-center justify-center text-primary hover:bg-primary/10"
+                                        >
+                                          <Printer className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 })}
