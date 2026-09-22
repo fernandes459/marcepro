@@ -7,12 +7,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ChevronDown, ChevronRight, CheckCircle2, Clock, CreditCard, Calendar,
-  FileText, User, History, Search, Receipt,
+  FileText, User, History, Search, Receipt, Printer,
 } from 'lucide-react';
 import Decimal from 'decimal.js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatBRL } from '@/lib/format';
+import { generateReceiptPdf } from './ReceiptPdfGenerator';
 
 interface PaymentRow {
   id: string;
