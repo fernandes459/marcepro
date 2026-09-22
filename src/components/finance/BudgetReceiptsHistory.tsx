@@ -73,15 +73,19 @@ export default function BudgetReceiptsHistory() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [txs, setTxs] = useState<TxRow[]>([]);
   const [budgets, setBudgets] = useState<BudgetLite[]>([]);
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string; cpf_cnpj: string | null }[]>([]);
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [company, setCompany] = useState<{
+    company_name: string | null; cnpj: string | null; city: string | null;
+    state: string | null; phone: string | null; email: string | null;
+  } | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'done'>('all');
   const [openKeys, setOpenKeys] = useState<Record<string, boolean>>({});
 
   async function fetchAll() {
     if (!user) return;
-    const [phRes, txRes, bRes, cRes, aRes] = await Promise.all([
+    const [phRes, txRes, bRes, cRes, aRes, csRes] = await Promise.all([
       supabase.from('payment_history').select('*').order('data', { ascending: false }),
       supabase
         .from('financial_transactions')
@@ -89,14 +93,16 @@ export default function BudgetReceiptsHistory() {
         .eq('type', 'income')
         .neq('status', 'cancelled'),
       supabase.from('budgets').select('id, code, project_name, client_id, final_price'),
-      supabase.from('clients').select('id, name'),
+      supabase.from('clients').select('id, name, cpf_cnpj'),
       supabase.from('bank_accounts').select('id, name'),
+      supabase.from('company_settings').select('company_name, cnpj, city, state, phone, email').maybeSingle(),
     ]);
     setPayments((phRes.data as any) || []);
     setTxs((txRes.data as any) || []);
     setBudgets((bRes.data as any) || []);
     setClients((cRes.data as any) || []);
     setAccounts((aRes.data as any) || []);
+    setCompany((csRes.data as any) || null);
     setLoading(false);
   }
 
