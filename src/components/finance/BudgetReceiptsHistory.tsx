@@ -55,6 +55,7 @@ interface BudgetGroup {
   code: string;
   project: string | null;
   clientName: string | null;
+  clientDoc: string | null;
   contratado: number;
   recebido: number;
   saldo: number;
