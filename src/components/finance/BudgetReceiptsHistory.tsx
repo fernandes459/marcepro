@@ -165,6 +165,7 @@ export default function BudgetReceiptsHistory() {
         code: budget.code,
         project: budget.project_name,
         clientName,
+        clientDoc: budget.client_id ? clients.find(c => c.id === budget.client_id)?.cpf_cnpj || null : null,
         contratado: contratado.toNumber(),
         recebido: recebido.toNumber(),
         saldo: saldo.toNumber(),
