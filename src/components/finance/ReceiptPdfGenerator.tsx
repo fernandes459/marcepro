@@ -83,7 +83,6 @@ function renderReceipt(d: ReceiptPdfData): string {
     ...(d.installmentLabel ? [['Referente a', esc(d.installmentLabel)]] as [string, string][] : []),
     ['Data do pagamento', fmtDate(d.date)],
     ['Forma de pagamento', esc(d.paymentMethod || 'Não informada')],
-    ...(d.accountName ? [['Conta de destino', esc(d.accountName)]] as [string, string][] : []),
   ];
 
   const saldoBlock = (d.contracted != null || d.remaining != null) ? `
