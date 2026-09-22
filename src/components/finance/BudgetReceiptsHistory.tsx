@@ -350,7 +350,38 @@ export default function BudgetReceiptsHistory() {
                                         {acc && <span className="text-muted-foreground"> · {acc}</span>}
                                         {p.notes && <span className="text-muted-foreground block truncate">{p.notes}</span>}
                                       </div>
-                                      <span className="font-bold text-success whitespace-nowrap">{formatBRL(p.valor)}</span>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="font-bold text-success whitespace-nowrap">{formatBRL(p.valor)}</span>
+                                        <button
+                                          type="button"
+                                          title="Gerar recibo em PDF"
+                                          onClick={() => generateReceiptPdf({
+                                            receiptNumber: `${g.code}-${p.id.slice(0, 6).toUpperCase()}`,
+                                            clientName: g.clientName,
+                                            clientDoc: g.clientDoc,
+                                            budgetCode: g.code,
+                                            projectName: g.project,
+                                            installmentLabel: t.description,
+                                            amount: Number(p.valor),
+                                            date: p.data,
+                                            paymentMethod: p.forma_pagamento,
+                                            accountName: acc,
+                                            notes: p.notes,
+                                            contracted: g.contratado,
+                                            received: g.recebido,
+                                            remaining: g.saldo,
+                                            companyName: company?.company_name,
+                                            companyDoc: company?.cnpj,
+                                            companyCity: company?.city,
+                                            companyState: company?.state,
+                                            companyPhone: company?.phone,
+                                            companyEmail: company?.email,
+                                          })}
+                                          className="h-6 w-6 rounded flex items-center justify-center text-primary hover:bg-primary/10"
+                                        >
+                                          <Printer className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 })}
