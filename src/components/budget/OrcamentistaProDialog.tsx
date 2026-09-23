@@ -79,6 +79,7 @@ export default function OrcamentistaProDialog() {
   const [comissao, setComissao] = useState('0');
   const [montador, setMontador] = useState('0');
   const [impostos, setImpostos] = useState('0');
+  const [cartao, setCartao] = useState('0');
   const [frete, setFrete] = useState('0');
   const [perda, setPerda] = useState('15');
   const [socios, setSocios] = useState<Socio[]>([{ nome: '', percentual: 50 }, { nome: '', percentual: 50 }]);
@@ -122,11 +123,12 @@ export default function OrcamentistaProDialog() {
       comissaoPct: n(comissao),
       montadorPct: n(montador),
       impostosPct: n(impostos),
+      cartaoPct: n(cartao),
       margemPct: n(margemDesejada),
     });
-  }, [result, isFW, custoDiario, prazoDias, frete, comissao, montador, impostos, margemDesejada]);
+  }, [result, isFW, custoDiario, prazoDias, frete, comissao, montador, impostos, cartao, margemDesejada]);
 
-  const varPct = n(comissao) + n(montador) + n(impostos);
+  const varPct = n(comissao) + n(montador) + n(impostos) + n(cartao);
 
   /** Faixas de preço recalculadas com a mesma engine (mínimo 15%, ideal, premium +20 p.p.). */
   const tiers = useMemo(() => {
@@ -365,7 +367,7 @@ export default function OrcamentistaProDialog() {
         margemDesejada: n(margemDesejada), prazoDias: n(prazoDias),
         custoDiarioEquipe: n(custoDiario), funcionarios: n(funcionarios),
         cidade, estado, padrao, material,
-        comissaoVendedor: n(comissao), montadorPct: n(montador), impostosPct: n(impostos),
+        comissaoVendedor: n(comissao), montadorPct: n(montador), impostosPct: n(impostos), taxaCartaoPct: n(cartao),
         freteInstalacao: n(frete), perdaTecnicaPct: n(perda),
         socios: isFW ? socios.filter(s => s.nome.trim()) : [],
       },
@@ -583,6 +585,7 @@ export default function OrcamentistaProDialog() {
         <div class="kpi"><span>Comissão vendedor</span><b>${formatBRL(costs?.comissao || 0)}</b></div>
         <div class="kpi"><span>Montagem/instalação</span><b>${formatBRL(costs?.montador || 0)}</b></div>
         <div class="kpi"><span>Impostos</span><b>${formatBRL(costs?.impostos || 0)}</b></div>
+        <div class="kpi"><span>Taxa cartão</span><b>${formatBRL(costs?.cartao || 0)}</b></div>
         <div class="kpi"><span>Custo total</span><b>${formatBRL(costs?.custoTotal || 0)}</b></div>
         <div class="kpi"><span>Venda</span><b>${formatBRL(vendaOf(r))}</b></div>
         <div class="kpi"><span>Lucro líquido</span><b>${formatBRL(costs?.lucroLiquido || 0)}</b></div>
@@ -725,6 +728,7 @@ export default function OrcamentistaProDialog() {
       ['Comissão do vendedor', n(comissao) / 100],
       ['Comissão do montador / instalação', n(montador) / 100],
       ['Impostos sobre a venda', n(impostos) / 100],
+      ['Taxa de cartão de crédito', n(cartao) / 100],
       ['Estrutura de marcenaria (s/ material)', isFW ? 0.1 : 0],
       ['Overhead operacional (s/ material)', 0.07],
       ['Custo diário da equipe (R$)', n(custoDiario)],
@@ -921,6 +925,7 @@ export default function OrcamentistaProDialog() {
             {field('Comissão do vendedor (%)', <Input inputMode="decimal" value={comissao} onChange={e => setComissao(e.target.value)} placeholder="5" />)}
             {field('Comissão do montador / instalador (%)', <Input inputMode="decimal" value={montador} onChange={e => setMontador(e.target.value)} placeholder="8" />)}
             {field('Impostos sobre a venda (%)', <Input inputMode="decimal" value={impostos} onChange={e => setImpostos(e.target.value)} placeholder="6" />)}
+            {field('Taxa de cartão de crédito (%)', <Input inputMode="decimal" value={cartao} onChange={e => setCartao(e.target.value)} placeholder="4.5" />)}
             {field('Frete / instalação (R$)', <Input inputMode="decimal" value={frete} onChange={e => setFrete(e.target.value)} placeholder="800" />)}
             {field('Perda técnica de chapas (%)', <Input inputMode="decimal" value={perda} onChange={e => setPerda(e.target.value)} placeholder="15" />)}
           </div>
@@ -1116,6 +1121,7 @@ export default function OrcamentistaProDialog() {
                             { nome: 'Comissão vend.', valor: costs.comissao },
                             { nome: 'Montador', valor: costs.montador },
                             { nome: 'Impostos', valor: costs.impostos },
+                            { nome: 'Taxa cartão', valor: costs.cartao },
                           ].filter(d => d.valor > 0)}
                           margin={{ left: 8, right: 16 }}
                         >
@@ -1172,6 +1178,7 @@ export default function OrcamentistaProDialog() {
                       [`Comissão do vendedor (${n(comissao)}%)`, costs.comissao],
                       [`Comissão do montador (${n(montador)}%)`, costs.montador],
                       [`Impostos (${n(impostos)}%)`, costs.impostos],
+                      [`Taxa cartão (${n(cartao)}%)`, costs.cartao],
                       ['CUSTO TOTAL', costs.custoTotal],
                     ].map(([label, value]) => (
                       <div key={String(label)} className="flex items-center justify-between py-1.5">

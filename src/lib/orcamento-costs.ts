@@ -6,7 +6,7 @@ import Decimal from 'decimal.js';
  * Regras:
  *  - Custo direto  = material + ferragens + estrutura (10% s/ material, só FW)
  *                    + mão de obra (custo diário × dias) + overhead (7% s/ material) + frete/instalação
- *  - Custos variáveis (comissão do vendedor, comissão do montador/instalador e impostos)
+ *  - Custos variáveis (comissão do vendedor, comissão do montador/instalador, impostos e taxa de cartão)
  *    incidem sobre o VALOR DE VENDA — por isso o preço é calculado por markup dividido:
  *      venda = custo_direto × (1 + margem) / (1 − (comissão + montador + impostos))
  *    garantindo que a margem desejada sobre o custo seja preservada DEPOIS dos variáveis.
@@ -25,6 +25,7 @@ export interface CostInputs {
   comissaoPct: number;
   montadorPct: number;
   impostosPct: number;
+  cartaoPct: number;          // taxa de cartão de crédito repassada no preço
   margemPct: number;
 }
 
@@ -39,6 +40,7 @@ export interface CostBreakdown {
   comissao: number;
   montador: number;
   impostos: number;
+  cartao: number;
   variaveis: number;
   custoTotal: number;
   venda: number;
@@ -67,13 +69,14 @@ export function computeCosts(i: CostInputs): CostBreakdown {
   const frete = d(i.frete);
 
   const custoDireto = baseMat.plus(estrutura).plus(maoObra).plus(overhead).plus(frete);
-  const varPct = d(i.comissaoPct).plus(d(i.montadorPct)).plus(d(i.impostosPct));
+  const varPct = d(i.comissaoPct).plus(d(i.montadorPct)).plus(d(i.impostosPct)).plus(d(i.cartaoPct));
 
   const venda = d(vendaForMargin(custoDireto.toNumber(), i.margemPct, varPct.toNumber()));
   const comissao = venda.times(d(i.comissaoPct).div(100));
   const montador = venda.times(d(i.montadorPct).div(100));
   const impostos = venda.times(d(i.impostosPct).div(100));
-  const variaveis = comissao.plus(montador).plus(impostos);
+  const cartao = venda.times(d(i.cartaoPct).div(100));
+  const variaveis = comissao.plus(montador).plus(impostos).plus(cartao);
   const custoTotal = custoDireto.plus(variaveis);
   const lucro = venda.minus(custoTotal);
 
@@ -88,6 +91,7 @@ export function computeCosts(i: CostInputs): CostBreakdown {
     comissao: comissao.toNumber(),
     montador: montador.toNumber(),
     impostos: impostos.toNumber(),
+    cartao: cartao.toNumber(),
     variaveis: variaveis.toNumber(),
     custoTotal: custoTotal.toNumber(),
     venda: venda.toNumber(),
