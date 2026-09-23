@@ -226,6 +226,7 @@ export default function OrcamentistaProDialog() {
         setIf(byLabel('comissão do vendedor'), setComissao, true);
         setIf(byLabel('comissão do montador'), setMontador, true);
         setIf(byLabel('imposto'), setImpostos, true);
+        setIf(byLabel('taxa de cart'), setCartao, true);
         setIf(byLabel('custo diário'), setCustoDiario);
         setIf(byLabel('dias de produção'), setPrazoDias);
         const fr = byLabel('frete');
