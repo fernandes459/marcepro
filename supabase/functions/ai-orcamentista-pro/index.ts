@@ -139,12 +139,16 @@ async function callGeminiDirect(
   });
 
   let lastErr = 'Gemini indisponível';
+  const deadline = Date.now() + 70_000;
   for (const model of GEMINI_MODELS) {
+    if (Date.now() > deadline - 10_000) break;
     for (let attempt = 0; attempt < 2; attempt++) {
       const resp = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body },
-      );
+        { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body,
+          signal: AbortSignal.timeout(Math.max(5_000, deadline - Date.now())) },
+      ).catch((e) => { lastErr = `Gemini timeout/erro de rede: ${e?.message || e}`; return null; });
+      if (!resp) break;
 
       if (resp.ok) {
         const data = await resp.json();
@@ -273,8 +277,9 @@ ${payload.notes?.trim() || '(nenhuma — extraia tudo dos arquivos anexos)'}`;
       const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(75_000),
         body: JSON.stringify({
-          model: 'google/gemini-3.6-flash',
+          model: 'google/gemini-2.5-flash',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content },
@@ -302,7 +307,7 @@ ${payload.notes?.trim() || '(nenhuma — extraia tudo dos arquivos anexos)'}`;
 
       const data = await resp.json();
       raw = data?.choices?.[0]?.message?.content ?? '{}';
-      usedModel = 'google/gemini-3.6-flash';
+      usedModel = 'google/gemini-2.5-flash';
     }
 
     let parsed: any = {};
@@ -313,7 +318,8 @@ ${payload.notes?.trim() || '(nenhuma — extraia tudo dos arquivos anexos)'}`;
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    let msg = err instanceof Error ? err.message : String(err);
+    if (/timeout|aborted/i.test(msg)) msg = 'A IA demorou demais para responder. Tente novamente ou envie imagens menores/menos arquivos.';
     console.error('ai-orcamentista-pro error:', msg);
     return new Response(JSON.stringify({ error: msg }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
