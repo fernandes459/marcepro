@@ -158,6 +158,7 @@ export default function BudgetWizardDialog({
   const [installments, setInstallments] = useState(1);
   const [installmentMethod, setInstallmentMethod] = useState('credit');
   const [cardFeePercent, setCardFeePercent] = useState(0);
+  const [cardFeeInPrice, setCardFeeInPrice] = useState(false);
   const [clientDescription, setClientDescription] = useState('');
 
   // Reset / Load on open
@@ -195,7 +196,7 @@ export default function BudgetWizardDialog({
     setMargin(Number(companySettings?.default_margin ?? 40));
     setDiscountPct(0); setComplexityFactor('1.0'); setFinishType('branco'); setMaterialMultiplier(1);
     setUseAdvancedPayment(false); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT);
-    setDownPayment(0); setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0);
+    setDownPayment(0); setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0); setCardFeeInPrice(false);
     setClientDescription('');
   }
 
@@ -241,6 +242,7 @@ export default function BudgetWizardDialog({
       setInstallments(Number(meta.installments) || 1);
       setInstallmentMethod(meta.installmentMethod || 'credit');
       setCardFeePercent(Number(meta.cardFeePercent) || 0);
+      setCardFeeInPrice(!!meta.cardFeeInPrice);
     } else {
       setUseAdvancedPayment(false);
       setSimplePaymentMethod(b.payment_method || DEFAULT_PAYMENT_TEXT);
@@ -291,8 +293,14 @@ export default function BudgetWizardDialog({
     const totalCost = baseCost.times(cMul).times(fMul).plus(overhead);
     const profit = totalCost.times(D(margin).div(100));
     const priceBeforeDiscount = totalCost.plus(profit);
-    const finalPrice = priceBeforeDiscount.times(D(1).minus(D(discountPct).div(100)));
-    const realProfit = finalPrice.minus(totalCost);
+    const priceAfterDiscount = priceBeforeDiscount.times(D(1).minus(D(discountPct).div(100)));
+    // Taxa do cartão de crédito embutida no preço (repassada ao cliente)
+    const feePct = cardFeeInPrice ? D(cardFeePercent).div(100) : D(0);
+    const finalPrice = feePct.gt(0) && feePct.lt(0.9)
+      ? priceAfterDiscount.div(D(1).minus(feePct))
+      : priceAfterDiscount;
+    const cardFeeInPriceAmount = finalPrice.minus(priceAfterDiscount);
+    const realProfit = finalPrice.minus(totalCost).minus(cardFeeInPriceAmount);
     const realMarginPct = totalCost.gt(0) ? realProfit.div(totalCost).times(100) : D(0);
     const minMargin = Number(companySettings?.min_margin ?? 20);
     return {
@@ -305,6 +313,8 @@ export default function BudgetWizardDialog({
       totalCost: totalCost.toNumber(),
       profit: profit.toNumber(),
       priceBeforeDiscount: priceBeforeDiscount.toNumber(),
+      priceAfterDiscount: priceAfterDiscount.toNumber(),
+      cardFeeInPriceAmount: cardFeeInPriceAmount.toNumber(),
       finalPrice: finalPrice.toNumber(),
       realProfit: realProfit.toNumber(),
       realMarginPct: realMarginPct.toNumber(),
@@ -313,7 +323,7 @@ export default function BudgetWizardDialog({
     };
   }, [items, useParametric, moduleResult, extraTaxes, extraFreight, extraOther,
       complexityFactor, finishType, includeOverhead, overheadPerProject,
-      margin, discountPct, companySettings, materialMultiplier]);
+      margin, discountPct, companySettings, materialMultiplier, cardFeeInPrice, cardFeePercent]);
 
   // payment per environment (rateado)
   const envSubtotals = useMemo(() => {
@@ -334,7 +344,7 @@ export default function BudgetWizardDialog({
 
   const remaining = calc.finalPrice - downPayment;
   const cardFeeAmount = remaining * (cardFeePercent / 100);
-  const totalWithFee = remaining + (installmentMethod === 'credit' ? cardFeeAmount : 0);
+  const totalWithFee = remaining + (installmentMethod === 'credit' && !cardFeeInPrice ? cardFeeAmount : 0);
   const installmentValue = installments > 0 ? totalWithFee / installments : 0;
 
   // ========= ITEM HELPERS =========
@@ -419,7 +429,7 @@ export default function BudgetWizardDialog({
     const meta = {
       extraTaxes, extraFreight, extraOther, discountPct,
       useAdvancedPayment, downPayment, downPaymentMethod,
-      installments, installmentMethod, cardFeePercent,
+      installments, installmentMethod, cardFeePercent, cardFeeInPrice,
       includeOverhead, environments, clientDescription,
       clientNotes, projectDate,
       useParametric, modules, mdfPricePerM2, edgeTapePricePerM,
@@ -1124,6 +1134,28 @@ export default function BudgetWizardDialog({
                       )}
                     </div>
 
+                    <div className="border-t border-border/60 pt-4 space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label className="text-sm font-semibold">Taxa de cartão de crédito no preço</Label>
+                        <Switch checked={cardFeeInPrice} onCheckedChange={setCardFeeInPrice} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number" step="0.1" min={0}
+                          value={cardFeePercent || ''}
+                          onChange={e => setCardFeePercent(Number(e.target.value))}
+                          placeholder="4.5" className="h-10 w-28"
+                          disabled={!cardFeeInPrice}
+                        />
+                        <span className="text-xs text-muted-foreground">% sobre o valor de venda</span>
+                      </div>
+                      {cardFeeInPrice && cardFeePercent > 0 && (
+                        <p className="text-[11px] text-muted-foreground">
+                          Taxa repassada: <span className="text-destructive font-semibold">+{formatBRL(calc.cardFeeInPriceAmount)}</span> — o lucro fica preservado.
+                        </p>
+                      )}
+                    </div>
+
                     <div className="border-t border-border/60 pt-4">
                       <AISuggestPricing
                         totalCost={calc.totalCost}
@@ -1203,7 +1235,7 @@ export default function BudgetWizardDialog({
                         <div className="rounded-lg bg-muted/40 p-3 space-y-1 text-sm">
                           {downPayment > 0 && <Row label="Entrada" value={formatBRL(downPayment)} />}
                           <Row label="Saldo" value={formatBRL(remaining)} />
-                          {installmentMethod === 'credit' && cardFeePercent > 0 && (
+                          {installmentMethod === 'credit' && cardFeePercent > 0 && !cardFeeInPrice && (
                             <Row label="+ Taxa cartão" value={formatBRL(cardFeeAmount)} valueClass="text-destructive" />
                           )}
                           <div className="flex justify-between border-t border-border/60 pt-1 font-semibold">

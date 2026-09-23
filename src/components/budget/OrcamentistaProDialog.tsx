@@ -79,6 +79,7 @@ export default function OrcamentistaProDialog() {
   const [comissao, setComissao] = useState('0');
   const [montador, setMontador] = useState('0');
   const [impostos, setImpostos] = useState('0');
+  const [cartao, setCartao] = useState('0');
   const [frete, setFrete] = useState('0');
   const [perda, setPerda] = useState('15');
   const [socios, setSocios] = useState<Socio[]>([{ nome: '', percentual: 50 }, { nome: '', percentual: 50 }]);
@@ -122,11 +123,12 @@ export default function OrcamentistaProDialog() {
       comissaoPct: n(comissao),
       montadorPct: n(montador),
       impostosPct: n(impostos),
+      cartaoPct: n(cartao),
       margemPct: n(margemDesejada),
     });
-  }, [result, isFW, custoDiario, prazoDias, frete, comissao, montador, impostos, margemDesejada]);
+  }, [result, isFW, custoDiario, prazoDias, frete, comissao, montador, impostos, cartao, margemDesejada]);
 
-  const varPct = n(comissao) + n(montador) + n(impostos);
+  const varPct = n(comissao) + n(montador) + n(impostos) + n(cartao);
 
   /** Faixas de preço recalculadas com a mesma engine (mínimo 15%, ideal, premium +20 p.p.). */
   const tiers = useMemo(() => {
@@ -224,6 +226,7 @@ export default function OrcamentistaProDialog() {
         setIf(byLabel('comissão do vendedor'), setComissao, true);
         setIf(byLabel('comissão do montador'), setMontador, true);
         setIf(byLabel('imposto'), setImpostos, true);
+        setIf(byLabel('taxa de cart'), setCartao, true);
         setIf(byLabel('custo diário'), setCustoDiario);
         setIf(byLabel('dias de produção'), setPrazoDias);
         const fr = byLabel('frete');
@@ -365,7 +368,7 @@ export default function OrcamentistaProDialog() {
         margemDesejada: n(margemDesejada), prazoDias: n(prazoDias),
         custoDiarioEquipe: n(custoDiario), funcionarios: n(funcionarios),
         cidade, estado, padrao, material,
-        comissaoVendedor: n(comissao), montadorPct: n(montador), impostosPct: n(impostos),
+        comissaoVendedor: n(comissao), montadorPct: n(montador), impostosPct: n(impostos), taxaCartaoPct: n(cartao),
         freteInstalacao: n(frete), perdaTecnicaPct: n(perda),
         socios: isFW ? socios.filter(s => s.nome.trim()) : [],
       },
@@ -583,6 +586,7 @@ export default function OrcamentistaProDialog() {
         <div class="kpi"><span>Comissão vendedor</span><b>${formatBRL(costs?.comissao || 0)}</b></div>
         <div class="kpi"><span>Montagem/instalação</span><b>${formatBRL(costs?.montador || 0)}</b></div>
         <div class="kpi"><span>Impostos</span><b>${formatBRL(costs?.impostos || 0)}</b></div>
+        <div class="kpi"><span>Taxa cartão</span><b>${formatBRL(costs?.cartao || 0)}</b></div>
         <div class="kpi"><span>Custo total</span><b>${formatBRL(costs?.custoTotal || 0)}</b></div>
         <div class="kpi"><span>Venda</span><b>${formatBRL(vendaOf(r))}</b></div>
         <div class="kpi"><span>Lucro líquido</span><b>${formatBRL(costs?.lucroLiquido || 0)}</b></div>
@@ -712,9 +716,10 @@ export default function OrcamentistaProDialog() {
     const FER = `FERRAGENS!D${ferrTotalRow}`;
 
     /* ---------- 3. CUSTOS (motor de cálculo, tudo editável) ---------- */
-    // Parâmetros: B3 margem, B4 comissão, B5 montador, B6 impostos, B7 estrutura, B8 overhead,
-    // B9 custo diário, B10 dias, B11 frete. Custos: B14..B20. Variáveis: B23..B26. B28 total, B30 venda.
-    const VARS = '(CUSTOS!$B$4+CUSTOS!$B$5+CUSTOS!$B$6)';
+    // Parâmetros: B3 margem, B4 comissão, B5 montador, B6 impostos, B7 taxa cartão, B8 estrutura,
+    // B9 overhead, B10 custo diário, B11 dias, B12 frete. Custos diretos: B15..B21.
+    // Variáveis: B24..B28. B30 custo total, B32 preço de venda, B33 lucro.
+    const VARS = '(CUSTOS!$B$4+CUSTOS!$B$5+CUSTOS!$B$6+CUSTOS!$B$7)';
     const pctOf = (row: number) => ({ f: `IF($B$28=0,0,B${row}/$B$28)`, t: 'n' } as any);
     const bar = (row: number) => ({ f: `REPT("|",ROUND(C${row}*60,0))` } as any);
 
@@ -725,6 +730,7 @@ export default function OrcamentistaProDialog() {
       ['Comissão do vendedor', n(comissao) / 100],
       ['Comissão do montador / instalação', n(montador) / 100],
       ['Impostos sobre a venda', n(impostos) / 100],
+      ['Taxa de cartão de crédito', n(cartao) / 100],
       ['Estrutura de marcenaria (s/ material)', isFW ? 0.1 : 0],
       ['Overhead operacional (s/ material)', 0.07],
       ['Custo diário da equipe (R$)', n(custoDiario)],
@@ -732,40 +738,41 @@ export default function OrcamentistaProDialog() {
       ['Frete / instalação (R$)', n(frete)],
       [],
       ['CUSTOS DIRETOS', 'Valor (R$)', '% do custo', 'Peso'],
-      ['Material (chapas e insumos)', { f: MAT, t: 'n' }, pctOf(14), bar(14)],
-      ['Ferragens e acessórios', { f: FER, t: 'n' }, pctOf(15), bar(15)],
-      ['Estrutura de marcenaria', { f: '(B14+B15)*B7', t: 'n' }, pctOf(16), bar(16)],
-      ['Mão de obra (dias × custo diário)', { f: 'B9*B10', t: 'n' }, pctOf(17), bar(17)],
-      ['Overhead operacional', { f: '(B14+B15)*B8', t: 'n' }, pctOf(18), bar(18)],
-      ['Frete / instalação', { f: 'B11', t: 'n' }, pctOf(19), bar(19)],
-      ['SUBTOTAL CUSTO DIRETO', { f: 'SUM(B14:B19)', t: 'n' }, pctOf(20)],
+      ['Material (chapas e insumos)', { f: MAT, t: 'n' }, pctOf(15), bar(15)],
+      ['Ferragens e acessórios', { f: FER, t: 'n' }, pctOf(16), bar(16)],
+      ['Estrutura de marcenaria', { f: '(B15+B16)*B8', t: 'n' }, pctOf(17), bar(17)],
+      ['Mão de obra (dias × custo diário)', { f: 'B10*B11', t: 'n' }, pctOf(18), bar(18)],
+      ['Overhead operacional', { f: '(B15+B16)*B9', t: 'n' }, pctOf(19), bar(19)],
+      ['Frete / instalação', { f: 'B12', t: 'n' }, pctOf(20), bar(20)],
+      ['SUBTOTAL CUSTO DIRETO', { f: 'SUM(B15:B20)', t: 'n' }, pctOf(21)],
       [],
       ['CUSTOS VARIÁVEIS (incidem sobre a venda)', 'Valor (R$)', '% do custo', 'Peso'],
-      ['Comissão do vendedor', { f: 'B30*B4', t: 'n' }, pctOf(23), bar(23)],
-      ['Comissão do montador / instalação', { f: 'B30*B5', t: 'n' }, pctOf(24), bar(24)],
-      ['Impostos', { f: 'B30*B6', t: 'n' }, pctOf(25), bar(25)],
-      ['SUBTOTAL VARIÁVEIS', { f: 'SUM(B23:B25)', t: 'n' }, pctOf(26)],
+      ['Comissão do vendedor', { f: 'B32*B4', t: 'n' }, pctOf(24), bar(24)],
+      ['Comissão do montador / instalação', { f: 'B32*B5', t: 'n' }, pctOf(25), bar(25)],
+      ['Impostos', { f: 'B32*B6', t: 'n' }, pctOf(26), bar(26)],
+      ['Taxa de cartão de crédito', { f: 'B32*B7', t: 'n' }, pctOf(27), bar(27)],
+      ['SUBTOTAL VARIÁVEIS', { f: 'SUM(B24:B27)', t: 'n' }, pctOf(28)],
       [],
-      ['CUSTO TOTAL DO PROJETO', { f: 'B20+B26', t: 'n' }],
+      ['CUSTO TOTAL DO PROJETO', { f: 'B21+B28', t: 'n' }],
       [],
-      ['PREÇO DE VENDA', { f: `B20*(1+B3)/(1-${VARS})`, t: 'n' }],
-      ['LUCRO LÍQUIDO', { f: 'B30-B28', t: 'n' }],
-      ['Margem sobre a venda', { f: 'IF(B30=0,0,B31/B30)', t: 'n' }],
-      ['Margem sobre o custo', { f: 'IF(B28=0,0,B31/B28)', t: 'n' }],
+      ['PREÇO DE VENDA', { f: `B21*(1+B3)/(1-${VARS})`, t: 'n' }],
+      ['LUCRO LÍQUIDO', { f: 'B32-B30', t: 'n' }],
+      ['Margem sobre a venda', { f: 'IF(B32=0,0,B33/B32)', t: 'n' }],
+      ['Margem sobre o custo', { f: 'IF(B30=0,0,B33/B30)', t: 'n' }],
       [],
-      ['Conferência', { f: 'IF(ROUND(B30-B28-B31,2)=0,"OK — números fechados","⚠ revisar")' }],
+      ['Conferência', { f: 'IF(ROUND(B32-B30-B33,2)=0,"OK — números fechados","⚠ revisar")' }],
     ], {
       widths: [42, 20, 14, 26],
       formats: { B: BRL, C: PCT },
-      cells: { B3: PCT, B4: PCT, B5: PCT, B6: PCT, B7: PCT, B8: PCT, B10: NUM, B32: PCT, B33: PCT },
+      cells: { B3: PCT, B4: PCT, B5: PCT, B6: PCT, B7: PCT, B8: PCT, B9: PCT, B11: NUM, B34: PCT, B35: PCT },
       merges: ['A1:D1', 'A2:D2'],
     });
 
     /* ---------- 4. PREÇOS ---------- */
     const priceRow = (label: string, margem: string, row: number) => [
       label,
-      { f: `CUSTOS!$B$20*(1+${margem})/(1-${VARS})`, t: 'n' },
-      { f: `B${row}-CUSTOS!$B$20-B${row}*${VARS}`, t: 'n' },
+      { f: `CUSTOS!$B$21*(1+${margem})/(1-${VARS})`, t: 'n' },
+      { f: `B${row}-CUSTOS!$B$21-B${row}*${VARS}`, t: 'n' },
       { f: `IF(B${row}=0,0,C${row}/B${row})`, t: 'n' },
       { f: `IF(${area}=0,"—",B${row}/${area})`, t: 'n' },
     ];
@@ -786,7 +793,7 @@ export default function OrcamentistaProDialog() {
       ['Método mais rentável', r.analise_m2?.metodo_mais_rentavel || '—'],
       [],
       ['Justificativa da IA', r.recomendacao_comercial?.justificativa || '—'],
-      ['Alerta', { f: 'IF(B3<CUSTOS!$B$28,"⚠ preço mínimo abaixo do custo total","Todas as faixas cobrem o custo total")' }],
+      ['Alerta', { f: 'IF(B3<CUSTOS!$B$30,"⚠ preço mínimo abaixo do custo total","Todas as faixas cobrem o custo total")' }],
     ], {
       widths: [40, 20, 22, 18, 16],
       formats: { B: BRL, C: BRL, D: PCT, E: BRL },
@@ -807,12 +814,12 @@ export default function OrcamentistaProDialog() {
       ['Funcionários no projeto', n(funcionarios)],
       [],
       ['INDICADORES', 'Valor'],
-      ['Custo direto', { f: 'CUSTOS!B20', t: 'n' }],
-      ['Custos variáveis (comissões + impostos)', { f: 'CUSTOS!B26', t: 'n' }],
-      ['Custo total', { f: 'CUSTOS!B28', t: 'n' }],
-      ['Preço de venda', { f: 'CUSTOS!B30', t: 'n' }],
-      ['Lucro líquido', { f: 'CUSTOS!B31', t: 'n' }],
-      ['Margem sobre a venda', { f: 'CUSTOS!B32', t: 'n' }],
+      ['Custo direto', { f: 'CUSTOS!B21', t: 'n' }],
+      ['Custos variáveis (comissões + impostos + cartão)', { f: 'CUSTOS!B28', t: 'n' }],
+      ['Custo total', { f: 'CUSTOS!B30', t: 'n' }],
+      ['Preço de venda', { f: 'CUSTOS!B32', t: 'n' }],
+      ['Lucro líquido', { f: 'CUSTOS!B33', t: 'n' }],
+      ['Margem sobre a venda', { f: 'CUSTOS!B34', t: 'n' }],
       [],
       ['LEVANTAMENTO TÉCNICO', 'Valor'],
       ['Área total (m²)', area],
@@ -843,7 +850,7 @@ export default function OrcamentistaProDialog() {
       sheet('SOCIOS', [
         ['DIVISÃO DE SÓCIOS — SOBRE O LUCRO LÍQUIDO'],
         ['Sócio', 'Participação', 'Valor (R$)'],
-        ...ss.map((s: any, i: number) => [s.nome || `Sócio ${i + 1}`, n(s.participacao_pct) / 100, { f: `CUSTOS!$B$31*B${i + 3}`, t: 'n' }]),
+        ...ss.map((s: any, i: number) => [s.nome || `Sócio ${i + 1}`, n(s.participacao_pct) / 100, { f: `CUSTOS!$B$33*B${i + 3}`, t: 'n' }]),
         [],
         ['TOTAL DISTRIBUÍDO', { f: `SUM(B3:B${ss.length + 2})`, t: 'n' }, { f: `SUM(C3:C${ss.length + 2})`, t: 'n' }],
       ], { widths: [32, 16, 20], formats: { B: PCT, C: BRL }, merges: ['A1:C1'] });
@@ -921,6 +928,7 @@ export default function OrcamentistaProDialog() {
             {field('Comissão do vendedor (%)', <Input inputMode="decimal" value={comissao} onChange={e => setComissao(e.target.value)} placeholder="5" />)}
             {field('Comissão do montador / instalador (%)', <Input inputMode="decimal" value={montador} onChange={e => setMontador(e.target.value)} placeholder="8" />)}
             {field('Impostos sobre a venda (%)', <Input inputMode="decimal" value={impostos} onChange={e => setImpostos(e.target.value)} placeholder="6" />)}
+            {field('Taxa de cartão de crédito (%)', <Input inputMode="decimal" value={cartao} onChange={e => setCartao(e.target.value)} placeholder="4.5" />)}
             {field('Frete / instalação (R$)', <Input inputMode="decimal" value={frete} onChange={e => setFrete(e.target.value)} placeholder="800" />)}
             {field('Perda técnica de chapas (%)', <Input inputMode="decimal" value={perda} onChange={e => setPerda(e.target.value)} placeholder="15" />)}
           </div>
@@ -1116,6 +1124,7 @@ export default function OrcamentistaProDialog() {
                             { nome: 'Comissão vend.', valor: costs.comissao },
                             { nome: 'Montador', valor: costs.montador },
                             { nome: 'Impostos', valor: costs.impostos },
+                            { nome: 'Taxa cartão', valor: costs.cartao },
                           ].filter(d => d.valor > 0)}
                           margin={{ left: 8, right: 16 }}
                         >
@@ -1172,6 +1181,7 @@ export default function OrcamentistaProDialog() {
                       [`Comissão do vendedor (${n(comissao)}%)`, costs.comissao],
                       [`Comissão do montador (${n(montador)}%)`, costs.montador],
                       [`Impostos (${n(impostos)}%)`, costs.impostos],
+                      [`Taxa cartão (${n(cartao)}%)`, costs.cartao],
                       ['CUSTO TOTAL', costs.custoTotal],
                     ].map(([label, value]) => (
                       <div key={String(label)} className="flex items-center justify-between py-1.5">
