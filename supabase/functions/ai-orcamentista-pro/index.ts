@@ -139,7 +139,7 @@ async function callGeminiDirect(
   });
 
   let lastErr = 'Gemini indisponível';
-  const deadline = Date.now() + 70_000;
+  const deadline = Date.now() + 50_000;
   for (const model of GEMINI_MODELS) {
     if (Date.now() > deadline - 10_000) break;
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -277,7 +277,7 @@ ${payload.notes?.trim() || '(nenhuma — extraia tudo dos arquivos anexos)'}`;
       const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(75_000),
+        signal: AbortSignal.timeout(90_000),
         body: JSON.stringify({
           model: 'google/gemini-2.5-flash',
           messages: [
