@@ -1552,26 +1552,48 @@ export default function FinancePage() {
     );
   }
 
+  const tabs: { id: Section; label: string; icon: typeof Plus; hint: string }[] = [
+    { id: 'home', label: 'Visão Geral', icon: Wallet, hint: 'Resumo do caixa, entradas, saídas e alertas' },
+    { id: 'fluxo', label: 'Fluxo de Caixa', icon: TrendingUp, hint: 'Saldo previsto para os próximos meses' },
+    { id: 'obras', label: 'Lucro por Obra', icon: FileBarChart, hint: 'Contrato, recebido, custo real e lucro de cada obra' },
+    { id: 'dre', label: 'DRE', icon: BarChart3, hint: 'Resultado da empresa no período' },
+    { id: 'vencer', label: 'A Receber / Pagar', icon: Clock, hint: 'Contas em aberto e vencidas' },
+    { id: 'lancamentos', label: 'Lançamentos', icon: Receipt, hint: 'Todas as entradas e saídas' },
+    { id: 'recebimentos', label: 'Recebimentos', icon: CheckCircle2, hint: 'Histórico de recebimentos por orçamento e recibos' },
+    { id: 'despesas', label: 'Despesas', icon: PieChartIcon, hint: 'Para onde vai o dinheiro' },
+    { id: 'contas', label: 'Bancos', icon: Building2, hint: 'Saldo por conta e transferências' },
+    { id: 'marcos', label: 'Parcelas de Obra', icon: Milestone, hint: 'Parcelas ligadas às etapas de produção' },
+    { id: 'colaboradores', label: 'Colaboradores', icon: Users, hint: 'Horas e diárias a pagar' },
+    { id: 'relatorio', label: 'Por Cliente', icon: FileBarChart, hint: 'Lucro por cliente' },
+  ];
+  const tourSteps: TourStep[] = [
+    { target: 'fin-tabs', title: 'Navegue pelas áreas', text: 'Cada aba é uma parte do financeiro. Tudo se atualiza sozinho quando algo muda no sistema.' },
+    { target: 'fin-period', title: 'Escolha o período', text: 'Selecione o mês/ano ou um intervalo. Os números das abas seguem esse período.' },
+    { target: 'fin-new', title: 'Lance entradas e saídas', text: 'Use "Novo Lançamento" para registrar receitas, despesas, fixas e parceladas.' },
+    { target: 'fin-tab-home', title: 'Visão Geral', text: 'Saldo real disponível, o que entrou, o que saiu e alertas de vencidos.', onEnter: () => setActiveSection('home') },
+    { target: 'fin-tab-fluxo', title: 'Fluxo de Caixa', text: 'Mostra como seu saldo vai ficar nos próximos meses e avisa se ficar negativo.', onEnter: () => setActiveSection('fluxo') },
+    { target: 'fin-tab-obras', title: 'Lucro por Obra', text: 'Veja quanto cada obra fechada rendeu de verdade, quanto já recebeu e quanto falta.', onEnter: () => setActiveSection('obras') },
+    { target: 'fin-tab-vencer', title: 'Dar baixa em contas', text: 'Em "A Receber / Pagar" marque como pago ou registre um pagamento parcial.', onEnter: () => setActiveSection('vencer') },
+    { target: 'fin-tab-recebimentos', title: 'Recibos', text: 'Em "Recebimentos" você vê cada parcela recebida e imprime o recibo para o cliente.', onEnter: () => setActiveSection('recebimentos') },
+    { target: 'fin-help', title: 'Rever este guia', text: 'Clique em "Como usar" sempre que quiser ver este passo a passo de novo.', onEnter: () => setActiveSection('home') },
+  ];
+
   return (
-    <motion.div ref={pageRef} variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          {activeSection !== 'home' && (
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setActiveSection('home')}>
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-          )}
+    <motion.div ref={pageRef} variants={containerVariants} initial="hidden" animate="visible" className="space-y-5">
+      <FinanceTour steps={tourSteps} open={tour.open} onClose={tour.close} />
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex items-start gap-3">
           <div>
             <h1 className="text-2xl font-bold font-display">Financeiro</h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              {activeSection === 'home' ? 'Controle completo de receitas, despesas e contas' :
-                miniCards.find(c => c.id === activeSection)?.title || 'Financeiro'}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Período analisado: {periodLabel}</p>
+            <p className="text-muted-foreground text-sm mt-1">{tabs.find(t => t.id === activeSection)?.hint}</p>
+            <p className="text-xs text-muted-foreground mt-1">Período analisado: <span className="capitalize">{periodLabel}</span> · atualizado em tempo real</p>
           </div>
+          <Button data-tour="fin-help" variant="outline" size="sm" className="ml-auto lg:ml-2" onClick={tour.start}>
+            <HelpCircle className="h-4 w-4 mr-1" /> Como usar
+          </Button>
         </div>
         <div className="flex flex-wrap gap-2 items-end justify-end">
-          <div className="grid gap-2 sm:grid-cols-4">
+          <div data-tour="fin-period" className="grid gap-2 grid-cols-2 sm:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="finance-filter-mode">Filtro</Label>
               <Select value={periodMode} onValueChange={(value: PeriodFilterMode) => setPeriodMode(value)}>
