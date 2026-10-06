@@ -33,6 +33,10 @@ import { useFinancialInsights, computeFinancialMetrics } from '@/hooks/useFinanc
 import { FinancialCategoryOption, getCategoryLabel, mergeFinancialCategories, isFixedExpense } from '@/lib/financial';
 import { calculateAccountBalances, calculateAvailableBalance, summarizeFinance } from '@/lib/finance-calc';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import CashFlowForecast from '@/components/finance/CashFlowForecast';
+import ProjectProfitability from '@/components/finance/ProjectProfitability';
+import FinanceTour, { useFinanceTour, type TourStep } from '@/components/finance/FinanceTour';
+import { HelpCircle } from 'lucide-react';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
@@ -87,9 +91,10 @@ const EXPENSE_COLORS = ['hsl(28, 85%, 56%)', 'hsl(0, 72%, 51%)', 'hsl(38, 92%, 5
 const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.06 } } };
 const itemVariants = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } };
 
-type Section = 'home' | 'lancamentos' | 'dre' | 'despesas' | 'vencer' | 'recebidos' | 'relatorio' | 'contas' | 'marcos' | 'recebimentos' | 'colaboradores';
+type Section = 'home' | 'fluxo' | 'obras' | 'lancamentos' | 'dre' | 'despesas' | 'vencer' | 'recebidos' | 'relatorio' | 'contas' | 'marcos' | 'recebimentos' | 'colaboradores';
 
 export default function FinancePage() {
+  const tour = useFinanceTour();
   const { user } = useAuth();
   const pageRef = useRef<HTMLDivElement>(null);
   const today = new Date().toISOString().slice(0, 10);
@@ -517,6 +522,8 @@ export default function FinancePage() {
       case 'relatorio': return renderRelatorio();
       case 'contas': return renderContas();
       case 'marcos': return <MilestoneReceivables />;
+      case 'fluxo': return <CashFlowForecast transactions={transactions as any} startingBalance={totalBankBalance} />;
+      case 'obras': return <ProjectProfitability />;
       case 'recebimentos': return <BudgetReceiptsHistory />;
       case 'colaboradores':
         return (
@@ -1647,6 +1654,24 @@ export default function FinancePage() {
           <Button className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Novo Lançamento
           </Button>
+        </div>
+      </div>
+
+      <div data-tour="fin-tabs" className="sticky top-0 z-20 -mx-4 px-4 py-2 bg-background/90 backdrop-blur border-b border-border/60">
+        <div className="flex gap-1 overflow-x-auto no-scrollbar">
+          {tabs.map((t) => {
+            const active = activeSection === t.id;
+            return (
+              <button
+                key={t.id}
+                data-tour={`fin-tab-${t.id}`}
+                onClick={() => setActiveSection(t.id)}
+                className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${active ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+              >
+                <t.icon className="h-4 w-4" />{t.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
