@@ -1520,6 +1520,7 @@ export default function FinancePage() {
             <ArrowRightLeft className="h-4 w-4 mr-2" /> Transferir
           </Button>
         </div>
+        <p className="text-xs text-muted-foreground">Movimentos de <span className="capitalize font-semibold">{periodLabel}</span> por conta</p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {bankAccountsWithBalance.map(acc => (
             <Card key={acc.id} className="border-l-4 hover:shadow-md transition-shadow" style={{ borderLeftColor: acc.color }}>
@@ -1536,6 +1537,18 @@ export default function FinancePage() {
                   </div>
                 </div>
                 <p className="text-2xl font-bold font-display text-gold tabular-nums">{formatBRL(acc.current_balance)}</p>
+                <p className="text-[10px] text-muted-foreground -mt-2">saldo atual</p>
+                {(() => {
+                  const m = accountPeriodMoves[acc.id] || { opening: 0, inc: 0, exp: 0, closing: 0 };
+                  return (
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs border-t border-border pt-2">
+                      <span className="text-muted-foreground">Início do período</span><span className="text-right tabular-nums">{formatBRL(m.opening)}</span>
+                      <span className="text-muted-foreground">Entradas</span><span className="text-right tabular-nums text-success">{formatBRL(m.inc)}</span>
+                      <span className="text-muted-foreground">Saídas</span><span className="text-right tabular-nums text-destructive">{formatBRL(m.exp)}</span>
+                      <span className="font-semibold">Fim do período</span><span className={`text-right tabular-nums font-semibold ${m.closing >= 0 ? '' : 'text-destructive'}`}>{formatBRL(m.closing)}</span>
+                    </div>
+                  );
+                })()}
                 <div className="flex gap-2 pt-2 border-t border-border">
                   <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => openEditBank(acc)}>
                     <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
@@ -1606,13 +1619,26 @@ export default function FinancePage() {
               <Select value={periodMode} onValueChange={(value: PeriodFilterMode) => setPeriodMode(value)}>
                 <SelectTrigger id="finance-filter-mode" className="w-full sm:w-[120px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="month">Mês/Ano</SelectItem>
+                  <SelectItem value="month">Mês</SelectItem>
+                  <SelectItem value="year">Ano inteiro</SelectItem>
                   <SelectItem value="custom">Período</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {periodMode === 'month' ? (
+            {periodMode === 'year' ? (
+              <div className="space-y-2">
+                <Label htmlFor="finance-year-only">Ano</Label>
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger id="finance-year-only" className="w-full sm:w-[110px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={year}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : periodMode === 'month' ? (
               <>
                 <div className="space-y-2">
                   <Label htmlFor="finance-month">Mês</Label>
