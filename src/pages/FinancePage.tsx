@@ -1651,7 +1651,7 @@ export default function FinancePage() {
             )}
           </div>
 
-          <Button className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
+          <Button data-tour="fin-new" className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Novo Lançamento
           </Button>
         </div>
