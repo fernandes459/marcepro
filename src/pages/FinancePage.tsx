@@ -55,7 +55,7 @@ interface BankAccount {
 }
 interface BankTransfer { from_account_id: string; to_account_id: string; amount: number; }
 
-type PeriodFilterMode = 'month' | 'custom';
+type PeriodFilterMode = 'month' | 'year' | 'custom';
 
 function getMonthOptions() {
   return Array.from({ length: 12 }, (_, index) => ({
@@ -344,7 +344,7 @@ export default function FinancePage() {
         end: end >= start ? end : start,
       };
     }
-
+    if (periodMode === 'year') return { start: `${selectedYear}-01-01`, end: `${selectedYear}-12-31` };
     return getMonthRange(selectedYear, selectedMonth);
   }, [customEnd, customStart, periodMode, selectedMonth, selectedYear, today]);
 
@@ -390,6 +390,49 @@ export default function FinancePage() {
     () => calculateAvailableBalance(transactions, bankAccounts),
     [transactions, bankAccounts],
   );
+  const closingBalance = previousBalance + profit;
+
+  // Saldo mês a mês do ano selecionado (mesma regra do saldo anterior: pagos por data)
+  const monthlyBalances = useMemo(() => {
+    const paid = transactions.filter(t => t.status === 'paid' && t.date);
+    const initial = bankAccounts.reduce((s, a) => s + Number(a.initial_balance || 0), 0);
+    const yStart = `${selectedYear}-01-01`;
+    let running = initial + paid.filter(t => t.date < yStart)
+      .reduce((s, t) => s + (t.type === 'income' ? 1 : -1) * Number(t.amount || 0), 0);
+    return getMonthOptions().map(({ value, label }) => {
+      const { start, end } = getMonthRange(selectedYear, value);
+      const inMonth = paid.filter(t => isDateWithinRange(t.date, start, end));
+      const inc = inMonth.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+      const exp = inMonth.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+      const opening = running;
+      running = opening + inc - exp;
+      return { month: value, label, opening, inc, exp, closing: running };
+    });
+  }, [transactions, bankAccounts, selectedYear]);
+
+  // Movimentos por conta dentro do período (transações pagas + transferências)
+  const accountPeriodMoves = useMemo(() => {
+    const out: Record<string, { opening: number; inc: number; exp: number; closing: number }> = {};
+    for (const acc of bankAccounts) {
+      let opening = Number(acc.initial_balance || 0), inc = 0, exp = 0;
+      for (const t of transactions) {
+        if (t.status !== 'paid' || (t as any).bank_account_id !== acc.id || !t.date) continue;
+        const v = (t.type === 'income' ? 1 : -1) * Number(t.amount || 0);
+        if (t.date < period.start) opening += v;
+        else if (t.date <= period.end) { if (v >= 0) inc += v; else exp -= v; }
+      }
+      for (const tr of bankTransfers as any[]) {
+        const d: string = tr.date || '';
+        const sign = tr.to_account_id === acc.id ? 1 : tr.from_account_id === acc.id ? -1 : 0;
+        if (!sign) continue;
+        const v = sign * Number(tr.amount || 0);
+        if (d && d < period.start) opening += v;
+        else if (!d || d <= period.end) { if (v >= 0) inc += v; else exp -= v; }
+      }
+      out[acc.id] = { opening, inc, exp, closing: opening + inc - exp };
+    }
+    return out;
+  }, [bankAccounts, transactions, bankTransfers, period.start, period.end]);
   const pendingReceivable = globalPending.receivable;
   const pendingPayable = globalPending.payable;
   const overdueItems = globalPending.all.filter(t => (t.status === 'overdue') || (t.status === 'pending' && t.due_date && t.due_date < today));
@@ -492,6 +535,8 @@ export default function FinancePage() {
     if (periodMode === 'custom') {
       return `${new Date(`${period.start}T12:00:00`).toLocaleDateString('pt-BR')} → ${new Date(`${period.end}T12:00:00`).toLocaleDateString('pt-BR')}`;
     }
+    if (periodMode === 'year') return `ano de ${selectedYear}`;
+
 
     return new Date(`${selectedYear}-${selectedMonth}-01T12:00:00`).toLocaleDateString('pt-BR', {
       month: 'long',
@@ -605,6 +650,49 @@ export default function FinancePage() {
                   <p className={`text-lg sm:text-2xl font-bold font-display mt-1.5 tabular-nums ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatBRL(profit)}</p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Saldo do período: início → fim */}
+        <motion.div variants={itemVariants}>
+          <Card className="border-border/60">
+            <CardContent className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Saldo no início</p><p className="text-base sm:text-lg font-bold font-display tabular-nums">{formatBRL(previousBalance)}</p></div>
+              <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Resultado do período</p><p className={`text-base sm:text-lg font-bold font-display tabular-nums ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatBRL(profit)}</p></div>
+              <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Saldo no fim</p><p className={`text-base sm:text-lg font-bold font-display tabular-nums ${closingBalance >= 0 ? 'text-foreground' : 'text-destructive'}`}>{formatBRL(closingBalance)}</p></div>
+              <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Saldo hoje (contas)</p><p className="text-base sm:text-lg font-bold font-display tabular-nums text-gold">{formatBRL(totalBankBalance)}</p></div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Saldo mês a mês do ano selecionado */}
+        <motion.div variants={itemVariants}>
+          <Card className="card-premium">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs uppercase tracking-[0.18em] text-muted-foreground font-bold">Saldo mês a mês — {selectedYear}</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <table className="w-full text-xs tabular-nums">
+                <thead><tr className="text-muted-foreground text-left">
+                  <th className="py-1.5 pr-2">Mês</th><th className="text-right px-2">Início</th><th className="text-right px-2">Entradas</th><th className="text-right px-2">Saídas</th><th className="text-right px-2">Resultado</th><th className="text-right pl-2">Fim</th>
+                </tr></thead>
+                <tbody>
+                  {monthlyBalances.map(m => (
+                    <tr key={m.month}
+                      onClick={() => { setPeriodMode('month'); setSelectedMonth(m.month); }}
+                      className={`border-t border-border/50 cursor-pointer hover:bg-accent/40 ${periodMode === 'month' && selectedMonth === m.month ? 'bg-primary/10 font-semibold' : ''}`}>
+                      <td className="py-1.5 pr-2 capitalize">{m.label}</td>
+                      <td className="text-right px-2">{formatBRL(m.opening)}</td>
+                      <td className="text-right px-2 text-success">{formatBRL(m.inc)}</td>
+                      <td className="text-right px-2 text-destructive">{formatBRL(m.exp)}</td>
+                      <td className={`text-right px-2 ${m.inc - m.exp >= 0 ? 'text-success' : 'text-destructive'}`}>{formatBRL(m.inc - m.exp)}</td>
+                      <td className={`text-right pl-2 font-semibold ${m.closing >= 0 ? '' : 'text-destructive'}`}>{formatBRL(m.closing)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-[10px] text-muted-foreground mt-2">Toque em um mês para filtrar todo o Financeiro por ele.</p>
             </CardContent>
           </Card>
         </motion.div>
