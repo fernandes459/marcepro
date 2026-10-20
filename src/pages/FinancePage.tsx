@@ -37,6 +37,9 @@ import CashFlowForecast from '@/components/finance/CashFlowForecast';
 import ProjectProfitability from '@/components/finance/ProjectProfitability';
 import FinanceTour, { useFinanceTour, type TourStep } from '@/components/finance/FinanceTour';
 import { HelpCircle } from 'lucide-react';
+import FinancialReportDialog from '@/components/finance/FinancialReportDialog';
+import { useNavSide } from '@/hooks/useNavSide';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
@@ -96,6 +99,9 @@ type Section = 'home' | 'fluxo' | 'obras' | 'lancamentos' | 'dre' | 'despesas' |
 export default function FinancePage() {
   const tour = useFinanceTour();
   const { user } = useAuth();
+  const { company } = useCurrentCompany();
+  const [finSide, setFinSide] = useNavSide('finance');
+  const [reportOpen, setReportOpen] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
   const today = new Date().toISOString().slice(0, 10);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
