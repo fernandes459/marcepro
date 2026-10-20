@@ -32,7 +32,7 @@ function Kicker({ children }: { children: React.ReactNode }) {
   return <p className="text-primary uppercase font-semibold" style={{ fontSize: 24, letterSpacing: '0.14em' }}>{children}</p>;
 }
 function Title({ children }: { children: React.ReactNode }) {
-  return <h2 className="font-display font-bold text-sidebar-primary-foreground mt-4" style={{ fontSize: 76, lineHeight: 1.05 }}>{children}</h2>;
+  return <h2 className="font-display font-bold text-sidebar-foreground mt-4" style={{ fontSize: 76, lineHeight: 1.05 }}>{children}</h2>;
 }
 
 function ListSlide({ kicker, title, items, tone }: { kicker: string; title: string; items: { title: string; text: string }[]; tone: string }) {
@@ -43,7 +43,7 @@ function ListSlide({ kicker, title, items, tone }: { kicker: string; title: stri
       <div className="grid grid-cols-3 gap-10 mt-20 flex-1">
         {items.slice(0, 3).map((it, i) => (
           <div key={i} className="rounded-3xl border border-sidebar-border bg-sidebar-accent/50 p-12" style={{ borderTop: `8px solid ${tone}` }}>
-            <p className="font-display font-bold text-sidebar-primary-foreground" style={{ fontSize: 40, lineHeight: 1.15 }}>{it.title}</p>
+            <p className="font-display font-bold text-sidebar-foreground" style={{ fontSize: 40, lineHeight: 1.15 }}>{it.title}</p>
             <p className="mt-6 text-sidebar-foreground/80" style={{ fontSize: 30, lineHeight: 1.35 }}>{it.text}</p>
           </div>
         ))}
@@ -64,14 +64,14 @@ export function buildSlides(r: ReportData, p: PresentationText, company: string)
     <Slide key="cover">
       <div className="flex-1 flex flex-col justify-center">
         <Kicker>{company} · Relatório {r.kind === 'year' ? 'anual' : 'mensal'}</Kicker>
-        <h1 className="font-display font-bold text-sidebar-primary-foreground mt-8" style={{ fontSize: 112, lineHeight: 1 }}>{p.headline}</h1>
+        <h1 className="font-display font-bold text-sidebar-foreground mt-8" style={{ fontSize: 112, lineHeight: 1 }}>{p.headline}</h1>
         <p className="mt-10 text-sidebar-foreground/80 max-w-[1300px]" style={{ fontSize: 38, lineHeight: 1.3 }}>{p.summary}</p>
       </div>
       <div className="flex justify-between items-end">
         <p className="capitalize text-primary font-semibold" style={{ fontSize: 36 }}>{r.label}</p>
         <div className="text-right">
           <p className="text-sidebar-foreground/60" style={{ fontSize: 22 }}>Saúde financeira</p>
-          <p className="font-display font-bold text-sidebar-primary-foreground" style={{ fontSize: 64 }}>{Math.round(p.score)}<span style={{ fontSize: 30 }}>/100 · {p.health_label}</span></p>
+          <p className="font-display font-bold text-sidebar-foreground" style={{ fontSize: 64 }}>{Math.round(p.score)}<span style={{ fontSize: 30 }}>/100 · {p.health_label}</span></p>
         </div>
       </div>
     </Slide>,
@@ -94,7 +94,7 @@ export function buildSlides(r: ReportData, p: PresentationText, company: string)
         ].map((k) => (
           <div key={k.label} className="rounded-3xl border border-sidebar-border p-10">
             <p className="text-sidebar-foreground/70" style={{ fontSize: 26 }}>{k.label}</p>
-            <p className="font-display font-bold mt-3 text-sidebar-primary-foreground tabular-nums" style={{ fontSize: 48 }}>{k.value}</p>
+            <p className="font-display font-bold mt-3 text-sidebar-foreground tabular-nums" style={{ fontSize: 48 }}>{k.value}</p>
           </div>
         ))}
       </div>
@@ -136,7 +136,7 @@ export function buildSlides(r: ReportData, p: PresentationText, company: string)
           <div className="space-y-6">
             {r.expenseCategories.slice(0, 6).map((c, i) => (
               <div key={c.name} className="flex items-center justify-between gap-6 border-b border-sidebar-border pb-4">
-                <span className="flex items-center gap-4 text-sidebar-primary-foreground" style={{ fontSize: 32 }}>
+                <span className="flex items-center gap-4 text-sidebar-foreground" style={{ fontSize: 32 }}>
                   <span className="inline-block rounded-full" style={{ width: 22, height: 22, background: PIE[i % PIE.length] }} />{c.name}
                 </span>
                 <span className="tabular-nums font-semibold" style={{ fontSize: 32 }}>{formatBRL(c.value)}</span>
@@ -152,7 +152,7 @@ export function buildSlides(r: ReportData, p: PresentationText, company: string)
     <Slide key="end">
       <div className="flex-1 flex flex-col justify-center items-center text-center">
         <Kicker>{company}</Kicker>
-        <p className="font-display font-bold text-sidebar-primary-foreground mt-10 max-w-[1400px]" style={{ fontSize: 72, lineHeight: 1.15 }}>{p.closing}</p>
+        <p className="font-display font-bold text-sidebar-foreground mt-10 max-w-[1400px]" style={{ fontSize: 72, lineHeight: 1.15 }}>{p.closing}</p>
         <p className="mt-12 text-sidebar-foreground/60 capitalize" style={{ fontSize: 28 }}>{r.label} · análise gerada por IA com os dados do sistema</p>
       </div>
     </Slide>,
@@ -229,7 +229,7 @@ export default function AIPresentation({ report, text, company, onClose }: { rep
         <button className="rounded-md p-2 hover:bg-muted" title="Imprimir / Salvar PDF" onClick={print}><Printer className="h-4 w-4" /></button>
         <button className="rounded-md p-2 hover:bg-muted" title="Fechar" onClick={onClose}><X className="h-4 w-4" /></button>
       </div>
-      <div className="flex-1 relative bg-foreground/90">
+      <div className="flex-1 relative bg-background">
         <Scaled>{slides[i]}</Scaled>
         <button onClick={prev} disabled={i === 0} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-card/80 p-3 shadow disabled:opacity-30"><ChevronLeft className="h-5 w-5" /></button>
         <button onClick={next} disabled={i === slides.length - 1} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-card/80 p-3 shadow disabled:opacity-30"><ChevronRight className="h-5 w-5" /></button>
