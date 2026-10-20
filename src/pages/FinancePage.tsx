@@ -37,6 +37,9 @@ import CashFlowForecast from '@/components/finance/CashFlowForecast';
 import ProjectProfitability from '@/components/finance/ProjectProfitability';
 import FinanceTour, { useFinanceTour, type TourStep } from '@/components/finance/FinanceTour';
 import { HelpCircle } from 'lucide-react';
+import FinancialReportDialog from '@/components/finance/FinancialReportDialog';
+import { useNavSide } from '@/hooks/useNavSide';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
@@ -96,6 +99,9 @@ type Section = 'home' | 'fluxo' | 'obras' | 'lancamentos' | 'dre' | 'despesas' |
 export default function FinancePage() {
   const tour = useFinanceTour();
   const { user } = useAuth();
+  const { company } = useCurrentCompany();
+  const [finSide, setFinSide] = useNavSide('finance');
+  const [reportOpen, setReportOpen] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
   const today = new Date().toISOString().slice(0, 10);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -191,6 +197,12 @@ export default function FinancePage() {
         void fetchAll();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_transfers' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_history' }, () => {
         void fetchAll();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'collaborator_work_logs' }, () => {
@@ -522,6 +534,8 @@ export default function FinancePage() {
     return { revenue, fixedExp, varExp, totalExp: fixedExp + varExp, profit: revenue - fixedExp - varExp, byCategory };
   }, [periodTransactions]);
 
+  const reportCatLabel = useCallback((c: string) => getCategoryLabel(mergedCategories, c) || 'Outros', [mergedCategories]);
+  const reportClientName = useCallback((id: string) => clients.find((c) => c.id === id)?.name || 'Cliente', [clients]);
   const expenseByCat = useMemo(() => {
     const counts: Record<string, number> = {};
     periodTransactions.filter(t => t.type === 'expense').forEach(t => {
@@ -1765,20 +1779,23 @@ export default function FinancePage() {
             )}
           </div>
 
+          <Button variant="outline" onClick={() => setReportOpen(true)}>
+            <FileBarChart className="h-4 w-4 mr-2" /> Relatório
+          </Button>
           <Button data-tour="fin-new" className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Novo Lançamento
           </Button>
         </div>
       </div>
 
-      <div data-tour="fin-tabs" className="sticky top-0 z-20 -mx-4 px-4 py-2 bg-background/90 backdrop-blur border-b border-border/60">
+      {/* Mobile/tablet: abas horizontais */}
+      <div data-tour="fin-tabs" className="lg:hidden sticky top-0 z-20 -mx-4 px-4 py-2 bg-background/90 backdrop-blur border-b border-border/60">
         <div className="flex gap-1 overflow-x-auto no-scrollbar">
           {tabs.map((t) => {
             const active = activeSection === t.id;
             return (
               <button
                 key={t.id}
-                data-tour={`fin-tab-${t.id}`}
                 onClick={() => setActiveSection(t.id)}
                 className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${active ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
               >
@@ -1789,6 +1806,41 @@ export default function FinancePage() {
         </div>
       </div>
 
+      <div className={`lg:flex lg:gap-5 lg:items-start ${finSide === 'right' ? 'lg:flex-row-reverse' : ''}`}>
+        {/* Desktop: cards laterais */}
+        <aside className="hidden lg:block w-60 shrink-0 sticky top-0 space-y-1.5">
+          <div className="flex items-center justify-between px-1 pb-1">
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Áreas</span>
+            <button
+              onClick={() => setFinSide(finSide === 'left' ? 'right' : 'left')}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+              title="Trocar lado"
+            >
+              <ArrowRightLeft className="h-3 w-3" /> {finSide === 'left' ? 'Para direita' : 'Para esquerda'}
+            </button>
+          </div>
+          {tabs.map((t) => {
+            const active = activeSection === t.id;
+            return (
+              <button
+                key={t.id}
+                data-tour={`fin-tab-${t.id}`}
+                onClick={() => setActiveSection(t.id)}
+                className={`w-full text-left flex items-start gap-3 rounded-xl border px-3 py-2.5 transition-all ${active ? 'border-primary/60 bg-primary/10 shadow-sm' : 'border-border bg-card hover:border-primary/40 hover:bg-muted/50'}`}
+              >
+                <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'gradient-gold text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                  <t.icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className={`block text-sm font-semibold ${active ? 'text-foreground' : 'text-foreground/85'}`}>{t.label}</span>
+                  <span className="block text-[11px] leading-snug text-muted-foreground line-clamp-2">{t.hint}</span>
+                </span>
+              </button>
+            );
+          })}
+        </aside>
+
+        <div className="flex-1 min-w-0 space-y-5">
       {overdueItems.length > 0 && activeSection === 'home' && (
         <motion.div variants={itemVariants}>
           <Card className="border-destructive/50 bg-destructive/5 cursor-pointer" onClick={() => setActiveSection('vencer')}>
@@ -1814,6 +1866,18 @@ export default function FinancePage() {
           {renderSection()}
         </ErrorBoundary>
       </motion.div>
+        </div>
+      </div>
+
+      <FinancialReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        transactions={transactions as any}
+        categoryLabel={reportCatLabel}
+        clientName={reportClientName}
+        companyName={company?.name || 'Marcenaria PRO'}
+        loading={loading}
+      />
 
       {/* Dialogs */}
       <TransactionDialog

@@ -12,10 +12,12 @@ import {
   Menu,
   LogOut,
   Package,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
+import { useNavSide } from '@/hooks/useNavSide';
 import NotificationBell from '@/components/NotificationBell';
 
 type NavGroup = {
@@ -68,6 +70,8 @@ export function useLayout() {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [side, setSide] = useNavSide('app');
+  const right = side === 'right';
   const location = useLocation();
   const { user, signOut } = useAuth() as any;
 
@@ -80,7 +84,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <LayoutContext.Provider value={{ collapsed, setCollapsed }}>
-      <div className="flex h-screen overflow-hidden bg-background">
+      <div className={cn('flex h-screen overflow-hidden bg-background', right && 'flex-row-reverse')}>
         {/* Mobile overlay */}
         <AnimatePresence>
           {mobileOpen && (
@@ -97,9 +101,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Sidebar */}
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-50 flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 lg:relative border-r border-sidebar-border',
+            'fixed inset-y-0 z-50 flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 lg:relative',
+            right ? 'right-0 border-l border-sidebar-border' : 'left-0 border-r border-sidebar-border',
             collapsed ? 'w-[72px]' : 'w-64',
-            mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+            mobileOpen ? 'translate-x-0' : right ? 'translate-x-full lg:translate-x-0' : '-translate-x-full lg:translate-x-0'
           )}
         >
           {/* Brand */}
@@ -183,6 +188,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             )}
+            <button
+              onClick={() => setSide(right ? 'left' : 'right')}
+              title={right ? 'Menu à esquerda' : 'Menu à direita'}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent transition-colors"
+            >
+              <ArrowLeftRight className="h-4 w-4 shrink-0" />
+              {!collapsed && <span>{right ? 'Menu à esquerda' : 'Menu à direita'}</span>}
+            </button>
             <button
               onClick={() => setCollapsed(!collapsed)}
               className="hidden lg:flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent transition-colors"
