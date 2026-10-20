@@ -1876,6 +1876,7 @@ export default function FinancePage() {
         categoryLabel={reportCatLabel}
         clientName={reportClientName}
         companyName={company?.name || 'Marcenaria PRO'}
+        loading={loading}
       />
 
       {/* Dialogs */}

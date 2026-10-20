@@ -20,11 +20,12 @@ interface Props {
   categoryLabel: (c: string) => string;
   clientName: (id: string) => string;
   companyName: string;
+  loading?: boolean;
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 
-export default function FinancialReportDialog({ open, onOpenChange, transactions, categoryLabel, clientName, companyName }: Props) {
+export default function FinancialReportDialog({ open, onOpenChange, transactions, categoryLabel, clientName, companyName, loading }: Props) {
   const now = new Date();
   const [kind, setKind] = useState<'month' | 'year'>('month');
   const [year, setYear] = useState(now.getFullYear());
@@ -179,10 +180,10 @@ ${s.overdueCount ? `<h2>Vencidos</h2><table>${row(`${s.overdueCount} conta(s) ve
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={exportPdf}><FileText className="h-4 w-4 mr-2" /> PDF</Button>
-            <Button variant="outline" onClick={exportExcel}><FileSpreadsheet className="h-4 w-4 mr-2" /> Excel</Button>
+            <Button variant="outline" disabled={loading} onClick={exportPdf}><FileText className="h-4 w-4 mr-2" /> PDF</Button>
+            <Button variant="outline" disabled={loading} onClick={exportExcel}><FileSpreadsheet className="h-4 w-4 mr-2" /> Excel</Button>
           </div>
-          <Button className="gradient-primary border-0 text-primary-foreground" disabled={aiLoading} onClick={generateAI}>
+          <Button className="gradient-primary border-0 text-primary-foreground" disabled={aiLoading || loading} onClick={generateAI}>
             {aiLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
             {aiLoading ? 'A IA está montando a apresentação…' : 'Gerar apresentação com IA'}
             {!aiLoading && <Presentation className="h-4 w-4 ml-2" />}
