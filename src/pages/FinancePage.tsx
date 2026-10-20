@@ -199,6 +199,12 @@ export default function FinancePage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_transfers' }, () => {
         void fetchAll();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => {
+        void fetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_history' }, () => {
+        void fetchAll();
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'collaborator_work_logs' }, () => {
         void fetchAll();
       })
@@ -528,6 +534,8 @@ export default function FinancePage() {
     return { revenue, fixedExp, varExp, totalExp: fixedExp + varExp, profit: revenue - fixedExp - varExp, byCategory };
   }, [periodTransactions]);
 
+  const reportCatLabel = useCallback((c: string) => getCategoryLabel(mergedCategories, c) || 'Outros', [mergedCategories]);
+  const reportClientName = useCallback((id: string) => clients.find((c) => c.id === id)?.name || 'Cliente', [clients]);
   const expenseByCat = useMemo(() => {
     const counts: Record<string, number> = {};
     periodTransactions.filter(t => t.type === 'expense').forEach(t => {
