@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { LEAD_STAGES, LEAD_SOURCES, whatsappLink } from '@/core/crm';
 
 interface Lead {
   id: string;
@@ -28,23 +29,8 @@ interface Lead {
   created_at: string;
 }
 
-const stages = [
-  { id: 'novo',        title: 'Novo',         color: 'hsl(210, 80%, 52%)' },
-  { id: 'qualificado', title: 'Qualificado',  color: 'hsl(38, 92%, 50%)'  },
-  { id: 'proposta',    title: 'Proposta',     color: 'hsl(28, 85%, 56%)'  },
-  { id: 'negociacao',  title: 'Negociação',   color: 'hsl(265, 60%, 55%)' },
-  { id: 'ganho',       title: 'Ganho',        color: 'hsl(152, 60%, 42%)' },
-  { id: 'perdido',     title: 'Perdido',      color: 'hsl(0, 70%, 55%)'   },
-];
-
-const sources = [
-  { value: 'manual',     label: 'Cadastro Manual' },
-  { value: 'indicacao',  label: 'Indicação' },
-  { value: 'instagram',  label: 'Instagram' },
-  { value: 'site',       label: 'Site' },
-  { value: 'anuncio',    label: 'Anúncio' },
-  { value: 'outro',      label: 'Outro' },
-];
+const stages = LEAD_STAGES;
+const sources = LEAD_SOURCES;
 
 export default function CrmPage() {
   const { user } = useAuth();
@@ -127,12 +113,15 @@ export default function CrmPage() {
     const patch: { stage: string; won_at?: string; lost_at?: string } = { stage: newStage };
     if (newStage === 'ganho') patch.won_at = new Date().toISOString();
     if (newStage === 'perdido') patch.lost_at = new Date().toISOString();
-    await supabase.from('leads').update(patch).eq('id', id);
+    const { error } = await supabase.from('leads').update(patch).eq('id', id);
+    if (error) { toast.error('Não foi possível mover o lead'); return; }
     setLeads((prev) => prev.map((l) => l.id === id ? { ...l, stage: newStage } : l));
   }
 
   async function removeLead(id: string) {
-    await supabase.from('leads').delete().eq('id', id);
+    if (!window.confirm('Excluir este lead? Esta ação não pode ser desfeita.')) return;
+    const { error } = await supabase.from('leads').delete().eq('id', id);
+    if (error) { toast.error('Não foi possível excluir'); return; }
     setLeads((prev) => prev.filter((l) => l.id !== id));
     toast.success('Lead removido');
   }
@@ -218,7 +207,7 @@ export default function CrmPage() {
                       <div className="flex flex-wrap gap-1 pt-1">
                         {lead.phone && (
                           <a
-                            href={`https://wa.me/55${lead.phone.replace(/\D/g, '')}`}
+                            href={whatsappLink(lead.phone) ?? '#'}
                             target="_blank" rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
                             className="text-success hover:bg-success/10 rounded p-1"
