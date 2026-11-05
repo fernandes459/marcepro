@@ -13,6 +13,7 @@ import {
   LogOut,
   Package,
   ArrowLeftRight,
+  Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -31,6 +32,7 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/', label: 'Dashboard', icon: LayoutDashboard },
       { path: '/clientes', label: 'Clientes', icon: Users },
+      { path: '/crm', label: 'CRM', icon: Target },
       { path: '/orcamentos', label: 'Orçamentos', icon: FileText },
     ],
   },

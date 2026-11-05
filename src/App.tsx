@@ -18,6 +18,7 @@ import ManagementPage from "@/pages/ManagementPage";
 import SettingsPage from "@/pages/SettingsPage";
 
 import NotificationsPage from "@/pages/NotificationsPage";
+import CrmPage from "@/pages/CrmPage";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -51,7 +52,7 @@ function RoutesWithBoundary() {
       <Routes>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/clientes" element={<ClientsPage />} />
-        <Route path="/crm" element={<Navigate to="/orcamentos" replace />} />
+        <Route path="/crm" element={<CrmPage />} />
         <Route path="/orcamentos" element={<BudgetsPage />} />
         <Route path="/producao" element={<ProductionPage />} />
         <Route path="/assistencia" element={<AssistancePage />} />
