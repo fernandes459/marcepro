@@ -50,7 +50,7 @@ const ALL: Permission[] = [
 export const ROLE_PERMISSIONS: Record<AppRole, Permission[]> = {
   admin: ALL,
   gerente: ALL.filter((p) => p !== 'settings.users'),
-  partner: ALL.filter((p) => p !== 'settings.users'),
+  partner: ALL.filter((p) => p !== 'settings.users' && !['finance.create', 'finance.edit', 'finance.delete'].includes(p)),
   vendedor: [
     'dashboard.view',
     'clients.view','clients.create','clients.edit',
@@ -115,4 +115,16 @@ export function hasPermission(roles: AppRole[] | undefined, perm: Permission): b
 export function hasAnyRole(roles: AppRole[] | undefined, allowed: AppRole[]): boolean {
   if (!roles) return false;
   return roles.some((r) => allowed.includes(r));
+}
+
+export const ROUTE_PERMISSIONS: Record<string, Permission> = {
+  '/': 'dashboard.view', '/clientes': 'clients.view', '/crm': 'clients.view',
+  '/orcamentos': 'budgets.view', '/producao': 'production.view',
+  '/assistencia': 'assistance.view', '/financeiro': 'finance.view',
+  '/gestao': 'management.view', '/configuracoes': 'settings.view',
+};
+
+export function canAccessRoute(roles: AppRole[], path: string): boolean {
+  const permission = ROUTE_PERMISSIONS[path];
+  return !permission || hasPermission(roles, permission);
 }

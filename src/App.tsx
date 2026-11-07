@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import ScrollToTop from "@/components/ScrollToTop";
 import AppLayout from "@/components/AppLayout";
+import RouteAccess from "@/components/RouteAccess";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthPage from "@/pages/AuthPage";
 import DashboardPage from "@/pages/DashboardPage";
@@ -40,7 +41,7 @@ function ProtectedRoutes() {
 
   return (
     <AppLayout>
-      <RoutesWithBoundary />
+      <RouteAccess><RoutesWithBoundary /></RouteAccess>
     </AppLayout>
   );
 }

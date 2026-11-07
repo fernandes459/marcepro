@@ -15,6 +15,7 @@ export interface RegistrarPagamentoInput {
   formaPagamento?: string | null;
   bankAccountId?: string | null;
   notes?: string | null;
+  requestId?: string;
 }
 
 export interface PagamentoResult {
@@ -25,13 +26,14 @@ export interface PagamentoResult {
 }
 
 export async function registrarPagamento(input: RegistrarPagamentoInput): Promise<PagamentoResult> {
-  const { data, error } = await supabase.rpc('registrar_pagamento_parcial', {
+  const { data, error } = await supabase.rpc('registrar_pagamento_seguro', {
     _transaction_id: input.transactionId,
     _valor: input.valor,
     _data: input.data ?? new Date().toISOString().slice(0, 10),
     _forma_pagamento: input.formaPagamento ?? null,
     _bank_account_id: input.bankAccountId ?? null,
     _notes: input.notes ?? null,
+    _request_id: input.requestId ?? crypto.randomUUID(),
   });
   if (error) throw error;
   return data as unknown as PagamentoResult;

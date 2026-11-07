@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Decimal from 'decimal.js';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +39,9 @@ const PAYMENT_METHODS = ['Pix', 'Dinheiro', 'Transferência', 'Cartão de Crédi
 
 export default function PartialPaymentDialog({ open, onOpenChange, transaction, bankAccounts = [], onSaved }: Props) {
   const isIncome = transaction?.type === 'income';
+  const { can } = usePermissions();
+  const submitting = useRef(false);
+  const request = useRef<{ fingerprint: string; id: string } | null>(null);
   const saldoAtual = useMemo(() => transaction ? getSaldoAberto(transaction) : 0, [transaction]);
   const totalOriginal = Number(transaction?.amount || 0);
   const jaRecebido = Number(transaction?.valor_recebido || 0);
@@ -58,6 +63,7 @@ export default function PartialPaymentDialog({ open, onOpenChange, transaction, 
       setBankId('');
       setNotes('');
       setQuick('full');
+      request.current = null;
       fetchPaymentHistory(transaction.id).then(setHistory).catch(() => setHistory([]));
     }
   }, [open, transaction, saldoAtual]);
@@ -65,13 +71,16 @@ export default function PartialPaymentDialog({ open, onOpenChange, transaction, 
   function applyQuick(q: 'full' | 'half' | 'custom') {
     setQuick(q);
     if (q === 'full') setValor(saldoAtual);
-    else if (q === 'half') setValor(Math.round((saldoAtual / 2) * 100) / 100);
+    else if (q === 'half') setValor(new Decimal(saldoAtual).div(2).toDecimalPlaces(2).toNumber());
   }
 
   async function handleSubmit() {
-    if (!transaction) return;
+    if (!transaction || submitting.current || !can('finance.edit')) return;
     if (valor <= 0) { toast.error('Informe um valor maior que zero'); return; }
     if (valor > saldoAtual + 0.009) { toast.error(`Valor excede o saldo em aberto (${formatBRL(saldoAtual)})`); return; }
+    const fingerprint = JSON.stringify([transaction.id, valor, data, forma, bankId, notes]);
+    if (request.current?.fingerprint !== fingerprint) request.current = { fingerprint, id: crypto.randomUUID() };
+    submitting.current = true;
     setLoading(true);
     try {
       const res = await registrarPagamento({
@@ -81,6 +90,7 @@ export default function PartialPaymentDialog({ open, onOpenChange, transaction, 
         formaPagamento: forma || null,
         bankAccountId: bankId || null,
         notes: notes || null,
+        requestId: request.current?.id,
       });
       if (res.status === 'paid') toast.success(`Recebimento total registrado — ${formatBRL(valor)}`);
       else toast.success(`Pagamento parcial registrado — saldo: ${formatBRL(res.saldo_aberto)}`);
@@ -89,12 +99,13 @@ export default function PartialPaymentDialog({ open, onOpenChange, transaction, 
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao registrar pagamento');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   }
 
   if (!transaction) return null;
-  const saldoApos = Math.max(0, saldoAtual - valor);
+  const saldoApos = Decimal.max(0, new Decimal(saldoAtual).minus(valor)).toNumber();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -191,7 +202,7 @@ export default function PartialPaymentDialog({ open, onOpenChange, transaction, 
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={loading || valor <= 0}>
+          <Button onClick={handleSubmit} disabled={loading || valor <= 0 || !can('finance.edit')}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
             Confirmar
           </Button>

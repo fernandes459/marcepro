@@ -20,6 +20,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavSide } from '@/hooks/useNavSide';
 import NotificationBell from '@/components/NotificationBell';
+import { usePermissions } from '@/hooks/usePermissions';
+import { canAccessRoute } from '@/lib/rbac';
 
 type NavGroup = {
   label: string;
@@ -76,6 +78,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const right = side === 'right';
   const location = useLocation();
   const { user, signOut } = useAuth() as any;
+  const { roles } = usePermissions();
+  const visibleGroups = navGroups.map(group => ({ ...group,
+    items: group.items.filter(item => canAccessRoute(roles, item.path)),
+  })).filter(group => group.items.length > 0);
 
   // Discover the page title from current route
   const currentItem = navGroups.flatMap((g) => g.items).find((i) => i.path === location.pathname);
@@ -132,7 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
           {/* Nav grouped */}
           <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-            {navGroups.map((group) => (
+            {visibleGroups.map((group) => (
               <div key={group.label}>
                 {!collapsed && (
                   <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-sidebar-foreground/45">
