@@ -1739,6 +1739,18 @@ export type Database = {
         }
         Returns: Json
       }
+      registrar_pagamento_seguro: {
+        Args: {
+          _bank_account_id?: string
+          _data?: string
+          _forma_pagamento?: string
+          _notes?: string
+          _request_id?: string
+          _transaction_id: string
+          _valor: number
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role:
