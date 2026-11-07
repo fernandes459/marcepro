@@ -22,6 +22,13 @@
       "when": 1793906784578,
       "tag": "0002_harden_security_definer_rpcs",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794057667178,
+      "tag": "0003_secure_financial_permissions",
+      "breakpoints": true
     }
   ]
 }

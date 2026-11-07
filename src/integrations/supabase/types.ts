@@ -1261,6 +1261,8 @@ export type Database = {
           forma_pagamento: string | null
           id: string
           notes: string | null
+          recorded_by: string | null
+          request_id: string | null
           transaction_id: string
           user_id: string
           valor: number
@@ -1273,6 +1275,8 @@ export type Database = {
           forma_pagamento?: string | null
           id?: string
           notes?: string | null
+          recorded_by?: string | null
+          request_id?: string | null
           transaction_id: string
           user_id: string
           valor?: number
@@ -1285,6 +1289,8 @@ export type Database = {
           forma_pagamento?: string | null
           id?: string
           notes?: string | null
+          recorded_by?: string | null
+          request_id?: string | null
           transaction_id?: string
           user_id?: string
           valor?: number
@@ -1690,6 +1696,7 @@ export type Database = {
         Args: { _data_owner_id: string; _user_id: string }
         Returns: boolean
       }
+      can_write_finance: { Args: never; Returns: boolean }
       get_data_owner_id: { Args: { _user_id: string }; Returns: string }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_id_by_email: { Args: { _email: string }; Returns: string }
