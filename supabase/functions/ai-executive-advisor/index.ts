@@ -1,12 +1,20 @@
 // Supabase Edge Function: ai-executive-advisor
 // Recebe métricas financeiras e devolve análise executiva via Lovable AI Gateway.
-// CORS habilitado, sem JWT (público p/ simplicidade — não persiste dados aqui).
+import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { createClient } from 'npm:@supabase/supabase-js@2';
+import { z } from 'npm:zod@3';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const numeric = z.number().finite();
+const MetricsSchema = z.object({
+  period_label: z.string().max(200).optional(), company_name: z.string().max(255).optional(),
+  revenue: numeric.optional(), fixed_expenses: numeric.optional(), variable_expenses: numeric.optional(),
+  total_expenses: numeric.optional(), profit: numeric.optional(), margin_percent: numeric.optional(),
+  cash_balance: numeric.optional(), overdue_receivables: numeric.optional(), overdue_count: numeric.optional(),
+  active_projects: numeric.optional(), delivered_projects: numeric.optional(), pending_assistance: numeric.optional(),
+  break_even: numeric.optional(), monthly_goal: numeric.optional(),
+  top_clients: z.array(z.object({ name: z.string().max(255), revenue: numeric })).max(50).optional(),
+  top_expense_categories: z.array(z.object({ category: z.string().max(255), amount: numeric })).max(50).optional(),
+});
 
 interface Metrics {
   period_label?: string;
@@ -84,13 +92,31 @@ function calcScore(m: Metrics): number {
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  const json = (body: unknown, status: number) => new Response(JSON.stringify(body), {
+    status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+  if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405);
 
   try {
+    const authorization = req.headers.get('Authorization');
+    if (!authorization?.startsWith('Bearer ')) return json({ error: 'Faça login para usar a IA' }, 401);
+    const client = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { Authorization: authorization } },
+    });
+    const { data: auth, error: authError } = await client.auth.getUser(authorization.slice(7));
+    if (authError || !auth.user) return json({ error: 'Sessão inválida' }, 401);
+    const { data: roles, error: rolesError } = await client.from('user_roles').select('role').eq('user_id', auth.user.id);
+    if (rolesError || !roles?.some(row => ['admin', 'gerente', 'financeiro', 'partner'].includes(row.role))) {
+      return json({ error: 'Sem permissão para análise financeira' }, 403);
+    }
+    let body: unknown;
+    try { body = await req.json(); } catch { return json({ error: 'Dados inválidos' }, 400); }
+    const parsedInput = z.object({ metrics: MetricsSchema }).safeParse(body);
+    if (!parsedInput.success) return json({ error: 'Métricas inválidas', details: parsedInput.error.flatten().fieldErrors }, 400);
     const apiKey = Deno.env.get('LOVABLE_API_KEY');
     if (!apiKey) throw new Error('LOVABLE_API_KEY ausente');
 
-    const { metrics } = (await req.json()) as { metrics: Metrics };
-    if (!metrics) throw new Error('metrics ausente');
+    const { metrics } = parsedInput.data;
 
     const fallbackScore = calcScore(metrics);
 

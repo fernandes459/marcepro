@@ -1,9 +1,7 @@
 // Gera os textos de uma apresentação financeira a partir dos números do relatório.
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { corsHeaders as cors } from 'npm:@supabase/supabase-js@2/cors';
+import { createClient } from 'npm:@supabase/supabase-js@2';
+import { z } from 'npm:zod@3';
 
 const item = {
   type: 'object',
@@ -40,9 +38,24 @@ Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
   try {
+    if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405);
+    const authorization = req.headers.get('Authorization');
+    if (!authorization?.startsWith('Bearer ')) return json({ error: 'Faça login para usar a IA' }, 401);
+    const client = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { Authorization: authorization } },
+    });
+    const { data: auth, error: authError } = await client.auth.getUser(authorization.slice(7));
+    if (authError || !auth.user) return json({ error: 'Sessão inválida' }, 401);
+    const { data: roles, error: rolesError } = await client.from('user_roles').select('role').eq('user_id', auth.user.id);
+    if (rolesError || !roles?.some(row => ['admin', 'gerente', 'financeiro', 'partner'].includes(row.role))) return json({ error: 'Sem permissão para relatórios financeiros' }, 403);
+    let body: unknown;
+    try { body = await req.json(); } catch { return json({ error: 'Dados inválidos' }, 400); }
+    const parsed = z.object({ company: z.string().max(255).optional(), report: z.record(z.unknown()) })
+      .refine(value => JSON.stringify(value).length <= 100000, 'Relatório muito grande').safeParse(body);
+    if (!parsed.success) return json({ error: 'Relatório inválido' }, 400);
     const apiKey = Deno.env.get('LOVABLE_API_KEY');
     if (!apiKey) return json({ error: 'IA não configurada.' }, 500);
-    const { report, company } = await req.json();
+    const { report, company } = parsed.data;
     if (!report) return json({ error: 'Relatório ausente.' }, 400);
 
     const resp = await fetch('https://ai.gateway.lovable.dev/v1/responses', {
