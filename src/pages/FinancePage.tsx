@@ -40,6 +40,7 @@ import { HelpCircle } from 'lucide-react';
 import FinancialReportDialog from '@/components/finance/FinancialReportDialog';
 import { useNavSide } from '@/hooks/useNavSide';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
@@ -100,6 +101,10 @@ export default function FinancePage() {
   const tour = useFinanceTour();
   const { user } = useAuth();
   const { company } = useCurrentCompany();
+  const { can } = usePermissions();
+  const canCreate = can('finance.create');
+  const canEdit = can('finance.edit');
+  const canDelete = can('finance.delete');
   const [finSide, setFinSide] = useNavSide('finance');
   const [reportOpen, setReportOpen] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -227,7 +232,7 @@ export default function FinancePage() {
   // Mark overdue transactions (fire-and-forget, only once per load)
   const overdueCheckedRef = useRef(false);
   useEffect(() => {
-    if (overdueCheckedRef.current || transactions.length === 0) return;
+    if (!canEdit || overdueCheckedRef.current || transactions.length === 0) return;
     overdueCheckedRef.current = true;
     const today = new Date().toISOString().slice(0, 10);
     const overdueIds = transactions
@@ -239,9 +244,10 @@ export default function FinancePage() {
         .in('id', overdueIds)
         .then(() => fetchAll());
     }
-  }, [transactions]);
+  }, [transactions, canEdit]);
 
   async function handleSaveBank() {
+    if (!user || !(editingBankId ? canEdit : canCreate)) return;
     if (!bankForm.name) { toast.error('Nome da conta é obrigatório'); return; }
     if (editingBankId) {
       const { error } = await supabase.from('bank_accounts').update({
@@ -256,7 +262,7 @@ export default function FinancePage() {
       toast.success('Conta atualizada!');
     } else {
       const { error } = await supabase.from('bank_accounts').insert({
-        user_id: user!.id, name: bankForm.name, bank_name: bankForm.bank_name || null,
+        user_id: user.id, name: bankForm.name, bank_name: bankForm.bank_name || null,
         account_type: bankForm.account_type, agency: bankForm.agency || null,
         account_number: bankForm.account_number || null, initial_balance: bankForm.initial_balance,
         current_balance: bankForm.initial_balance, color: bankForm.color,
@@ -272,6 +278,7 @@ export default function FinancePage() {
   }
 
   function openEditBank(acc: BankAccount) {
+    if (!canEdit) return;
     setEditingBankId(acc.id);
     setBankForm({
       name: acc.name,
@@ -287,6 +294,7 @@ export default function FinancePage() {
   }
 
   async function deleteBankConfirm(id: string) {
+    if (!canDelete) return;
     const acc = bankAccounts.find((a) => a.id === id);
     if (!acc) return;
     const linked = transactions.some((t) => t.bank_account_id === id);
@@ -298,13 +306,14 @@ export default function FinancePage() {
   }
 
   async function handleTransfer() {
+    if (!user || !canCreate) return;
     if (!transferForm.from_account_id || !transferForm.to_account_id || !transferForm.amount) { toast.error('Preencha todos os campos'); return; }
     if (transferForm.from_account_id === transferForm.to_account_id) { toast.error('Selecione contas diferentes'); return; }
     const fromAcc = bankAccounts.find(a => a.id === transferForm.from_account_id);
     const toAcc = bankAccounts.find(a => a.id === transferForm.to_account_id);
     if (!fromAcc || !toAcc) return;
     const { error } = await supabase.from('bank_transfers').insert({
-      user_id: user!.id, from_account_id: transferForm.from_account_id,
+      user_id: user.id, from_account_id: transferForm.from_account_id,
       to_account_id: transferForm.to_account_id, amount: transferForm.amount,
       description: transferForm.description || `Transferência ${fromAcc.name} → ${toAcc.name}`,
       date: transferForm.date,
@@ -317,6 +326,7 @@ export default function FinancePage() {
   }
 
   async function markPaid(id: string) {
+    if (!canEdit) return;
     // Mantido para compat. Mas o fluxo padrão agora abre o dialog de pagamento (parcial/total).
     const tx = transactions.find(t => t.id === id);
     if (tx) { setPaymentTx(tx); return; }
@@ -326,21 +336,27 @@ export default function FinancePage() {
   }
 
   function openPayment(tx: Transaction) {
+    if (!canEdit) return;
     setPaymentTx(tx);
   }
 
   async function deleteTransaction(id: string) {
-    await supabase.from('financial_transactions').delete().eq('id', id);
+    if (!canDelete) return;
+    const { error } = await supabase.from('financial_transactions').delete().eq('id', id);
+    if (error) { toast.error('Não foi possível excluir: pagamentos vinculados devem ser preservados.'); return; }
     toast.success('Lançamento removido');
     fetchAll();
   }
 
   async function deleteBank(id: string) {
-    await supabase.from('bank_accounts').delete().eq('id', id);
+    if (!canDelete) return;
+    const { error } = await supabase.from('bank_accounts').delete().eq('id', id);
+    if (error) { toast.error('Não foi possível excluir a conta vinculada ao histórico.'); return; }
     fetchAll(); toast.success('Conta removida');
   }
 
   function openEditTransaction(tx: Transaction) {
+    if (!canEdit) { setDetailTx(tx); return; }
     setEditingTransaction(tx);
     setDialogOpen(true);
   }
@@ -587,7 +603,7 @@ export default function FinancePage() {
       case 'colaboradores':
         return (
           <CollaboratorTab
-            userId={user!.id}
+            userId={user?.id ?? ''}
             budgets={budgetsList}
             clients={clients}
             bankAccounts={bankAccountsWithBalance as any}
@@ -739,7 +755,7 @@ export default function FinancePage() {
         </motion.div>
         <motion.div variants={itemVariants}>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
-            {quickActions.map((action) => (
+            {quickActions.filter(action => action.id !== 'new' || canCreate).map((action) => (
               <button
                 key={action.id}
                 onClick={action.onClick}
@@ -1881,9 +1897,9 @@ export default function FinancePage() {
 
       {/* Dialogs */}
       <TransactionDialog
-        open={dialogOpen}
+        open={dialogOpen && (editingTransaction ? canEdit : canCreate)}
         onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditingTransaction(null); }}
-        userId={user!.id}
+        userId={user?.id ?? ''}
         clients={clients}
         bankAccounts={bankAccountsWithBalance}
         budgets={budgetsList}
@@ -1899,6 +1915,7 @@ export default function FinancePage() {
         clients={clients}
         budgets={budgetsList}
         onMarkPaid={(id) => {
+          if (!canEdit) return;
           const tx = transactions.find(t => t.id === id);
           if (tx) setPaymentTx(tx);
           setDetailTx(null);

@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
 import { WorkLogDialog } from './WorkLogDialog';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Employee { id: string; name: string; hourly_rate?: number; daily_rate?: number; role?: string; }
 interface BudgetLite { id: string; project_name: string | null; code: string; client_id: string | null; }
@@ -40,6 +41,7 @@ interface Props {
 }
 
 export default function CollaboratorTab({ userId, budgets, clients, bankAccounts, onChange }: Props) {
+  const { can } = usePermissions();
   const today = new Date().toISOString().slice(0, 10);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [logs, setLogs] = useState<WorkLog[]>([]);
@@ -109,6 +111,7 @@ export default function CollaboratorTab({ userId, budgets, clients, bankAccounts
   }), [filtered]);
 
   async function handleDelete(id: string) {
+    if (!can('finance.delete')) return;
     if (!window.confirm('Excluir este registro?')) return;
     const log = logs.find(l => l.id === id);
     if (log?.linked_transaction_id) {
@@ -121,6 +124,7 @@ export default function CollaboratorTab({ userId, budgets, clients, bankAccounts
   }
 
   async function generateExpense(log: WorkLog) {
+    if (!can('finance.create')) return;
     const emp = employees.find(e => e.id === log.employee_id);
     if (!emp) { toast.error('Colaborador não encontrado'); return; }
     if (!defaultAcc) { toast.error('Cadastre uma conta bancária primeiro'); return; }
@@ -207,10 +211,10 @@ export default function CollaboratorTab({ userId, budgets, clients, bankAccounts
 
       {/* Action bar */}
       <div className="flex flex-wrap gap-2 items-end">
-        <Button className="gradient-primary border-0" onClick={() => { setEditLog(null); setDialogOpen(true); }}>
+        <Button disabled={!can('finance.create')} className="gradient-primary border-0" onClick={() => { setEditLog(null); setDialogOpen(true); }}>
           <Plus className="h-4 w-4 mr-1" /> Registrar horas
         </Button>
-        {totals.pending > 0 && (
+        {can('finance.create') && totals.pending > 0 && (
           <Button variant="outline" onClick={generateBatch}>
             <Receipt className="h-4 w-4 mr-1" /> Gerar despesas pendentes
           </Button>
@@ -292,7 +296,7 @@ export default function CollaboratorTab({ userId, budgets, clients, bankAccounts
             <div className="text-center py-12 px-4">
               <Clock className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
               <p className="text-sm text-muted-foreground">Nenhum registro neste filtro.</p>
-              <Button size="sm" className="mt-3 gradient-primary border-0" onClick={() => { setEditLog(null); setDialogOpen(true); }}>
+              <Button disabled={!can('finance.create')} size="sm" className="mt-3 gradient-primary border-0" onClick={() => { setEditLog(null); setDialogOpen(true); }}>
                 <Plus className="h-3.5 w-3.5 mr-1" /> Registrar primeiro
               </Button>
             </div>
@@ -334,15 +338,15 @@ export default function CollaboratorTab({ userId, budgets, clients, bankAccounts
                       </span>
                     </div>
                     <div className="flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {!isPaid && (
+                      {can('finance.create') && !isPaid && (
                         <Button size="sm" variant="ghost" className="h-8 text-xs rounded-full" onClick={() => generateExpense(log)} title="Gerar despesa no financeiro">
                           <Receipt className="h-3.5 w-3.5 mr-1" /> Gerar
                         </Button>
                       )}
-                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => { setEditLog(log); setDialogOpen(true); }} title="Editar">
+                      <Button disabled={!can('finance.edit')} size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => { setEditLog(log); setDialogOpen(true); }} title="Editar">
                         <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => handleDelete(log.id)} title="Excluir">
+                      <Button disabled={!can('finance.delete')} size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => handleDelete(log.id)} title="Excluir">
                         <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>
                     </div>
@@ -355,7 +359,7 @@ export default function CollaboratorTab({ userId, budgets, clients, bankAccounts
       </Card>
 
       <WorkLogDialog
-        open={dialogOpen}
+        open={dialogOpen && can(editLog ? 'finance.edit' : 'finance.create')}
         onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditLog(null); }}
         userId={userId}
         employees={employees}
