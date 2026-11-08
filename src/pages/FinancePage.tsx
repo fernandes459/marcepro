@@ -967,6 +967,7 @@ export default function FinancePage() {
                 </Card>
               ))}
               <button
+                disabled={!canCreate}
                 onClick={() => { setActiveSection('contas'); setBankDialogOpen(true); }}
                 className="min-w-[120px] snap-start rounded-lg border-2 border-dashed border-border hover:border-primary/40 hover:bg-accent/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary"
               >
@@ -994,7 +995,7 @@ export default function FinancePage() {
                 <div className="text-center py-12 px-4">
                   <Receipt className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">Nenhum lançamento neste período.</p>
-                  <Button size="sm" variant="outline" className="mt-4" onClick={() => setDialogOpen(true)}>
+                  <Button disabled={!canCreate} size="sm" variant="outline" className="mt-4" onClick={() => setDialogOpen(true)}>
                     <Plus className="h-3.5 w-3.5 mr-1.5" /> Criar primeiro lançamento
                   </Button>
                 </div>
@@ -1030,10 +1031,10 @@ export default function FinancePage() {
                           </span>
                         </div>
                         <div className="hidden sm:flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={(e) => { e.stopPropagation(); openEditTransaction(tx); }} title="Editar">
+                          <Button disabled={!canEdit} size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={(e) => { e.stopPropagation(); openEditTransaction(tx); }} title="Editar">
                             <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={(e) => { e.stopPropagation(); deleteTransaction(tx.id); }} title="Excluir">
+                          <Button disabled={!canEdit} size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={(e) => { e.stopPropagation(); deleteTransaction(tx.id); }} title="Excluir">
                             <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
                         </div>
@@ -1149,14 +1150,14 @@ export default function FinancePage() {
                     </div>
                     <div className="flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {(tx.status === 'pending' || tx.status === 'overdue') && (
-                        <Button size="sm" variant="ghost" className="h-8 text-xs rounded-full" onClick={() => markPaid(tx.id)}>
+                        <Button disabled={!canEdit} size="sm" variant="ghost" className="h-8 text-xs rounded-full" onClick={() => markPaid(tx.id)}>
                           {isIncome ? 'Receber' : 'Pagar'}
                         </Button>
                       )}
-                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => openEditTransaction(tx)} title="Editar">
+                      <Button disabled={!canEdit} size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => openEditTransaction(tx)} title="Editar">
                         <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => deleteTransaction(tx.id)} title="Excluir">
+                      <Button disabled={!canEdit} size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => deleteTransaction(tx.id)} title="Excluir">
                         <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>
                     </div>
@@ -1478,6 +1479,7 @@ export default function FinancePage() {
                         </Badge>
                       </div>
                       <Button
+                        disabled={!canEdit}
                         size="sm"
                         className={`h-8 text-xs rounded-full ml-1 shrink-0 ${
                           isIncome ? 'bg-success hover:bg-success/90 text-success-foreground' : 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
@@ -1631,10 +1633,10 @@ export default function FinancePage() {
     return (
       <div className="space-y-4">
         <div className="flex gap-2 flex-wrap">
-          <Button className="gradient-primary border-0 text-primary-foreground" onClick={() => { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' }); setBankDialogOpen(true); }}>
+          <Button disabled={!canCreate} className="gradient-primary border-0 text-primary-foreground" onClick={() => { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' }); setBankDialogOpen(true); }}>
             <Building2 className="h-4 w-4 mr-2" /> Nova Conta
           </Button>
-          <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
+          <Button disabled={!canCreate} variant="outline" onClick={() => setTransferDialogOpen(true)}>
             <ArrowRightLeft className="h-4 w-4 mr-2" /> Transferir
           </Button>
         </div>
@@ -1668,10 +1670,10 @@ export default function FinancePage() {
                   );
                 })()}
                 <div className="flex gap-2 pt-2 border-t border-border">
-                  <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => openEditBank(acc)}>
+                  <Button disabled={!canEdit} size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => openEditBank(acc)}>
                     <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
                   </Button>
-                  <Button size="sm" variant="outline" className="flex-1 h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30" onClick={() => deleteBankConfirm(acc.id)}>
+                  <Button disabled={!canDelete} size="sm" variant="outline" className="flex-1 h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30" onClick={() => deleteBankConfirm(acc.id)}>
                     <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Excluir
                   </Button>
                 </div>
@@ -1798,7 +1800,7 @@ export default function FinancePage() {
           <Button variant="outline" onClick={() => setReportOpen(true)}>
             <FileBarChart className="h-4 w-4 mr-2" /> Relatório
           </Button>
-          <Button data-tour="fin-new" className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
+          <Button disabled={!canCreate} data-tour="fin-new" className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Novo Lançamento
           </Button>
         </div>
