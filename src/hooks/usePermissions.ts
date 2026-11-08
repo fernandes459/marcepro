@@ -20,7 +20,7 @@ export function usePermissions() {
   });
   useEffect(() => {
     if (!user) return;
-    const channel = supabase.channel(`permissions-${user.id}`)
+    const channel = supabase.channel(`permissions-${user.id}-${crypto.randomUUID()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles', filter: `user_id=eq.${user.id}` },
         () => { void client.invalidateQueries({ queryKey: ['permissions', user.id] }); })
       .subscribe();
