@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
 import { syncMilestoneToTransaction } from '@/lib/milestone-sync';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface MilestoneWithBudget {
   id: string;
@@ -42,6 +43,7 @@ const STAGE_LABELS: Record<string, string> = {
 
 export default function MilestoneReceivables() {
   const { user } = useAuth();
+  const { can } = usePermissions();
   const [milestones, setMilestones] = useState<MilestoneWithBudget[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,6 +101,7 @@ export default function MilestoneReceivables() {
   }, [user]);
 
   async function markAsPaid(ms: MilestoneWithBudget) {
+    if (!user || !can('finance.edit')) return;
     const today = new Date().toISOString().slice(0, 10);
 
     const { error: msError } = await supabase
@@ -118,7 +121,7 @@ export default function MilestoneReceivables() {
       status: 'paid',
       paid_date: today,
       linked_transaction_id: ms.linked_transaction_id,
-      user_id: user!.id,
+      user_id: user.id,
     });
 
     toast.success(`Marco "${ms.title}" marcado como pago — receita confirmada no financeiro`);
@@ -255,7 +258,7 @@ export default function MilestoneReceivables() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {ms.status !== 'paid' && (
+                      {can('finance.edit') && ms.status !== 'paid' && (
                         <Button
                           size="sm"
                           variant="ghost"

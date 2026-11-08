@@ -16,6 +16,7 @@ import { formatBRL } from '@/lib/format';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { FinancialCategoryOption, mergeFinancialCategories } from '@/lib/financial';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Client { id: string; name: string; }
 interface BankAccount { id: string; name: string; bank_name: string | null; current_balance: number; }
@@ -61,6 +62,7 @@ interface TransactionDialogProps {
 }
 
 export function TransactionDialog({ open, onOpenChange, userId, clients, bankAccounts, budgets = [], onSaved, editTransaction }: TransactionDialogProps) {
+  const { can } = usePermissions();
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -191,6 +193,7 @@ export function TransactionDialog({ open, onOpenChange, userId, clients, bankAcc
   }
 
   async function handleSave() {
+    if (!can(editTransaction ? 'finance.edit' : 'finance.create')) { toast.error('Seu perfil permite apenas consulta.'); return; }
     if (!category || !description || !totalAmount) {
       toast.error('Preencha os campos obrigatórios'); return;
     }

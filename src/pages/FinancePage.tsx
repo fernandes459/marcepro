@@ -40,6 +40,7 @@ import { HelpCircle } from 'lucide-react';
 import FinancialReportDialog from '@/components/finance/FinancialReportDialog';
 import { useNavSide } from '@/hooks/useNavSide';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Transaction {
   id: string; type: string; category: string; subcategory: string | null;
@@ -100,6 +101,10 @@ export default function FinancePage() {
   const tour = useFinanceTour();
   const { user } = useAuth();
   const { company } = useCurrentCompany();
+  const { can } = usePermissions();
+  const canCreate = can('finance.create');
+  const canEdit = can('finance.edit');
+  const canDelete = can('finance.delete');
   const [finSide, setFinSide] = useNavSide('finance');
   const [reportOpen, setReportOpen] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -227,7 +232,7 @@ export default function FinancePage() {
   // Mark overdue transactions (fire-and-forget, only once per load)
   const overdueCheckedRef = useRef(false);
   useEffect(() => {
-    if (overdueCheckedRef.current || transactions.length === 0) return;
+    if (!canEdit || overdueCheckedRef.current || transactions.length === 0) return;
     overdueCheckedRef.current = true;
     const today = new Date().toISOString().slice(0, 10);
     const overdueIds = transactions
@@ -239,9 +244,10 @@ export default function FinancePage() {
         .in('id', overdueIds)
         .then(() => fetchAll());
     }
-  }, [transactions]);
+  }, [transactions, canEdit]);
 
   async function handleSaveBank() {
+    if (!user || !(editingBankId ? canEdit : canCreate)) return;
     if (!bankForm.name) { toast.error('Nome da conta é obrigatório'); return; }
     if (editingBankId) {
       const { error } = await supabase.from('bank_accounts').update({
@@ -256,7 +262,7 @@ export default function FinancePage() {
       toast.success('Conta atualizada!');
     } else {
       const { error } = await supabase.from('bank_accounts').insert({
-        user_id: user!.id, name: bankForm.name, bank_name: bankForm.bank_name || null,
+        user_id: user.id, name: bankForm.name, bank_name: bankForm.bank_name || null,
         account_type: bankForm.account_type, agency: bankForm.agency || null,
         account_number: bankForm.account_number || null, initial_balance: bankForm.initial_balance,
         current_balance: bankForm.initial_balance, color: bankForm.color,
@@ -272,6 +278,7 @@ export default function FinancePage() {
   }
 
   function openEditBank(acc: BankAccount) {
+    if (!canEdit) return;
     setEditingBankId(acc.id);
     setBankForm({
       name: acc.name,
@@ -287,6 +294,7 @@ export default function FinancePage() {
   }
 
   async function deleteBankConfirm(id: string) {
+    if (!canDelete) return;
     const acc = bankAccounts.find((a) => a.id === id);
     if (!acc) return;
     const linked = transactions.some((t) => t.bank_account_id === id);
@@ -298,13 +306,14 @@ export default function FinancePage() {
   }
 
   async function handleTransfer() {
+    if (!user || !canCreate) return;
     if (!transferForm.from_account_id || !transferForm.to_account_id || !transferForm.amount) { toast.error('Preencha todos os campos'); return; }
     if (transferForm.from_account_id === transferForm.to_account_id) { toast.error('Selecione contas diferentes'); return; }
     const fromAcc = bankAccounts.find(a => a.id === transferForm.from_account_id);
     const toAcc = bankAccounts.find(a => a.id === transferForm.to_account_id);
     if (!fromAcc || !toAcc) return;
     const { error } = await supabase.from('bank_transfers').insert({
-      user_id: user!.id, from_account_id: transferForm.from_account_id,
+      user_id: user.id, from_account_id: transferForm.from_account_id,
       to_account_id: transferForm.to_account_id, amount: transferForm.amount,
       description: transferForm.description || `Transferência ${fromAcc.name} → ${toAcc.name}`,
       date: transferForm.date,
@@ -317,6 +326,7 @@ export default function FinancePage() {
   }
 
   async function markPaid(id: string) {
+    if (!canEdit) return;
     // Mantido para compat. Mas o fluxo padrão agora abre o dialog de pagamento (parcial/total).
     const tx = transactions.find(t => t.id === id);
     if (tx) { setPaymentTx(tx); return; }
@@ -326,21 +336,27 @@ export default function FinancePage() {
   }
 
   function openPayment(tx: Transaction) {
+    if (!canEdit) return;
     setPaymentTx(tx);
   }
 
   async function deleteTransaction(id: string) {
-    await supabase.from('financial_transactions').delete().eq('id', id);
+    if (!canDelete) return;
+    const { error } = await supabase.from('financial_transactions').delete().eq('id', id);
+    if (error) { toast.error('Não foi possível excluir: pagamentos vinculados devem ser preservados.'); return; }
     toast.success('Lançamento removido');
     fetchAll();
   }
 
   async function deleteBank(id: string) {
-    await supabase.from('bank_accounts').delete().eq('id', id);
+    if (!canDelete) return;
+    const { error } = await supabase.from('bank_accounts').delete().eq('id', id);
+    if (error) { toast.error('Não foi possível excluir a conta vinculada ao histórico.'); return; }
     fetchAll(); toast.success('Conta removida');
   }
 
   function openEditTransaction(tx: Transaction) {
+    if (!canEdit) { setDetailTx(tx); return; }
     setEditingTransaction(tx);
     setDialogOpen(true);
   }
@@ -587,7 +603,7 @@ export default function FinancePage() {
       case 'colaboradores':
         return (
           <CollaboratorTab
-            userId={user!.id}
+            userId={user?.id ?? ''}
             budgets={budgetsList}
             clients={clients}
             bankAccounts={bankAccountsWithBalance as any}
@@ -644,7 +660,7 @@ export default function FinancePage() {
               </div>
 
               {/* 3 KPIs — Entradas / Saídas / Resultado */}
-              <div className="grid grid-cols-3 gap-5 sm:gap-8 pt-5 border-t border-border/60">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-8 pt-5 border-t border-border/60">
                 <div>
                   <div className="flex items-center gap-1.5 text-success text-[10px] uppercase tracking-[0.18em] font-bold">
                     <ArrowUpRight className="h-3.5 w-3.5" /> Entradas
@@ -739,7 +755,7 @@ export default function FinancePage() {
         </motion.div>
         <motion.div variants={itemVariants}>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
-            {quickActions.map((action) => (
+            {quickActions.filter(action => action.id !== 'new' || canCreate).map((action) => (
               <button
                 key={action.id}
                 onClick={action.onClick}
@@ -951,6 +967,7 @@ export default function FinancePage() {
                 </Card>
               ))}
               <button
+                disabled={!canCreate}
                 onClick={() => { setActiveSection('contas'); setBankDialogOpen(true); }}
                 className="min-w-[120px] snap-start rounded-lg border-2 border-dashed border-border hover:border-primary/40 hover:bg-accent/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary"
               >
@@ -978,7 +995,7 @@ export default function FinancePage() {
                 <div className="text-center py-12 px-4">
                   <Receipt className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">Nenhum lançamento neste período.</p>
-                  <Button size="sm" variant="outline" className="mt-4" onClick={() => setDialogOpen(true)}>
+                  <Button disabled={!canCreate} size="sm" variant="outline" className="mt-4" onClick={() => setDialogOpen(true)}>
                     <Plus className="h-3.5 w-3.5 mr-1.5" /> Criar primeiro lançamento
                   </Button>
                 </div>
@@ -1014,10 +1031,10 @@ export default function FinancePage() {
                           </span>
                         </div>
                         <div className="hidden sm:flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={(e) => { e.stopPropagation(); openEditTransaction(tx); }} title="Editar">
+                          <Button disabled={!canEdit} size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={(e) => { e.stopPropagation(); openEditTransaction(tx); }} title="Editar">
                             <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={(e) => { e.stopPropagation(); deleteTransaction(tx.id); }} title="Excluir">
+                          <Button disabled={!canEdit} size="icon" variant="ghost" className="h-7 w-7 rounded-full" onClick={(e) => { e.stopPropagation(); deleteTransaction(tx.id); }} title="Excluir">
                             <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
                         </div>
@@ -1133,14 +1150,14 @@ export default function FinancePage() {
                     </div>
                     <div className="flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {(tx.status === 'pending' || tx.status === 'overdue') && (
-                        <Button size="sm" variant="ghost" className="h-8 text-xs rounded-full" onClick={() => markPaid(tx.id)}>
+                        <Button disabled={!canEdit} size="sm" variant="ghost" className="h-8 text-xs rounded-full" onClick={() => markPaid(tx.id)}>
                           {isIncome ? 'Receber' : 'Pagar'}
                         </Button>
                       )}
-                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => openEditTransaction(tx)} title="Editar">
+                      <Button disabled={!canEdit} size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => openEditTransaction(tx)} title="Editar">
                         <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => deleteTransaction(tx.id)} title="Excluir">
+                      <Button disabled={!canEdit} size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => deleteTransaction(tx.id)} title="Excluir">
                         <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>
                     </div>
@@ -1462,6 +1479,7 @@ export default function FinancePage() {
                         </Badge>
                       </div>
                       <Button
+                        disabled={!canEdit}
                         size="sm"
                         className={`h-8 text-xs rounded-full ml-1 shrink-0 ${
                           isIncome ? 'bg-success hover:bg-success/90 text-success-foreground' : 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
@@ -1615,10 +1633,10 @@ export default function FinancePage() {
     return (
       <div className="space-y-4">
         <div className="flex gap-2 flex-wrap">
-          <Button className="gradient-primary border-0 text-primary-foreground" onClick={() => { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' }); setBankDialogOpen(true); }}>
+          <Button disabled={!canCreate} className="gradient-primary border-0 text-primary-foreground" onClick={() => { setEditingBankId(null); setBankForm({ name: '', bank_name: '', account_type: 'corrente', agency: '', account_number: '', initial_balance: 0, current_balance: 0, color: '#3B82F6' }); setBankDialogOpen(true); }}>
             <Building2 className="h-4 w-4 mr-2" /> Nova Conta
           </Button>
-          <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
+          <Button disabled={!canCreate} variant="outline" onClick={() => setTransferDialogOpen(true)}>
             <ArrowRightLeft className="h-4 w-4 mr-2" /> Transferir
           </Button>
         </div>
@@ -1652,10 +1670,10 @@ export default function FinancePage() {
                   );
                 })()}
                 <div className="flex gap-2 pt-2 border-t border-border">
-                  <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => openEditBank(acc)}>
+                  <Button disabled={!canEdit} size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => openEditBank(acc)}>
                     <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
                   </Button>
-                  <Button size="sm" variant="outline" className="flex-1 h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30" onClick={() => deleteBankConfirm(acc.id)}>
+                  <Button disabled={!canDelete} size="sm" variant="outline" className="flex-1 h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30" onClick={() => deleteBankConfirm(acc.id)}>
                     <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Excluir
                   </Button>
                 </div>
@@ -1782,7 +1800,7 @@ export default function FinancePage() {
           <Button variant="outline" onClick={() => setReportOpen(true)}>
             <FileBarChart className="h-4 w-4 mr-2" /> Relatório
           </Button>
-          <Button data-tour="fin-new" className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
+          <Button disabled={!canCreate} data-tour="fin-new" className="gradient-primary shadow-primary border-0" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Novo Lançamento
           </Button>
         </div>
@@ -1881,9 +1899,9 @@ export default function FinancePage() {
 
       {/* Dialogs */}
       <TransactionDialog
-        open={dialogOpen}
+        open={dialogOpen && (editingTransaction ? canEdit : canCreate)}
         onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditingTransaction(null); }}
-        userId={user!.id}
+        userId={user?.id ?? ''}
         clients={clients}
         bankAccounts={bankAccountsWithBalance}
         budgets={budgetsList}
@@ -1899,6 +1917,7 @@ export default function FinancePage() {
         clients={clients}
         budgets={budgetsList}
         onMarkPaid={(id) => {
+          if (!canEdit) return;
           const tx = transactions.find(t => t.id === id);
           if (tx) setPaymentTx(tx);
           setDetailTx(null);

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Decimal from 'decimal.js';
 import { formatBRL } from '@/lib/format';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export interface DetailTx {
   id: string;
@@ -63,6 +64,7 @@ interface Group {
 export default function ReceivableDetailDialog({
   open, onOpenChange, selectedTx, allTransactions, clients, budgets, onMarkPaid,
 }: Props) {
+  const { can } = usePermissions();
   const today = new Date().toISOString().slice(0, 10);
 
   const { groups, totals, selectedGroupKey } = useMemo(() => {
@@ -84,7 +86,7 @@ export default function ReceivableDetailDialog({
     for (const t of sameType) {
       const k = keyOf(t);
       if (!groupsMap.has(k)) groupsMap.set(k, []);
-      groupsMap.get(k)!.push(t);
+      groupsMap.get(k)?.push(t);
     }
 
     const selKey = keyOf(selectedTx);
@@ -353,7 +355,7 @@ export default function ReceivableDetailDialog({
                                   }`}>
                                     {isOverdue && !isPaid ? 'Vencido' : STATUS_LABELS[t.status]}
                                   </Badge>
-                                  {!isPaid && (
+                                  {can('finance.edit') && !isPaid && (
                                     <Button
                                       size="sm"
                                       variant="outline"
