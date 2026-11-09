@@ -146,6 +146,9 @@ export default function BudgetWizardDialog({
 
   // Tab 6: Precificação
   const [margin, setMargin] = useState(40);
+  // Preço fechado (ex.: vindo do Orçamentista IA) — preserva o valor cheio ao editar
+  const [fixedPrice, setFixedPrice] = useState<number>(0);
+  const [aiSnapshot, setAiSnapshot] = useState<any>(null);
   const [discountPct, setDiscountPct] = useState(0);
   const [complexityFactor, setComplexityFactor] = useState('1.0');
   const [materialMultiplier, setMaterialMultiplier] = useState<number>(1);
@@ -198,6 +201,7 @@ export default function BudgetWizardDialog({
     setUseAdvancedPayment(false); setSimplePaymentMethod(DEFAULT_PAYMENT_TEXT);
     setDownPayment(0); setInstallments(1); setInstallmentMethod('credit'); setCardFeePercent(0); setCardFeeInPrice(false);
     setClientDescription('');
+    setFixedPrice(0); setAiSnapshot(null);
   }
 
   async function loadFromBudget(b: Budget) {
@@ -228,6 +232,8 @@ export default function BudgetWizardDialog({
     );
     setPaymentSchedule(Array.isArray(meta.paymentSchedule) ? meta.paymentSchedule : []);
     setDiscountPct(Number(meta.discountPct) || 0);
+    setFixedPrice(Number(meta.fixedPrice) || 0);
+    setAiSnapshot(meta.aiSnapshot ?? null);
     setIncludeOverhead(meta.includeOverhead !== false);
     setClientNotes(meta.clientNotes || '');
     if (meta.projectDate) setProjectDate(meta.projectDate);
@@ -296,10 +302,12 @@ export default function BudgetWizardDialog({
     const priceAfterDiscount = priceBeforeDiscount.times(D(1).minus(D(discountPct).div(100)));
     // Taxa do cartão de crédito embutida no preço (repassada ao cliente)
     const feePct = cardFeeInPrice ? D(cardFeePercent).div(100) : D(0);
-    const finalPrice = feePct.gt(0) && feePct.lt(0.9)
-      ? priceAfterDiscount.div(D(1).minus(feePct))
-      : priceAfterDiscount;
-    const cardFeeInPriceAmount = finalPrice.minus(priceAfterDiscount);
+    const finalPrice = fixedPrice > 0
+      ? D(fixedPrice)
+      : feePct.gt(0) && feePct.lt(0.9)
+        ? priceAfterDiscount.div(D(1).minus(feePct))
+        : priceAfterDiscount;
+    const cardFeeInPriceAmount = fixedPrice > 0 ? D(0) : finalPrice.minus(priceAfterDiscount);
     const realProfit = finalPrice.minus(totalCost).minus(cardFeeInPriceAmount);
     const realMarginPct = totalCost.gt(0) ? realProfit.div(totalCost).times(100) : D(0);
     const minMargin = Number(companySettings?.min_margin ?? 20);
@@ -319,9 +327,9 @@ export default function BudgetWizardDialog({
       realProfit: realProfit.toNumber(),
       realMarginPct: realMarginPct.toNumber(),
       minMargin,
-      isBelowMin: totalCost.gt(0) && realMarginPct.lt(minMargin),
+      isBelowMin: fixedPrice <= 0 && totalCost.gt(0) && realMarginPct.lt(minMargin),
     };
-  }, [items, useParametric, moduleResult, extraTaxes, extraFreight, extraOther,
+  }, [fixedPrice, items, useParametric, moduleResult, extraTaxes, extraFreight, extraOther,
       complexityFactor, finishType, includeOverhead, overheadPerProject,
       margin, discountPct, companySettings, materialMultiplier, cardFeeInPrice, cardFeePercent]);
 
@@ -437,6 +445,8 @@ export default function BudgetWizardDialog({
       salespersonId: sellerId || null,
       productionDays, commissionPctOverride,
       paymentSchedule,
+      fixedPrice: fixedPrice > 0 ? fixedPrice : undefined,
+      aiSnapshot: aiSnapshot ?? undefined,
     };
     const cleaned = (projectNotes || '').replace(META_RE, '').trim();
     return `${cleaned}\n<!--BUDGET_META:${JSON.stringify(meta)}-->`.trim();
@@ -1518,6 +1528,28 @@ export default function BudgetWizardDialog({
                     <div className="border-t border-border/60 pt-3 mt-3 flex items-end justify-between">
                       <span className="text-sm uppercase tracking-wider text-muted-foreground">Preço Final</span>
                       <span className="font-display text-3xl font-bold text-gold tabular-nums">{formatBRL(calc.finalPrice)}</span>
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      <label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        Preço fechado {aiSnapshot ? '(Orçamentista IA)' : ''}
+                      </label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number" inputMode="decimal" step="0.01"
+                          value={fixedPrice || ''}
+                          placeholder="Calcular pelo custo e margem"
+                          onFocus={e => e.target.select()}
+                          onChange={e => setFixedPrice(Number(e.target.value) || 0)}
+                        />
+                        {fixedPrice > 0 && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => setFixedPrice(0)}>
+                            Recalcular
+                          </Button>
+                        )}
+                      </div>
+                      {fixedPrice > 0 && (
+                        <p className="text-[11px] text-muted-foreground">Valor cheio mantido. Clique em Recalcular para usar custo + margem.</p>
+                      )}
                     </div>
                     {calc.isBelowMin && (
                       <p className="text-xs text-destructive mt-2 flex items-center gap-1">
