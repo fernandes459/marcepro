@@ -31,6 +31,7 @@ import { computeSnapshot, periodFromKey } from '@/engines/FinancialEngine';
 import { computeFunnel } from '@/engines/MetricsEngine';
 import OpenPipelinePanel from '@/components/budget/OpenPipelinePanel';
 import OrcamentistaProDialog from '@/components/budget/OrcamentistaProDialog';
+import ProjectRooms from '@/components/budget/ProjectRooms';
 
 
 interface BudgetWithClient extends Budget {
@@ -844,7 +845,11 @@ export default function BudgetsPage() {
                                 <TabsList className="mb-4">
                                   <TabsTrigger value="dre" className="text-xs gap-1.5"><BarChart3 className="h-3.5 w-3.5" /> Saúde Financeira</TabsTrigger>
                                   <TabsTrigger value="milestones" className="text-xs gap-1.5"><Milestone className="h-3.5 w-3.5" /> Marcos de Pagamento</TabsTrigger>
+                                  <TabsTrigger value="rooms" className="text-xs gap-1.5"><Hammer className="h-3.5 w-3.5" /> Ambientes</TabsTrigger>
                                 </TabsList>
+                                <TabsContent value="rooms">
+                                  <ProjectRooms budgetId={b.id} finalPrice={b.final_price} />
+                                </TabsContent>
                                 <TabsContent value="dre">
                                   <ContractDRE budgetId={b.id} finalPrice={b.final_price} totalCost={b.total_cost} profitMargin={b.profit_margin} />
                                 </TabsContent>
