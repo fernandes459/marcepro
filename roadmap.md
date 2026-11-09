@@ -7,3 +7,6 @@
 - [x] Executar 19 testes e verificar navegação autenticada e rejeições de segurança.
 
 Limite da verificação: nenhum pagamento real foi registrado para não alterar os registros financeiros; concorrência e persistência de pagamentos novos precisam de ambiente isolado de testes.
+# Fase 4 — Projetos com ambientes
+
+- [x] Ambientes por orçamento (nome, valor, etapa, prazo), importação dos itens e atualização em tempo real.
