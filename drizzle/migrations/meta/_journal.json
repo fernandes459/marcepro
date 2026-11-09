@@ -36,6 +36,13 @@
       "when": 1794057691717,
       "tag": "0004_atomic_idempotent_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794233700988,
+      "tag": "0005_create_project_rooms",
+      "breakpoints": true
     }
   ]
 }

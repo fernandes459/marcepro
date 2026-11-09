@@ -1477,6 +1477,59 @@ export type Database = {
           },
         ]
       }
+      project_rooms: {
+        Row: {
+          budget_id: string
+          company_id: string | null
+          created_at: string
+          due_date: string | null
+          id: string
+          name: string
+          notes: string | null
+          sort_order: number
+          status: string
+          updated_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          budget_id: string
+          company_id?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          sort_order?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+          value?: number
+        }
+        Update: {
+          budget_id?: string
+          company_id?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          sort_order?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_rooms_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       region_pricing: {
         Row: {
           active: boolean
