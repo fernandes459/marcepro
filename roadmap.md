@@ -12,6 +12,8 @@ Limite da verificação: nenhum pagamento real foi registrado para não alterar 
 - [x] Ambientes por orçamento (nome, valor, etapa, prazo), importação dos itens e atualização em tempo real.
 
 # Orçamento IA — Continuação
-- [ ] Salvar análise completa, parâmetros e preço integral da IA; preservar ao reabrir e editar.
-- [ ] Unificar materiais e ferragens no projeto e na proposta, sem preços de insumos somados à venda.
-- [ ] Testar persistência, valor e proposta no navegador.
+- [x] Salvar análise completa, parâmetros e preço integral da IA; preservar ao reabrir e editar.
+- [x] Unificar materiais e ferragens no projeto e na proposta, sem preços de insumos somados à venda.
+- [x] Testar persistência, valor e proposta no navegador: orçamento existente e rascunho temporário removido após teste; quatro testes automáticos passaram.
+
+Limites: análises antigas que nunca foram gravadas não podem ser recuperadas; anexos preservam identificação, não os arquivos originais. A geração externa da IA não foi repetida nesta conferência.
