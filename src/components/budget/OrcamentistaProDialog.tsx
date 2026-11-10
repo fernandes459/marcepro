@@ -508,7 +508,7 @@ export default function OrcamentistaProDialog() {
       if (error || !budget) throw new Error(error?.message || 'Falha ao criar orçamento');
 
       const { error: itemsError } = await supabase.from('budget_items').insert(
-        saved.items.map(({ unit, ...item }) => ({ ...item, budget_id: budget.id })) as any,
+        saved.storageItems.map(({ unit, ...item }) => ({ ...item, budget_id: budget.id })) as any,
       );
       if (itemsError) {
         await supabase.from('budgets').delete().eq('id', budget.id);

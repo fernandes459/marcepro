@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAiBudget, readBudgetMeta, savedBudgetPrice, unifyAiItems } from './ai-budget';
+import { buildAiBudget, readBudgetMeta, savedBudgetPrice, unifyAiItems, restoreAiQuantities } from './ai-budget';
 import { computeCosts } from './orcamento-costs';
 
 const inputs = { comissao: 5, montador: 3, impostos: 2, cartao: 4, prazoDias: 20, material: 'MDF', specs: { Corrediças: 'Soft-close' } };
@@ -16,6 +16,8 @@ describe('AI budget persistence', () => {
     const draft = buildAiBudget(result, 8803.88, costs, inputs);
     expect(draft.items.reduce((sum, item) => sum + Math.round(item.unit_price * item.quantity * 100), 0)).toBe(880388);
     expect(draft.items[3].quantity).toBe(0.5);
+    expect(draft.storageItems[3]).toMatchObject({ quantity: 1, material_cost: 100 });
+    expect(restoreAiQuantities(draft.storageItems, readBudgetMeta(draft.notes))[3].quantity).toBe(0.5);
     expect(draft.items[4]).toMatchObject({ name: 'Dobradiça soft-close', unit_price: 0, room_label: 'Cozinha' });
     expect(draft.totalCost).toBe(1357.54);
   });

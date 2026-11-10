@@ -1,5 +1,5 @@
 import { formatBRL } from '@/lib/format';
-import { readBudgetMeta } from '@/lib/ai-budget';
+import { readBudgetMeta, restoreAiQuantities } from '@/lib/ai-budget';
 
 export interface BudgetPdfItem {
   name: string;
@@ -411,6 +411,7 @@ ${data.notes ? `
 }
 
 export function generateBudgetPdf(data: BudgetPdfData): void {
+  data = { ...data, items: restoreAiQuantities(data.items, readBudgetMeta(data.notes)) };
   const mode: 'client' | 'internal' = data.mode ?? (data.simplified ? 'client' : 'internal');
   const html = mode === 'client' ? renderClientPdf(data) : renderInternalPdf(data);
 

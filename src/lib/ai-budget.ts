@@ -22,6 +22,12 @@ export function unifyAiItems<T extends { room_label?: string | null; unit_price:
   return items.map(item => !item.room_label || ['Geral', 'Ferragens'].includes(item.room_label)
     ? { ...item, room_label: firstRoom, unit_price: 0 } : item);
 }
+export function restoreAiQuantities<T extends { name: string; room_label?: string | null; quantity: number; material_cost?: number; unit_price: number }>(items: T[], meta: Record<string, any>): T[] {
+  return items.map(item => {
+    const exact = meta.fractionalItems?.find((entry: any) => entry.name === item.name && entry.room_label === item.room_label);
+    return exact ? { ...item, quantity: exact.quantity, material_cost: exact.material_cost, unit_price: exact.unit_price } : item;
+  });
+}
 export function buildAiBudget(result: any, salePrice: number, costs: CostBreakdown, inputs: Record<string, any>) {
   const price = d(salePrice).toDecimalPlaces(2);
   const variablePct = d(inputs.comissao).plus(inputs.montador).plus(inputs.impostos).plus(inputs.cartao);
@@ -48,12 +54,17 @@ export function buildAiBudget(result: any, salePrice: number, costs: CostBreakdo
   const meta = {
     fixedPrice: price.toNumber(), priceMode: 'fixed', unifiedProposal: true,
     environments: names, itemUnits: items.map(i => i.unit), includeOverhead: false,
+    fractionalItems: items.filter(i => !Number.isInteger(i.quantity)),
     extraOther: totalCost.minus(materialCost).toNumber(), extraFreight: 0, extraTaxes: 0,
     productionDays: Number(inputs.prazoDias) || 0, commissionPctOverride: Number(inputs.comissao) || 0,
     cardFeePercent: Number(inputs.cartao) || 0,
     aiSnapshot: { version: 1, result, inputs, costs: { ...costs, venda: price.toNumber(), variaveis: variableCost.toNumber(), custoTotal: totalCost.toNumber(), lucroLiquido: price.minus(totalCost).toNumber() } },
   };
-  return { price: price.toNumber(), totalCost: totalCost.toNumber(), items, meta,
+  const storageItems = items.map(item => Number.isInteger(item.quantity) ? item : {
+    ...item, quantity: 1, material_cost: d(item.material_cost).times(item.quantity).toNumber(),
+    unit_price: d(item.unit_price).times(item.quantity).toNumber(),
+  });
+  return { price: price.toNumber(), totalCost: totalCost.toNumber(), items, storageItems, meta,
     notes: `${result.recomendacao_comercial?.justificativa || ''}\n<!--BUDGET_META:${JSON.stringify(meta)}-->`,
     margin: totalCost.gt(0) ? price.minus(totalCost).div(totalCost).times(100).toDecimalPlaces(2).toNumber() : 0 };
 }

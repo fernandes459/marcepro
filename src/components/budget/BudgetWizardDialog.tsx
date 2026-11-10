@@ -23,7 +23,7 @@ import { CurrencyInput } from '@/components/CurrencyInput';
 import ClientPicker from './ClientPicker';
 import ModuleConfigurator, { ModuleConfig, ModuleResult } from './ModuleConfigurator';
 import { AISuggestPricing } from './AISuggestPricing';
-import { BUDGET_META_RE, readBudgetMeta, savedBudgetPrice, unifyAiItems } from '@/lib/ai-budget';
+import { BUDGET_META_RE, readBudgetMeta, savedBudgetPrice, unifyAiItems, restoreAiQuantities } from '@/lib/ai-budget';
 import AiBudgetDetails from './AiBudgetDetails';
 import { findBestMatch, normalizeMaterialName } from '@/lib/material-match';
 
@@ -264,7 +264,7 @@ export default function BudgetWizardDialog({
     const { data: bItems } = await supabase
       .from('budget_items').select('*').eq('budget_id', b.id);
     const itemUnits: string[] = Array.isArray(meta.itemUnits) ? meta.itemUnits : [];
-    const sourceItems = b.source === 'Orçamentista IA' ? unifyAiItems(bItems || []) : (bItems || []);
+    const sourceItems = b.source === 'Orçamentista IA' ? restoreAiQuantities(unifyAiItems(bItems || []), meta) : (bItems || []);
     const loaded: BudgetItem[] = sourceItems.map((i: any, idx: number) => ({
       name: i.name ?? '',
       quantity: Number(i.quantity) || 1,
@@ -454,6 +454,7 @@ export default function BudgetWizardDialog({
       paymentSchedule,
       fixedPrice: fixedPrice > 0 ? fixedPrice : undefined,
       aiSnapshot: aiSnapshot ?? undefined,
+      fractionalItems: items.filter(i => !Number.isInteger(i.quantity)).map(i => ({ name: i.name, room_label: i.roomLabel, quantity: i.quantity, material_cost: i.materialCost, unit_price: i.unitPrice })),
     };
     const cleaned = (projectNotes || '').replace(META_RE, '').trim();
     return `${cleaned}\n<!--BUDGET_META:${JSON.stringify(meta)}-->`.trim();
@@ -522,10 +523,10 @@ export default function BudgetWizardDialog({
       .map(i => ({
         budget_id: budgetId,
         name: i.name,
-        quantity: i.quantity,
-        material_cost: i.materialCost,
-        labor_cost: i.laborCost,
-        unit_price: i.unitPrice,
+        quantity: Number.isInteger(i.quantity) ? i.quantity : 1,
+        material_cost: Number.isInteger(i.quantity) ? i.materialCost : new Decimal(i.materialCost).times(i.quantity).toNumber(),
+        labor_cost: Number.isInteger(i.quantity) ? i.laborCost : new Decimal(i.laborCost).times(i.quantity).toNumber(),
+        unit_price: Number.isInteger(i.quantity) ? i.unitPrice : new Decimal(i.unitPrice).times(i.quantity).toNumber(),
         room_label: i.roomLabel?.trim() || null,
       }));
     if (insertable.length > 0) {
