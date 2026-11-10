@@ -10,3 +10,8 @@ Limite da verificação: nenhum pagamento real foi registrado para não alterar 
 # Fase 4 — Projetos com ambientes
 
 - [x] Ambientes por orçamento (nome, valor, etapa, prazo), importação dos itens e atualização em tempo real.
+
+# Orçamento IA — Continuação
+- [ ] Salvar análise completa, parâmetros e preço integral da IA; preservar ao reabrir e editar.
+- [ ] Unificar materiais e ferragens no projeto e na proposta, sem preços de insumos somados à venda.
+- [ ] Testar persistência, valor e proposta no navegador.
