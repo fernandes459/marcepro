@@ -23,6 +23,8 @@ import { CurrencyInput } from '@/components/CurrencyInput';
 import ClientPicker from './ClientPicker';
 import ModuleConfigurator, { ModuleConfig, ModuleResult } from './ModuleConfigurator';
 import { AISuggestPricing } from './AISuggestPricing';
+import { BUDGET_META_RE, readBudgetMeta, savedBudgetPrice, unifyAiItems, restoreAiQuantities } from '@/lib/ai-budget';
+import AiBudgetDetails from './AiBudgetDetails';
 import { findBestMatch, normalizeMaterialName } from '@/lib/material-match';
 
 // ----------- TYPES -----------
@@ -90,7 +92,7 @@ const PROJECT_TYPES = [
 const TAB_ORDER = ['cliente', 'projeto', 'ambientes', 'modulos', 'operacional', 'precificacao', 'resumo'] as const;
 type TabKey = typeof TAB_ORDER[number];
 
-const META_RE = /\n?<!--BUDGET_META:(.*?)-->\n?/s;
+const META_RE = BUDGET_META_RE;
 
 export default function BudgetWizardDialog({
   open, onOpenChange, clients, employees, materialCatalog, companySettings,
@@ -178,6 +180,7 @@ export default function BudgetWizardDialog({
 
   // auto card fee from settings
   useEffect(() => {
+    if (editingBudget?.source === 'Orçamentista IA') return;
     if (installmentMethod === 'credit' && companySettings) {
       const fees = (companySettings as any).card_fees || {};
       const autoFee = fees[String(installments)];
@@ -185,7 +188,7 @@ export default function BudgetWizardDialog({
     } else if (installmentMethod !== 'credit') {
       setCardFeePercent(0);
     }
-  }, [installments, installmentMethod, companySettings]);
+  }, [installments, installmentMethod, companySettings, editingBudget?.source]);
 
   function resetAll() {
     setSelectedClientId(''); setClientNotes(''); setLeadSource('');
@@ -232,7 +235,7 @@ export default function BudgetWizardDialog({
     );
     setPaymentSchedule(Array.isArray(meta.paymentSchedule) ? meta.paymentSchedule : []);
     setDiscountPct(Number(meta.discountPct) || 0);
-    setFixedPrice(Number(meta.fixedPrice) || 0);
+    setFixedPrice(savedBudgetPrice(b));
     setAiSnapshot(meta.aiSnapshot ?? null);
     setIncludeOverhead(meta.includeOverhead !== false);
     setClientNotes(meta.clientNotes || '');
@@ -261,7 +264,8 @@ export default function BudgetWizardDialog({
     const { data: bItems } = await supabase
       .from('budget_items').select('*').eq('budget_id', b.id);
     const itemUnits: string[] = Array.isArray(meta.itemUnits) ? meta.itemUnits : [];
-    const loaded: BudgetItem[] = (bItems || []).map((i: any, idx: number) => ({
+    const sourceItems = b.source === 'Orçamentista IA' ? restoreAiQuantities(unifyAiItems(bItems || []), meta) : (bItems || []);
+    const loaded: BudgetItem[] = sourceItems.map((i: any, idx: number) => ({
       name: i.name ?? '',
       quantity: Number(i.quantity) || 1,
       unitPrice: Number(i.unit_price) || 0,
@@ -435,6 +439,9 @@ export default function BudgetWizardDialog({
 
   function buildNotesWithMeta() {
     const meta = {
+      ...readBudgetMeta(editingBudget?.notes),
+      priceMode: fixedPrice > 0 ? 'fixed' : 'calculated',
+      unifiedProposal: editingBudget?.source === 'Orçamentista IA' || readBudgetMeta(editingBudget?.notes).unifiedProposal === true,
       extraTaxes, extraFreight, extraOther, discountPct,
       useAdvancedPayment, downPayment, downPaymentMethod,
       installments, installmentMethod, cardFeePercent, cardFeeInPrice,
@@ -447,6 +454,7 @@ export default function BudgetWizardDialog({
       paymentSchedule,
       fixedPrice: fixedPrice > 0 ? fixedPrice : undefined,
       aiSnapshot: aiSnapshot ?? undefined,
+      fractionalItems: items.filter(i => !Number.isInteger(i.quantity)).map(i => ({ name: i.name, room_label: i.roomLabel, quantity: i.quantity, material_cost: i.materialCost, unit_price: i.unitPrice })),
     };
     const cleaned = (projectNotes || '').replace(META_RE, '').trim();
     return `${cleaned}\n<!--BUDGET_META:${JSON.stringify(meta)}-->`.trim();
@@ -515,10 +523,10 @@ export default function BudgetWizardDialog({
       .map(i => ({
         budget_id: budgetId,
         name: i.name,
-        quantity: i.quantity,
-        material_cost: i.materialCost,
-        labor_cost: i.laborCost,
-        unit_price: i.unitPrice,
+        quantity: Number.isInteger(i.quantity) ? i.quantity : 1,
+        material_cost: Number.isInteger(i.quantity) ? i.materialCost : new Decimal(i.materialCost).times(i.quantity).toNumber(),
+        labor_cost: Number.isInteger(i.quantity) ? i.laborCost : new Decimal(i.laborCost).times(i.quantity).toNumber(),
+        unit_price: Number.isInteger(i.quantity) ? i.unitPrice : new Decimal(i.unitPrice).times(i.quantity).toNumber(),
         room_label: i.roomLabel?.trim() || null,
       }));
     if (insertable.length > 0) {
@@ -1511,6 +1519,8 @@ export default function BudgetWizardDialog({
                       </div>
                     </div>
                   )}
+
+                  {aiSnapshot && <AiBudgetDetails snapshot={aiSnapshot} />}
 
                   {/* Totais financeiros */}
                   <div className="card-premium rounded-2xl p-4 sm:p-5 space-y-2">
