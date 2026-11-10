@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/format';
+import { buildAiBudget } from '@/lib/ai-budget';
+import { generateBudgetPdf } from '@/components/finance/BudgetPdfGenerator';
 import { computeCosts, vendaForMargin, type CostBreakdown } from '@/lib/orcamento-costs';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import ClientPicker, { type ClientLite } from '@/components/budget/ClientPicker';
@@ -477,16 +479,15 @@ export default function OrcamentistaProDialog() {
         clientIdFinal = created?.id ?? null;
       }
 
-      const custo = costs?.custoTotal || n(result.custos?.total);
-      const margem = custo > 0 ? ((preco - custo) / custo) * 100 : 0;
-
-      // Rateio do preço entre os ambientes (por área) para o PDF do cliente sair preenchido
-      const ambientesArr = (result.ambientes || []) as any[];
-      const ambienteNomes = ambientesArr.map((a: any) => a?.nome).filter(Boolean);
-      const areaTotal = ambientesArr.reduce((s, a) => s + n(a.area_m2), 0);
-      const valorAmbiente = (a: any) =>
-        areaTotal > 0 ? (n(a.area_m2) / areaTotal) * preco : preco / Math.max(1, ambientesArr.length);
-
+      if (!costs) throw new Error('Composição de custos indisponível.');
+      const saved = buildAiBudget(result, preco, costs, {
+        empresa, cliente, cidade, estado, padrao, material, margemDesejada: n(margemDesejada),
+        prazoDias: n(prazoDias), custoDiario: n(custoDiario), funcionarios: n(funcionarios),
+        comissao: n(comissao), montador: n(montador), impostos: n(impostos), cartao: n(cartao),
+        frete: n(frete), perda: n(perda), socios, specs, questions, answersQ, notes,
+        attachments: files.map(({ name, mime, size }) => ({ name, mime, size })),
+      });
+      const ambienteNomes = saved.meta.environments;
 
       const { data: budget, error } = await supabase.from('budgets').insert({
         user_id: user.id,
@@ -497,34 +498,21 @@ export default function OrcamentistaProDialog() {
           ? `Projeto de ${ambienteNomes.join(' + ')}`
           : `${padrao} · ${material} — ${cliente.trim()}`,
         client_description: result.resumo_executivo?.material || material,
-        total_cost: custo,
-        profit_margin: Number(margem.toFixed(2)),
-        final_price: preco,
+        total_cost: saved.totalCost,
+        profit_margin: saved.margin,
+        final_price: saved.price,
         finish_type: padrao,
         source: 'Orçamentista IA',
-        notes: (result.recomendacao_comercial?.justificativa || '').slice(0, 1000),
+        notes: saved.notes,
       } as any).select('id').single();
       if (error || !budget) throw new Error(error?.message || 'Falha ao criar orçamento');
 
-      const itens = [
-        ...ambientesArr.map((a: any) => ({
-          name: a.descricao || a.nome || 'Ambiente', quantity: 1,
-          material_cost: 0, labor_cost: 0,
-          unit_price: Number(valorAmbiente(a).toFixed(2)),
-          room_label: a.nome || 'Projeto',
-        })),
-        ...(result.materiais || []).map((m: any) => ({
-          name: m.descricao || 'Material', quantity: Math.max(1, Math.round(n(m.quantidade)) || 1),
-          material_cost: n(m.valor_unitario), labor_cost: 0, unit_price: n(m.valor_unitario), room_label: null,
-        })),
-        ...(result.ferragens || []).map((f: any) => ({
-          name: f.item || 'Ferragem', quantity: Math.max(1, Math.round(n(f.quantidade)) || 1),
-          material_cost: n(f.valor_unitario), labor_cost: 0, unit_price: n(f.valor_unitario), room_label: 'Ferragens',
-        })),
-      ].filter(i => i.name.trim());
-
-      if (itens.length) {
-        await supabase.from('budget_items').insert(itens.map(i => ({ ...i, budget_id: budget.id })) as any);
+      const { error: itemsError } = await supabase.from('budget_items').insert(
+        saved.items.map(({ unit, ...item }) => ({ ...item, budget_id: budget.id })) as any,
+      );
+      if (itemsError) {
+        await supabase.from('budgets').delete().eq('id', budget.id);
+        throw new Error(`Falha ao salvar os itens: ${itemsError.message}`);
       }
 
       toast.success('Orçamento criado e enviado para o pipeline "Em Aberto"');
@@ -543,116 +531,21 @@ export default function OrcamentistaProDialog() {
 
   const exportPdf = () => {
     if (!result) return;
-    const r = result;
-    const rows = (arr: any[], cols: string[]) =>
-      (arr || []).map(i => `<tr>${cols.map(c => `<td>${
-        typeof i[c] === 'number' && /valor|total|unitario/.test(c) ? formatBRL(i[c]) : (i[c] ?? '—')
-      }</td>`).join('')}</tr>`).join('');
-
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Orçamento ${cliente}</title>
-    <style>
-      *{box-sizing:border-box} body{font-family:Georgia,serif;color:#2b2b2b;margin:0;padding:0}
-      .capa{height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:#36454F;color:#fff;page-break-after:always}
-      .capa h1{font-size:42px;margin:0;letter-spacing:2px}
-      .capa .gold{color:#B8860B;font-size:16px;letter-spacing:6px;text-transform:uppercase;margin-bottom:24px}
-      .capa p{margin:4px 0;font-size:16px}
-      .page{padding:40px 48px}
-      h2{color:#36454F;border-bottom:2px solid #B8860B;padding-bottom:6px;font-size:18px;margin-top:28px}
-      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
-      th{background:#36454F;color:#fff;text-align:left;padding:6px 8px}
-      td{border-bottom:1px solid #e3e3e3;padding:6px 8px}
-      .kpis{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
-      .kpi{border:1px solid #ddd;border-left:4px solid #B8860B;padding:10px 14px;min-width:150px}
-      .kpi span{display:block;font-size:10px;text-transform:uppercase;color:#777}
-      .kpi b{font-size:16px}
-      .obs{font-size:11px;color:#666;margin-top:20px}
-      @media print{.no-print{display:none}}
-    </style></head><body>
-    <div class="capa">
-      <div class="gold">${empresa}</div>
-      <h1>ORÇAMENTO DE MARCENARIA</h1>
-      <p><b>Cliente:</b> ${cliente}</p>
-      <p><b>Local:</b> ${cidade}/${estado}</p>
-      <p><b>Padrão:</b> ${padrao} · <b>Material:</b> ${material}</p>
-      <p><b>Prazo:</b> ${prazoDias} dias</p>
-      <p>${new Date().toLocaleDateString('pt-BR')}</p>
-    </div>
-    <div class="page">
-      <h2>Resumo Executivo</h2>
-      <div class="kpis">
-        <div class="kpi"><span>Material + ferragens</span><b>${formatBRL((costs?.material || 0) + (costs?.ferragens || 0))}</b></div>
-        <div class="kpi"><span>Mão de obra + overhead</span><b>${formatBRL((costs?.maoObra || 0) + (costs?.overhead || 0))}</b></div>
-        ${isFW ? `<div class="kpi"><span>Estrutura (10%)</span><b>${formatBRL(costs?.estrutura || 0)}</b></div>` : ''}
-        <div class="kpi"><span>Comissão vendedor</span><b>${formatBRL(costs?.comissao || 0)}</b></div>
-        <div class="kpi"><span>Montagem/instalação</span><b>${formatBRL(costs?.montador || 0)}</b></div>
-        <div class="kpi"><span>Impostos</span><b>${formatBRL(costs?.impostos || 0)}</b></div>
-        <div class="kpi"><span>Taxa cartão</span><b>${formatBRL(costs?.cartao || 0)}</b></div>
-        <div class="kpi"><span>Custo total</span><b>${formatBRL(costs?.custoTotal || 0)}</b></div>
-        <div class="kpi"><span>Venda</span><b>${formatBRL(vendaOf(r))}</b></div>
-        <div class="kpi"><span>Lucro líquido</span><b>${formatBRL(costs?.lucroLiquido || 0)}</b></div>
-        <div class="kpi"><span>Margem s/ venda</span><b>${(costs?.margemSobreVenda || 0).toFixed(1)}%</b></div>
-      </div>
-
-      <h2>Levantamento Técnico</h2>
-      <table><tbody>
-        <tr><td>Área total</td><td>${n(r.levantamento_tecnico?.area_total_m2).toFixed(2)} m²</td></tr>
-        <tr><td>Chapas</td><td>${n(r.levantamento_tecnico?.chapas)}</td></tr>
-        <tr><td>Aproveitamento</td><td>${n(r.levantamento_tecnico?.aproveitamento_pct)}%</td></tr>
-        <tr><td>Perda técnica</td><td>${n(r.levantamento_tecnico?.perda_tecnica_pct)}%</td></tr>
-        <tr><td>Portas / Gavetas / Prateleiras / Divisórias</td><td>${n(r.levantamento_tecnico?.portas)} / ${n(r.levantamento_tecnico?.gavetas)} / ${n(r.levantamento_tecnico?.prateleiras)} / ${n(r.levantamento_tecnico?.divisorias)}</td></tr>
-        <tr><td>Complexidade</td><td>${r.levantamento_tecnico?.complexidade ?? '—'}</td></tr>
-      </tbody></table>
-
-      <h2>Materiais</h2>
-      <table><thead><tr><th>Descrição</th><th>Qtd</th><th>Un.</th><th>Vlr Unit.</th><th>Total</th></tr></thead>
-      <tbody>${rows(r.materiais, ['descricao', 'quantidade', 'unidade', 'valor_unitario', 'valor_total'])}</tbody></table>
-
-      <h2>Ferragens e Acessórios</h2>
-      <table><thead><tr><th>Item</th><th>Qtd</th><th>Vlr Unit.</th><th>Total</th></tr></thead>
-      <tbody>${rows(r.ferragens, ['item', 'quantidade', 'valor_unitario', 'valor_total'])}</tbody></table>
-
-      <h2>Custo Operacional</h2>
-      <table><tbody>
-        <tr><td>Funcionários</td><td>${n(r.operacional?.funcionarios) || funcionarios}</td></tr>
-        <tr><td>Dias</td><td>${n(r.operacional?.dias) || prazoDias}</td></tr>
-        <tr><td>Custo diário</td><td>${formatBRL(n(r.operacional?.custo_diario) || n(custoDiario))}</td></tr>
-        <tr><td>7% sobre materiais</td><td>${formatBRL(n(r.operacional?.percentual_materiais))}</td></tr>
-        <tr><td><b>Total operacional</b></td><td><b>${formatBRL(n(r.operacional?.total))}</b></td></tr>
-      </tbody></table>
-
-      <h2>Simulação de Venda</h2>
-      <table><tbody>
-        <tr><td>Material × 1</td><td>${formatBRL(n(r.simulacao_venda?.material_1x))}</td></tr>
-        <tr><td>Material × 2</td><td>${formatBRL(n(r.simulacao_venda?.material_2x))}</td></tr>
-        <tr><td>Material × 3</td><td>${formatBRL(n(r.simulacao_venda?.material_3x))}</td></tr>
-        <tr><td>Valor por m²</td><td>${formatBRL(n(r.analise_m2?.valor_por_m2))} (${r.analise_m2?.faixa_referencia ?? '—'})</td></tr>
-        <tr><td>Método mais rentável</td><td>${r.analise_m2?.metodo_mais_rentavel ?? '—'}</td></tr>
-      </tbody></table>
-
-      ${isFW && (r.divisao_socios || []).length ? `<h2>Divisão dos Sócios</h2>
-      <table><thead><tr><th>Sócio</th><th>Participação</th><th>Valor</th></tr></thead>
-      <tbody>${(r.divisao_socios || []).map((s: any) => `<tr><td>${s.nome}</td><td>${n(s.participacao_pct)}%</td><td>${formatBRL(n(s.valor))}</td></tr>`).join('')}</tbody></table>` : ''}
-
-      <h2>Recomendação Comercial</h2>
-      <table><tbody>
-        <tr><td>Preço mínimo</td><td>${formatBRL(n(r.recomendacao_comercial?.preco_minimo))}</td></tr>
-        <tr><td>Preço ideal</td><td>${formatBRL(n(r.recomendacao_comercial?.preco_ideal))}</td></tr>
-        <tr><td>Preço premium</td><td>${formatBRL(n(r.recomendacao_comercial?.preco_premium))}</td></tr>
-        <tr><td><b>Recomendado p/ fechamento</b></td><td><b>${formatBRL(n(r.recomendacao_comercial?.preco_recomendado))}</b></td></tr>
-      </tbody></table>
-      <p class="obs">${r.recomendacao_comercial?.justificativa ?? ''}</p>
-      <p class="obs">${(r.observacoes_tecnicas || []).join(' · ')}</p>
-      <p class="obs">Valores estimados com base em preços médios de mercado.</p>
-    </div>
-    <script>window.onload=()=>window.print()</script>
-    </body></html>`;
-
-    const w = window.open('', '_blank');
-    if (!w) { toast.error('Permita pop-ups para gerar o PDF'); return; }
-    w.document.write(html);
-    w.document.close();
+    if (!costs) return;
+    const saved = buildAiBudget(result, precoFinal, costs, { comissao: n(comissao), montador: n(montador), impostos: n(impostos), cartao: n(cartao), material, notes, prazoDias: n(prazoDias) });
+    const selectedClient = clientsList.find(c => c.id === clientId);
+    generateBudgetPdf({
+      code: 'IA', projectName: `Projeto de ${saved.meta.environments.join(' + ')}`,
+      finalPrice: saved.price, totalCost: saved.totalCost, profitMargin: saved.margin,
+      paymentMethod: null, notes: saved.notes, createdAt: new Date().toISOString(),
+      deliveryDays: n(prazoDias), companyName: empresa, contractClauses: [], mode: 'client',
+      clientDescription: result.resumo_executivo?.material || material,
+      clientPdfOptions: { showItemsList: true, showPaymentTerms: false },
+      client: { name: cliente, phone: selectedClient?.phone || '', email: null, cpf_cnpj: null,
+        address: null, address_number: null, complement: null, neighborhood: null, city: cidade, state: estado, cep: null },
+      items: saved.items,
+    });
   };
-
   const exportXlsx = () => {
     if (!result || !costs) return;
     const r = result;

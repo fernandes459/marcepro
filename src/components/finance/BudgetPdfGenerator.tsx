@@ -1,4 +1,5 @@
 import { formatBRL } from '@/lib/format';
+import { readBudgetMeta } from '@/lib/ai-budget';
 
 export interface BudgetPdfItem {
   name: string;
@@ -75,7 +76,7 @@ function groupByRoom(items: BudgetPdfItem[]) {
   for (const it of items) {
     const key = (it.room_label || 'Geral').trim() || 'Geral';
     if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(it);
+    map.get(key)?.push(it);
   }
   return Array.from(map.entries());
 }
@@ -86,6 +87,7 @@ function groupByRoom(items: BudgetPdfItem[]) {
    =========================================================== */
 function renderClientPdf(data: BudgetPdfData): string {
   const grouped = groupByRoom(data.items);
+  const unified = readBudgetMeta(data.notes).unifiedProposal === true;
   const deliveryDate = addBusinessDays(new Date(data.createdAt), data.deliveryDays);
   const esc = (s: any) => String(s ?? '').replace(/</g, '&lt;');
 
@@ -205,13 +207,13 @@ ${(data.clientPdfOptions?.showDescription ?? true) && data.clientDescription
 ${ambientes.length ? `
 <h2>3. Ambientes contemplados</h2>
 <table>
-  <thead><tr><th>Ambiente</th><th class="num">Investimento</th></tr></thead>
+  <thead><tr><th>Ambiente</th>${unified ? '' : '<th class="num">Investimento</th>'}</tr></thead>
   <tbody>
-    ${scaled.map(({ room, value }) => `<tr><td>${esc(room)}</td><td class="num">${formatBRL(value)}</td></tr>`).join('')}
+    ${scaled.map(({ room, value }) => `<tr><td>${esc(room)}</td>${unified ? '' : `<td class="num">${formatBRL(value)}</td>`}</tr>`).join('')}
   </tbody>
 </table>` : ''}
 
-${(data.clientPdfOptions?.showItemsList ?? false) && data.items.length ? `
+${(unified || (data.clientPdfOptions?.showItemsList ?? false)) && data.items.length ? `
 <h2>Itens detalhados</h2>
 <table>
   <thead><tr><th>Ambiente</th><th>Item</th><th class="num">Qtd</th></tr></thead>
