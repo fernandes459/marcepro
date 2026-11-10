@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAiBudget, readBudgetMeta, savedBudgetPrice } from './ai-budget';
+import { buildAiBudget, readBudgetMeta, savedBudgetPrice, unifyAiItems } from './ai-budget';
 import { computeCosts } from './orcamento-costs';
 
 const inputs = { comissao: 5, montador: 3, impostos: 2, cartao: 4, prazoDias: 20, material: 'MDF', specs: { Corrediças: 'Soft-close' } };
@@ -22,5 +22,10 @@ describe('AI budget persistence', () => {
   it('preserves the price of older AI budgets and supports explicit recalculation', () => {
     expect(savedBudgetPrice({ source: 'Orçamentista IA', final_price: 8803.88 })).toBe(8803.88);
     expect(savedBudgetPrice({ source: 'Orçamentista IA', final_price: 8803.88, notes: '<!--BUDGET_META:{"priceMode":"calculated"}-->' })).toBe(0);
+  });
+  it('unifies legacy hardware with the project instead of selling it twice', () => {
+    expect(unifyAiItems([{ room_label: 'Cozinha', unit_price: 8803.88 }, { room_label: 'Ferragens', unit_price: 250 }])).toEqual([
+      { room_label: 'Cozinha', unit_price: 8803.88 }, { room_label: 'Cozinha', unit_price: 0 },
+    ]);
   });
 });

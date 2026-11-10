@@ -23,7 +23,7 @@ import { CurrencyInput } from '@/components/CurrencyInput';
 import ClientPicker from './ClientPicker';
 import ModuleConfigurator, { ModuleConfig, ModuleResult } from './ModuleConfigurator';
 import { AISuggestPricing } from './AISuggestPricing';
-import { BUDGET_META_RE, readBudgetMeta, savedBudgetPrice } from '@/lib/ai-budget';
+import { BUDGET_META_RE, readBudgetMeta, savedBudgetPrice, unifyAiItems } from '@/lib/ai-budget';
 import AiBudgetDetails from './AiBudgetDetails';
 import { findBestMatch, normalizeMaterialName } from '@/lib/material-match';
 
@@ -264,7 +264,8 @@ export default function BudgetWizardDialog({
     const { data: bItems } = await supabase
       .from('budget_items').select('*').eq('budget_id', b.id);
     const itemUnits: string[] = Array.isArray(meta.itemUnits) ? meta.itemUnits : [];
-    const loaded: BudgetItem[] = (bItems || []).map((i: any, idx: number) => ({
+    const sourceItems = b.source === 'Orçamentista IA' ? unifyAiItems(bItems || []) : (bItems || []);
+    const loaded: BudgetItem[] = sourceItems.map((i: any, idx: number) => ({
       name: i.name ?? '',
       quantity: Number(i.quantity) || 1,
       unitPrice: Number(i.unit_price) || 0,
@@ -440,6 +441,7 @@ export default function BudgetWizardDialog({
     const meta = {
       ...readBudgetMeta(editingBudget?.notes),
       priceMode: fixedPrice > 0 ? 'fixed' : 'calculated',
+      unifiedProposal: editingBudget?.source === 'Orçamentista IA' || readBudgetMeta(editingBudget?.notes).unifiedProposal === true,
       extraTaxes, extraFreight, extraOther, discountPct,
       useAdvancedPayment, downPayment, downPaymentMethod,
       installments, installmentMethod, cardFeePercent, cardFeeInPrice,

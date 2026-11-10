@@ -16,6 +16,12 @@ export function savedBudgetPrice(budget: { notes?: string | null; source?: strin
 }
 
 const d = (value: unknown) => new Decimal(Number(value) || 0);
+export function unifyAiItems<T extends { room_label?: string | null; unit_price: number }>(items: T[]): T[] {
+  const realRooms = items.map(i => i.room_label).filter((label): label is string => Boolean(label) && !['Geral', 'Ferragens'].includes(String(label)));
+  const firstRoom = realRooms[0] || 'Projeto';
+  return items.map(item => !item.room_label || ['Geral', 'Ferragens'].includes(item.room_label)
+    ? { ...item, room_label: firstRoom, unit_price: 0 } : item);
+}
 export function buildAiBudget(result: any, salePrice: number, costs: CostBreakdown, inputs: Record<string, any>) {
   const price = d(salePrice).toDecimalPlaces(2);
   const variablePct = d(inputs.comissao).plus(inputs.montador).plus(inputs.impostos).plus(inputs.cartao);
